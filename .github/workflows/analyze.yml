@@ -35,6 +35,7 @@ jobs:
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          commit_message: "Automated update of holdings and history [skip ci]"
+          commit_message: "Automated update of analysis results [skip ci]"
           file_pattern: 'holdings.json recommendations.csv'
           branch: main
+          push_options: '--force'

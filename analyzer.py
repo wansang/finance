@@ -49,6 +49,48 @@ class StockAnalyzer:
                 summary += f"⚠️ {name}: 데이터 오류\n"
         return summary
 
+    def get_market_sentiment(self):
+        """코스피/코스닥 지수 기반 시장 상태 분석"""
+        indices = {'코스피': 'KS11', '코스닥': 'KQ11'}
+        sentiment_report = "<b>[국내 시장 상태 분석]</b>\n"
+        is_positive = False
+        
+        details = []
+        for name, symbol in indices.items():
+            try:
+                # 최근 40거래일 데이터
+                df = fdr.DataReader(symbol, start=(datetime.datetime.now() - datetime.timedelta(days=60)).strftime('%Y-%m-%d'))
+                df['SMA20'] = df['Close'].rolling(window=20).mean()
+                df['SMA5'] = df['Close'].rolling(window=5).mean()
+                
+                last = df.iloc[-1]
+                prev = df.iloc[-2]
+                
+                # 상태 판별
+                curr_price = last['Close']
+                sma20 = last['SMA20']
+                sma5 = last['SMA5']
+                prev_sma5 = prev['SMA5']
+                
+                status = "보통"
+                emoji = "➡️"
+                
+                if curr_price > sma20 * 1.01 and sma5 > prev_sma5:
+                    status = "<b>우호적</b>"
+                    emoji = "🚀"
+                    is_positive = True
+                elif curr_price < sma20 * 0.99:
+                    status = "주의"
+                    emoji = "⚠️"
+                
+                pct = (curr_price - prev['Close']) / prev['Close'] * 100
+                details.append(f"{emoji} {name}: {curr_price:,.2f} ({pct:+.2f}%) - {status}")
+            except Exception as e:
+                details.append(f"⚠️ {name}: 분석 오류")
+                
+        sentiment_report += "\n".join(details) + "\n"
+        return sentiment_report, is_positive
+
     def get_indicators(self, df, kospi_index=None):
         """기술적 지표 계산 (SMA, RSI, MACD, BB, StochRSI, MFI)"""
         # SMAs for Trend Template
@@ -388,9 +430,8 @@ class StockAnalyzer:
                 continue
         return sell_alerts
 
-    def run(self):
-        print("Starting analysis...")
-        us_summary = self.get_us_market_summary()
+        # 0. 시장 상태 분석
+        sentiment_msg, is_positive = self.get_market_sentiment()
         
         # 1. 새 추천 종목 분석
         recs_msg, recs_raw = self.analyze_kospi()
@@ -398,10 +439,13 @@ class StockAnalyzer:
         # 2. 보유 종목 매도 타이밍 분석
         sell_alerts = self.analyze_holdings()
         
-        report = us_summary
+        report = us_summary + "\n" + sentiment_msg
         
         if sell_alerts:
-            report += "\n<b>[🚨 매도 알림]</b>\n" + "\n".join(sell_alerts) + "\n"
+            advice = ""
+            if is_positive:
+                advice = "\n💡 <i>시장이 우호적이므로 매도 결정을 신중히(분할 매도 등) 하셔도 좋습니다.</i>"
+            report += "\n<b>[🚨 매도 알림]</b>\n" + "\n".join(sell_alerts) + advice + "\n"
             
         report += "\n<b>[코스피 추천 종목]</b>\n"
         if recs_msg:

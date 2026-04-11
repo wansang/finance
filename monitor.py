@@ -19,8 +19,10 @@ class MarketMonitor:
             print("No holdings to monitor.")
             return
 
+        sentiment_msg, is_positive = self.analyzer.get_market_sentiment()
         report = "<b>[🕒 30분 정기 실시간 감시 보고]</b>\n"
         report += f"감시 시간: {datetime.datetime.now().strftime('%H:%M')}\n\n"
+        report += sentiment_msg + "\n"
         
         sell_triggered = False
         status_lines = []
@@ -57,6 +59,8 @@ class MarketMonitor:
                 if triggered:
                     status_emoji = "🚨"
                     action_text = "<b>즉시매도(SELL)</b>"
+                    if is_positive:
+                        action_text += "\n    💡 <i>시장 분위기가 긍정적이므로 분할 매도를 고려해 보세요.</i>"
                     sell_triggered = True
 
                 # HTML 이스케이프 적용 (특수문자 방어)
