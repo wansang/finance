@@ -2,8 +2,8 @@ name: Elite Stock Analysis
 
 on:
   schedule:
-    # Run at 23:30 UTC every day (08:30 KST)
-    - cron: '30 23 * * *'
+    # Run at 23:00 UTC every day (08:00 KST)
+    - cron: '00 23 * * *'
   workflow_dispatch: # Allow manual trigger from GitHub Actions tab
 
 jobs:
@@ -35,6 +35,6 @@ jobs:
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
-          commit_message: "Automated update of holdings [skip ci]"
-          file_pattern: 'holdings.json'
+          commit_message: "Automated update of holdings and history [skip ci]"
+          file_pattern: 'holdings.json recommendations.csv'
           branch: main

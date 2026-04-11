@@ -326,7 +326,7 @@ class StockAnalyzer:
                 msg += f"  - 과거 승률: {r['win_rate']:.1f}% | 평균 수익: {r['avg_ret']:+.1f}%"
                 formatted_recs.append(msg)
             
-        return formatted_recs
+        return formatted_recs, results
 
     def analyze_holdings(self):
         """보유 종목의 매도 타이밍(트레일링 스톱) 분석"""
@@ -357,7 +357,7 @@ class StockAnalyzer:
         us_summary = self.get_us_market_summary()
         
         # 1. 새 추천 종목 분석
-        recs = self.analyze_kospi()
+        recs_msg, recs_raw = self.analyze_kospi()
         
         # 2. 보유 종목 매도 타이밍 분석
         sell_alerts = self.analyze_holdings()
@@ -368,15 +368,46 @@ class StockAnalyzer:
             report += "\n<b>[🚨 매도 알림]</b>\n" + "\n".join(sell_alerts) + "\n"
             
         report += "\n<b>[코스피 추천 종목]</b>\n"
-        if recs:
-            report += "\n".join(recs[:30])
-            if len(recs) > 30:
-                report += f"\n...외 {len(recs)-30}개 종목"
+        if recs_msg:
+            report += "".join(recs_msg[:30])
+            if len(recs_msg) > 30:
+                report += f"\n...외 {len(recs_msg)-30}개 종목"
         else:
             report += "조건에 맞는 종목이 없습니다."
             
+        # 3. 추천 내역 기록 (CSV 저장)
+        self.log_recommendations(recs_raw)
+            
         self.notifier.send_message(report)
         print("Analysis complete and message sent.")
+
+    def log_recommendations(self, results):
+        """추천 결과를 recommendations.csv 파일에 저장"""
+        csv_file = 'recommendations.csv'
+        today = datetime.datetime.now().strftime('%Y-%m-%d')
+        
+        new_rows = []
+        tier_names = {1: "Elite", 2: "Strong", 3: "Active"}
+        
+        for tier, stocks in results.items():
+            for s in stocks:
+                new_rows.append({
+                    'Date': today,
+                    'Tier': tier_names[tier],
+                    'Name': s['name'],
+                    'Code': s['code'],
+                    'Reasons': s['reasons'],
+                    'WinRate': f"{s['win_rate']:.1f}%",
+                    'AvgReturn': f"{s['avg_ret']:.1f}%"
+                })
+        
+        if new_rows:
+            df_new = pd.DataFrame(new_rows)
+            if os.path.exists(csv_file):
+                df_new.to_csv(csv_file, mode='a', header=False, index=False, encoding='utf-8-sig')
+            else:
+                df_new.to_csv(csv_file, index=False, encoding='utf-8-sig')
+            print(f"Logged {len(new_rows)} recommendations to {csv_file}")
 
 if __name__ == "__main__":
     analyzer = StockAnalyzer()
