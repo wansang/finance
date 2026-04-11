@@ -49,47 +49,54 @@ class StockAnalyzer:
                 summary += f"⚠️ {name}: 데이터 오류\n"
         return summary
 
+    def load_watchlist(self):
+        if os.path.exists('watchlist.json'):
+            with open('watchlist.json', 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return {}
+
     def get_market_sentiment(self):
-        """코스피/코스닥 지수 기반 시장 상태 분석"""
-        indices = {'코스피': 'KS11', '코스닥': 'KQ11'}
-        sentiment_report = "<b>[국내 시장 상태 분석]</b>\n"
-        is_positive = False
-        
-        details = []
-        for name, symbol in indices.items():
-            try:
-                # 최근 40거래일 데이터
-                df = fdr.DataReader(symbol, start=(datetime.datetime.now() - datetime.timedelta(days=60)).strftime('%Y-%m-%d'))
+        """코스피/코스닥 지수의 이평선 기반 시장 심리 분석 (상세 한글 설명 추가)"""
+        try:
+            today = datetime.datetime.now()
+            start_date = (today - datetime.timedelta(days=100)).strftime('%Y-%m-%d')
+            
+            ks = fdr.DataReader('KS11', start=start_date)
+            kq = fdr.DataReader('KQ11', start=start_date)
+            
+            def analyze_index(df, name):
+                if len(df) < 20: return f"{name}: 데이터 부족", False, "데이터 부족"
                 df['SMA20'] = df['Close'].rolling(window=20).mean()
                 df['SMA5'] = df['Close'].rolling(window=5).mean()
-                
                 last = df.iloc[-1]
                 prev = df.iloc[-2]
+                curr_p = last['Close']
+                change = (curr_p - prev['Close']) / prev['Close'] * 100
+                is_above_20 = curr_p > last['SMA20']
+                is_up_trend = last['SMA5'] > prev['SMA5']
                 
-                # 상태 판별
-                curr_price = last['Close']
-                sma20 = last['SMA20']
-                sma5 = last['SMA5']
-                prev_sma5 = prev['SMA5']
-                
-                status = "보통"
-                emoji = "➡️"
-                
-                if curr_price > sma20 * 1.01 and sma5 > prev_sma5:
-                    status = "<b>우호적</b>"
+                if is_above_20 and is_up_trend:
+                    status = "우호적"
+                    desc = "지수가 이평선 위에서 안정적인 상승 흐름을 보이고 있습니다."
                     emoji = "🚀"
-                    is_positive = True
-                elif curr_price < sma20 * 0.99:
+                elif is_above_20:
+                    status = "보통"
+                    desc = "지수가 이평선 위에 있으나 단기 숨고르기 중입니다."
+                    emoji = "➡️"
+                else:
                     status = "주의"
+                    desc = "지수가 이평선 아래에 있어 하락 압력이 거셉니다. 보수적인 접근이 필요합니다."
                     emoji = "⚠️"
                 
-                pct = (curr_price - prev['Close']) / prev['Close'] * 100
-                details.append(f"{emoji} {name}: {curr_price:,.2f} ({pct:+.2f}%) - {status}")
-            except Exception as e:
-                details.append(f"⚠️ {name}: 분석 오류")
-                
-        sentiment_report += "\n".join(details) + "\n"
-        return sentiment_report, is_positive
+                msg = f"{emoji} <b>{name}</b>: {curr_p:,.2f} ({change:+.2f}%) - {status}\n    └ {desc}"
+                return msg, status == "우호적"
+
+            ks_msg, ks_pos = analyze_index(ks, "코스피")
+            kq_msg, kq_pos = analyze_index(kq, "코스닥")
+            full_msg = "[국내 시장 상태 분석]\n" + ks_msg + "\n" + kq_msg
+            return full_msg, (ks_pos or kq_pos)
+        except Exception as e:
+            return f"⚠️ 시장 분석 오류: {e}", False
 
     def get_indicators(self, df, kospi_index=None):
         """기술적 지표 계산 (SMA, RSI, MACD, BB, StochRSI, MFI)"""
