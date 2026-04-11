@@ -1,6 +1,8 @@
 name: Real-Time Market Monitor
 
 on:
+  push:
+    branches: [ main ]
   schedule:
     # Run every 30 minutes from 09:00 to 18:00 KST (00:00 to 09:00 UTC) to include after-market
     - cron: '*/30 00-09 * * 1-5'
