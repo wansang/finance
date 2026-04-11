@@ -475,36 +475,38 @@ class StockAnalyzer:
                 continue
         return sell_alerts
 
-        # 0. 시장 상태 분석
+    def run(self):
+        """매일 아침 수행하는 종합 분석 및 AI 리포트 전송"""
+        print("종합 분석 및 AI 리포트 생성 시작...")
+        
+        # 1.데이터 수집
+        us_summary = self.get_us_market_summary()
         sentiment_msg, is_positive = self.get_market_sentiment()
-        
-        # 1. 새 추천 종목 분석
         recs_msg, recs_raw = self.analyze_kospi()
-        
-        # 2. 보유 종목 매도 타이밍 분석
         sell_alerts = self.analyze_holdings()
         
-        report = us_summary + "\n" + sentiment_msg
+        # 2. AI에게 전달할 데이터 정리
+        market_context = us_summary + "\n" + sentiment_msg
+        holding_context = "\n".join(sell_alerts) if sell_alerts else "매도 신호 없음"
         
-        if sell_alerts:
-            advice = ""
-            if is_positive:
-                advice = "\n💡 <i>시장이 우호적이므로 매도 결정을 신중히(분할 매도 등) 하셔도 좋습니다.</i>"
-            report += "\n<b>[🚨 매도 알림]</b>\n" + "\n".join(sell_alerts) + advice + "\n"
-            
-        report += "\n<b>[📊 추천 종목 분석 결과]</b>\n"
-        if recs_msg:
-            report += "".join(recs_msg[:15]) # 메시지 길이 제한
-            if len(recs_msg) > 15:
-                report += f"\n...외 {len(recs_msg)-15}개 종목"
-        else:
-            report += "조건에 맞는 추천 종목이 없습니다."
-            
-        # 3. 추천 내역 기록 (CSV 저장)
+        # 추천 종목을 'watch_data' 항목으로 전달
+        recommendation_context = "".join(recs_msg) if recs_msg else "추천 종목 없음"
+        
+        # 3. AI 리포트 생성
+        final_report = self.ask_ai_report(
+            market_data=market_context,
+            holding_data=holding_context,
+            watch_data=recommendation_context
+        )
+        
+        # 제목 및 추가 정보 결합
+        today = datetime.datetime.now().strftime('%Y-%m-%d')
+        styled_report = f"📅 <b>[오늘의 AI 종합 투자 리포트 - {today}]</b>\n\n" + final_report
+        
+        # 4. 내역 기록 및 전송
         self.log_recommendations(recs_raw)
-            
-        self.notifier.send_message(report)
-        print("Analysis complete and message sent.")
+        self.notifier.send_message(styled_report)
+        print("종합 분석 리포트 전송 완료.")
 
     def log_recommendations(self, results):
         """추천 결과를 recommendations.csv 파일에 저장"""
