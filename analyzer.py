@@ -144,10 +144,13 @@ class StockAnalyzer:
                     print(f"AI 호출 한도 초과, {wait_sec}초 후 재시도... ({attempt+1}/3)")
                     time.sleep(wait_sec)
                     continue
-                elif "429" in err_str:
-                    return "⚠️ AI 서비스가 일시적으로 바쁩니다. 잠시 후 자동으로 정상화됩니다."
-                else:
-                    return f"⚠️ AI 생성 오류: {err_str}"
+                fallback_msg = (
+                    f"⚠️ AI 리포트 생성에 실패하여 원본 데이터를 전송합니다 (오류: {err_str})\n\n"
+                    f"📊 [지수/시장 상황]\n{market_data}\n\n"
+                    f"💼 [보유 종목]\n{holding_data}\n\n"
+                    f"👀 [관심 종목]\n{watch_data}"
+                )
+                return fallback_msg
 
     def get_indicators(self, df, kospi_index=None):
         """기술적 지표 계산 (SMA, RSI, MACD, BB, StochRSI, MFI)"""
