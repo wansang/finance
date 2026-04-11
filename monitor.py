@@ -37,6 +37,16 @@ class MarketMonitor:
                 current_price = df.iloc[-1]['Close']
                 profit_pct = (current_price - buy_price) / buy_price * 100
                 
+                # 마일스톤 알림 (5% 단위)
+                milestone_emoji = ""
+                if profit_pct <= -15: milestone_emoji = "🚨[위험] "
+                elif profit_pct <= -10: milestone_emoji = "⛔[경고] "
+                elif profit_pct <= -5: milestone_emoji = "🔴[유의] "
+                elif profit_pct >= 20: milestone_emoji = "🔥[대박] "
+                elif profit_pct >= 15: milestone_emoji = "💎[급등] "
+                elif profit_pct >= 10: milestone_emoji = "🚀[돌파] "
+                elif profit_pct >= 5: milestone_emoji = "🟢[양호] "
+
                 status_emoji = "✅"
                 action_text = "보유(HOLD)"
                 
@@ -45,7 +55,7 @@ class MarketMonitor:
                     action_text = "<b>즉시매도(SELL)</b>"
                     sell_triggered = True
                 
-                line = f"{status_emoji} <b>{name}({code})</b>: {action_text}\n"
+                line = f"{status_emoji} {milestone_emoji}<b>{name}({code})</b>: {action_text}\n"
                 line += f"  - 현재가: {current_price:,.0f}원 ({profit_pct:+.2f}%)\n"
                 line += f"  - 고점대비: -{drop_pct:.2f}%\n"
                 status_lines.append(line)
