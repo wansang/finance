@@ -1,3 +1,11 @@
+import FinanceDataReader as fdr
+import pandas_ta_classic as ta
+import pandas as pd
+import numpy as np
+from scipy.signal import argrelextrema
+from notifier import TelegramNotifier
+import datetime
+import time
 import json
 import os
 import html
