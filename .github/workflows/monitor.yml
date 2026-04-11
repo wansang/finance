@@ -2,8 +2,8 @@ name: Real-Time Market Monitor
 
 on:
   schedule:
-    # Run every 30 minutes from 09:00 to 15:30 KST (00:00 to 06:30 UTC)
-    - cron: '*/30 00-06 * * 1-5'
+    # Run every 30 minutes from 09:00 to 18:00 KST (00:00 to 09:00 UTC) to include after-market
+    - cron: '*/30 00-09 * * 1-5'
   workflow_dispatch: # Allow manual trigger
 
 jobs:
