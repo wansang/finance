@@ -258,15 +258,15 @@ class StockAnalyzer:
         return win_rate, avg_ret
 
     def analyze_kospi(self, target_date=None):
-        """코스피 전 종목 정밀 분석 (Elite Filter)"""
+        """코스피 전 종목 정밀 분석 (Tiered System)"""
         stocks = fdr.StockListing('KOSPI')
         kospi_index = fdr.DataReader('KS11', start=(datetime.datetime.now() - datetime.timedelta(days=365)).strftime('%Y-%m-%d'))
         
-        recommendations = []
+        results = {1: [], 2: [], 3: []}
         count = 0
         total = len(stocks)
         
-        print(f"Starting Elite Analysis for {total} stocks...")
+        print(f"Starting Tiered Analysis for {total} stocks...")
         
         for _, stock in stocks.iterrows():
             code = stock['Code']
@@ -277,44 +277,54 @@ class StockAnalyzer:
                 if len(df) < 200: continue
                 
                 df = self.get_indicators(df, kospi_index)
-                
                 target_idx = len(df) - 1
                 if target_date:
                     df_target = df[df.index <= target_date]
                     if len(df_target) < 1: continue
                     target_idx = len(df_target) - 1
                 
-                # Layer 1 & 2 & 3: 신호 + 트렌드 템플릿 확인
                 reasons = self.check_signals(df, target_idx)
-                if reasons and self.is_trend_template(df, target_idx):
-                    # Layer 4: 과거 승률 검증
-                    win_rate, avg_ret = self.validate_strategy(df, target_idx)
-                    
-                    # 승률 70% 이상 (또는 데이터가 적을 때 평균 수익률 양수) 필터링
-                    if win_rate >= 60 or (win_rate > 0 and avg_ret > 2):
-                        rs_score = df['RS_LINE'].iloc[target_idx] if 'RS_LINE' in df.columns else 0
-                        recommendations.append({
-                            'name': name,
-                            'code': code,
-                            'reasons': ", ".join(reasons),
-                            'win_rate': win_rate,
-                            'avg_ret': avg_ret,
-                            'rs_score': rs_score
-                        })
+                if not reasons: continue
+
+                # 지표 추출
+                last = df.iloc[target_idx]
+                win_rate, avg_ret = self.validate_strategy(df, target_idx)
+                is_elite = self.is_trend_template(df, target_idx)
+                is_above_200 = last['Close'] > last['SMA200']
+                rs_score = last['RS_LINE'] if 'RS_LINE' in last else 0
+                
+                stock_data = {
+                    'name': name, 'code': code, 'reasons': ", ".join(reasons),
+                    'win_rate': win_rate, 'avg_ret': avg_ret, 'rs_score': rs_score
+                }
+
+                # Tier Classification
+                if is_elite and win_rate >= 60:
+                    results[1].append(stock_data)
+                elif is_above_200 and win_rate >= 50:
+                    results[2].append(stock_data)
+                elif win_rate >= 40:
+                    results[3].append(stock_data)
                 
                 count += 1
-                if count % 100 == 0: print(f"Analyzed {count}/{total} stocks...")
+                if count % 200 == 0: print(f"Analyzed {count}/{total} stocks...")
             except Exception:
                 continue
 
-        # RS_SCORE 기준 상위 정렬
-        recommendations.sort(key=lambda x: x['rs_score'], reverse=True)
-        
+        # 결과 포맷팅
         formatted_recs = []
-        for r in recommendations:
-            msg = f"<b>{r['name']}({r['code']})</b>: {r['reasons']}\n"
-            msg += f"  - 검증 승률: {r['win_rate']:.1f}% | 평균 수익: {r['avg_ret']:.1f}%"
-            formatted_recs.append(msg)
+        tier_names = {1: "🥇 1등급 (Elite Setup)", 2: "🥈 2등급 (Strong Trend)", 3: "🥉 3등급 (Active Signal)"}
+        
+        for t in [1, 2, 3]:
+            if not results[t]: continue
+            # RS_SCORE 기준 정렬
+            results[t].sort(key=lambda x: x['rs_score'], reverse=True)
+            
+            formatted_recs.append(f"\n<b>{tier_names[t]}</b>")
+            for r in results[t][:5]: # 각 등급별 상위 5개만 노출
+                msg = f"• {r['name']}({r['code']}): {r['reasons']}\n"
+                msg += f"  - 과거 승률: {r['win_rate']:.1f}% | 평균 수익: {r['avg_ret']:+.1f}%"
+                formatted_recs.append(msg)
             
         return formatted_recs
 
