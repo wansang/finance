@@ -247,19 +247,19 @@ class StockAnalyzer:
             
         # 3. 타지마할 밴드 (BB 하단 지지 + RSI 반등)
         if self.is_taj_mahal_signal(df, idx):
-            reasons.append("Taj Mahal (BB Bottom Support)")
+            reasons.append("바닥권 반등 신호(BB 하단)")
             
         # 4. 볼린저 밴드 스퀴즈 (변동성 수렴)
         if self.detect_bb_squeeze(df, idx):
-            reasons.append("BB Squeeze")
+            reasons.append("에너지 응축(변동성 수렴)")
             
         # 5. 거래량 급증
         if self.detect_volume_spike(df, idx):
-            reasons.append("Volume Spike")
+            reasons.append("거래량 급증")
             
         # 6. Stochastic RSI & MFI 과매도 반등
         if self.detect_stoch_mfi_rebound(df, idx):
-            reasons.append("Stoch/MFI Rebound")
+            reasons.append("과매도 반등 신호")
             
         return reasons
 
@@ -399,8 +399,7 @@ class StockAnalyzer:
             
             formatted_recs.append(f"\n<b>{tier_names[t]}</b>")
             for r in results[t][:5]: # 각 등급별 상위 5개만 노출
-                msg = f"• {r['name']}({r['code']}): {r['reasons']}\n"
-                msg += f"  - 과거 승률: {r['win_rate']:.1f}% | 평균 수익: {r['avg_ret']:+.1f}%"
+                msg = f"• <b>{r['name']}</b>({r['code']}): {r['reasons']}\n"
                 formatted_recs.append(msg)
             
         return formatted_recs, results
@@ -447,13 +446,13 @@ class StockAnalyzer:
                 advice = "\n💡 <i>시장이 우호적이므로 매도 결정을 신중히(분할 매도 등) 하셔도 좋습니다.</i>"
             report += "\n<b>[🚨 매도 알림]</b>\n" + "\n".join(sell_alerts) + advice + "\n"
             
-        report += "\n<b>[코스피 추천 종목]</b>\n"
+        report += "\n<b>[📊 추천 종목 분석 결과]</b>\n"
         if recs_msg:
-            report += "".join(recs_msg[:30])
-            if len(recs_msg) > 30:
-                report += f"\n...외 {len(recs_msg)-30}개 종목"
+            report += "".join(recs_msg[:15]) # 메시지 길이 제한
+            if len(recs_msg) > 15:
+                report += f"\n...외 {len(recs_msg)-15}개 종목"
         else:
-            report += "조건에 맞는 종목이 없습니다."
+            report += "조건에 맞는 추천 종목이 없습니다."
             
         # 3. 추천 내역 기록 (CSV 저장)
         self.log_recommendations(recs_raw)
