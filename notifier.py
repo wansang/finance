@@ -20,10 +20,18 @@ class TelegramNotifier:
         }
         try:
             response = requests.post(url, json=payload)
+            if response.status_code == 400 and "parse_mode" in payload:
+                # HTML 파싱 오류 가능성 대비: 일반 텍스트로 재시도
+                print("HTML parsing failed. Retrying with plain text...")
+                payload.pop("parse_mode")
+                response = requests.post(url, json=payload)
+            
             response.raise_for_status()
             return response.json()
         except Exception as e:
             print(f"Failed to send Telegram message: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                print(f"Server Response: {e.response.text}")
             return None
 
 if __name__ == "__main__":
