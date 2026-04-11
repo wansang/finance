@@ -1,6 +1,8 @@
 name: Elite Stock Analysis
 
 on:
+  push:
+    branches: [main]
   schedule:
     # Run at 23:00 UTC every day (08:00 KST)
     - cron: '00 23 * * *'
