@@ -1,13 +1,6 @@
-import FinanceDataReader as fdr
-import pandas_ta_classic as ta
-import pandas as pd
-import numpy as np
-from scipy.signal import argrelextrema
-from notifier import TelegramNotifier
-import datetime
-import time
 import json
 import os
+import html
 
 class StockAnalyzer:
     def __init__(self):
@@ -293,8 +286,11 @@ class StockAnalyzer:
                 is_above_200 = last['Close'] > last['SMA200']
                 rs_score = last['RS_LINE'] if 'RS_LINE' in last else 0
                 
+                safe_name = html.escape(name)
+                safe_reasons = html.escape(", ".join(reasons))
+                
                 stock_data = {
-                    'name': name, 'code': code, 'reasons': ", ".join(reasons),
+                    'name': safe_name, 'code': code, 'reasons': safe_reasons,
                     'win_rate': win_rate, 'avg_ret': avg_ret, 'rs_score': rs_score
                 }
 
@@ -347,7 +343,8 @@ class StockAnalyzer:
                 triggered, drop_pct = self.check_trailing_stop(df, buy_date)
                 
                 if triggered:
-                    sell_alerts.append(f"🚨 <b>{name}({code}) 매도 알림</b>: 고점 대비 {drop_pct:.2f}% 하락 (트레일링 스톱)")
+                    safe_name = html.escape(name)
+                    sell_alerts.append(f"🚨 <b>{safe_name}({code}) 매도 알림</b>: 고점 대비 {drop_pct:.2f}% 하락 (트레일링 스톱)")
             except Exception as e:
                 continue
         return sell_alerts

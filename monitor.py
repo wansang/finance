@@ -1,7 +1,6 @@
-from analyzer import StockAnalyzer
-import FinanceDataReader as fdr
-import datetime
+import json
 import os
+import html
 
 class MarketMonitor:
     def __init__(self):
@@ -37,6 +36,9 @@ class MarketMonitor:
                 current_price = df.iloc[-1]['Close']
                 profit_pct = (current_price - buy_price) / buy_price * 100
                 
+                # HTML 이스케이프 적용 (특수문자 방어)
+                safe_name = html.escape(name)
+                
                 # 마일스톤 알림 (5% 단위)
                 milestone_text = ""
                 if profit_pct <= -15: milestone_text = "🚨[위험] "
@@ -55,7 +57,7 @@ class MarketMonitor:
                     action_text = "<b>즉시매도(SELL)</b>"
                     sell_triggered = True
                 
-                line = f"{status_emoji} {milestone_text}<b>{name}({code})</b>: {action_text}\n"
+                line = f"{status_emoji} {milestone_text}<b>{safe_name}({code})</b>: {action_text}\n"
                 line += f"  - 현재가: {current_price:,.0f}원 ({profit_pct:+.2f}%)\n"
                 line += f"  - 고점대비: -{drop_pct:.2f}%"
                 status_lines.append(line)
