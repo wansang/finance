@@ -13,6 +13,7 @@ class TelegramNotifier:
             return
 
         chat_ids = [cid.strip() for cid in str(self.chat_id).split(',')]
+        print(f"Sending message to {len(chat_ids)} recipient(s)...")
         results = []
 
         for cid in chat_ids:
