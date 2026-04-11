@@ -145,7 +145,7 @@ class StockAnalyzer:
                     time.sleep(wait_sec)
                     continue
                 fallback_msg = (
-                    f"⚠️ AI 리포트 생성에 실패하여 원본 데이터를 전송합니다 (오류: {err_str})\n\n"
+                    f"🤖 자동 기술적 분석 리포트 (데이터 원본 전문)\n\n"
                     f"📊 [지수/시장 상황]\n{market_data}\n\n"
                     f"💼 [보유 종목]\n{holding_data}\n\n"
                     f"👀 [관심 종목]\n{watch_data}"
