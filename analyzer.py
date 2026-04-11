@@ -190,6 +190,37 @@ class StockAnalyzer:
                 return True
         return False
 
+    def check_signals(self, df, idx=-1):
+        """다양한 기술적 지표들을 종합하여 매수 신호 확인"""
+        reasons = []
+        
+        # 1. RSI 다이버전스
+        if self.detect_divergence(df, idx):
+            reasons.append("RSI Divergence")
+            
+        # 2. Wedge/Flag 패턴
+        patterns = self.detect_patterns(df, idx)
+        if patterns:
+            reasons.append(patterns)
+            
+        # 3. 타지마할 밴드 (BB 하단 지지 + RSI 반등)
+        if self.is_taj_mahal_signal(df, idx):
+            reasons.append("Taj Mahal (BB Bottom Support)")
+            
+        # 4. 볼린저 밴드 스퀴즈 (변동성 수렴)
+        if self.detect_bb_squeeze(df, idx):
+            reasons.append("BB Squeeze")
+            
+        # 5. 거래량 급증
+        if self.detect_volume_spike(df, idx):
+            reasons.append("Volume Spike")
+            
+        # 6. Stochastic RSI & MFI 과매도 반등
+        if self.detect_stoch_mfi_rebound(df, idx):
+            reasons.append("Stoch/MFI Rebound")
+            
+        return reasons
+
     def check_trailing_stop(self, df, buy_date, threshold=0.03):
         """트레일링 스톱 감지 (고점 대비 일정 비율 하락 시 매도)"""
         # buy_date 이후의 데이터만 추출
