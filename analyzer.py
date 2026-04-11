@@ -131,11 +131,23 @@ class StockAnalyzer:
 
 가장 중요한 건 '왜'라는 질문에 답하는 거야. 시장 흐름에 비추어 대응 전략을 명확하게 제시해줘.
 """
-        try:
-            response = self.model.generate_content(prompt)
-            return response.text
-        except Exception as e:
-            return f"⚠️ AI 생성 오류: {e}\n\n(AI 없이 분석된 결과 전송 실패 - 기술적 분석 데이터 확인 필요)"
+        import time
+        wait_times = [30, 60]
+        for attempt in range(3):
+            try:
+                response = self.model.generate_content(prompt)
+                return response.text
+            except Exception as e:
+                err_str = str(e)
+                if "429" in err_str and attempt < 2:
+                    wait_sec = wait_times[attempt]
+                    print(f"AI 호출 한도 초과, {wait_sec}초 후 재시도... ({attempt+1}/3)")
+                    time.sleep(wait_sec)
+                    continue
+                elif "429" in err_str:
+                    return "⚠️ AI 서비스가 일시적으로 바쁩니다. 잠시 후 자동으로 정상화됩니다."
+                else:
+                    return f"⚠️ AI 생성 오류: {err_str}"
 
     def get_indicators(self, df, kospi_index=None):
         """기술적 지표 계산 (SMA, RSI, MACD, BB, StochRSI, MFI)"""
