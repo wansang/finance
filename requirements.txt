@@ -1,0 +1,8 @@
+finance-datareader
+pandas-ta-classic
+python-telegram-bot
+scipy
+pandas
+numpy
+matplotlib
+requests
