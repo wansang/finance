@@ -231,14 +231,14 @@ class StockAnalyzer:
         
         patterns = []
         if recent_vol < prev_vol * 0.7:
-            patterns.append("Wedge(수렴)")
+            patterns.append("에너지 응축 중(수렴 패턴)")
             
         # Flag 패턴: 급등 후 횡보
         returns = df_target['Close'].pct_change(5).iloc[-10:-5]
         if len(returns) > 0 and returns.max() > 0.05: # 5일간 5% 이상 급등 후
             curr_returns = df_target['Close'].pct_change(5).iloc[-1]
             if abs(curr_returns) < 0.02: # 현재는 횡보 중
-                patterns.append("Flag(깃발)")
+                patterns.append("급등 후 숨고르기(깃발형 패턴)")
                 
         return ", ".join(patterns)
 
@@ -299,7 +299,7 @@ class StockAnalyzer:
         
         # 1. RSI 다이버전스
         if self.detect_divergence(df, idx):
-            reasons.append("RSI Divergence")
+            reasons.append("RSI 반전 신호(상승 가능성)")
             
         # 2. Wedge/Flag 패턴
         patterns = self.detect_patterns(df, idx)
