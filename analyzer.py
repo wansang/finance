@@ -9,12 +9,21 @@ import time
 import json
 import os
 import html
+import google.generativeai as genai
 
 class StockAnalyzer:
     def __init__(self):
         self.notifier = TelegramNotifier()
         self.holdings_file = 'holdings.json'
         self.holdings = self.load_holdings()
+        
+        # Gemini AI 설정
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if api_key:
+            genai.configure(api_key=api_key)
+            self.model = genai.GenerativeModel('gemini-1.5-flash')
+        else:
+            self.model = None
 
     def load_holdings(self):
         """보유 종목 데이터 로드"""
@@ -97,6 +106,36 @@ class StockAnalyzer:
             return full_msg, (ks_pos or kq_pos)
         except Exception as e:
             return f"⚠️ 시장 분석 오류: {e}", False
+
+    def ask_ai_report(self, market_data, holding_data, watch_data):
+        """Gemini AI를 사용하여 주식 전문가 스타일의 한글 리포트 생성"""
+        if not self.model:
+            return "⚠️ AI 설정(API Key)이 되어 있지 않아 기본 분석 결과만 전송합니다."
+
+        prompt = f"""
+주식 투자 전문가로서 아래 데이터를 바탕으로 30분 단위 실시간 감시 리포트를 작성해줘.
+
+[데이터 정보]
+1. 시장 상황: {market_data}
+2. 보유 종목 상태: {holding_data}
+3. 관심 종목(Watchlist) 상태: {watch_data}
+
+[작성 가이드라인]
+- **어투**: 신뢰감 있고 친숙한 한국어 존댓말로 작성해줘.
+- **언어 제약**: 영어 문장을 절대 사용하지 말고, 전문 용어는 한글로 풀어서 설명해줘 (예: SELL -> 매도 권장, HOLD -> 포지션 유지).
+- **구조**:
+  1. 현재 시장의 전반적인 분위기를 한눈에 설명 (왜 좋은지 혹은 나쁜지 포함)
+  2. 보유 종목에 대해 왜 지금 팔아야 하거나 계속 가지고 있어야 하는지 '이유'를 들어 설명 (이평선, 지지선 등 언급)
+  3. 관심 종목 중 매수할 만한 것이 있다면 언급하며 추천 이유 설명
+- **금지**: 차트 데이터 수치들(SMA, RSI 등)을 그대로 나열하기보다 그게 '무슨 의미'인지 해석해서 한마디로 요약해줘.
+
+가장 중요한 건 '왜'라는 질문에 답하는 거야. 시장 흐름에 비추어 대응 전략을 명확하게 제시해줘.
+"""
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            return f"⚠️ AI 생성 오류: {e}\n\n(AI 없이 분석된 결과 전송 실패 - 기술적 분석 데이터 확인 필요)"
 
     def get_indicators(self, df, kospi_index=None):
         """기술적 지표 계산 (SMA, RSI, MACD, BB, StochRSI, MFI)"""
