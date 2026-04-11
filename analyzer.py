@@ -489,6 +489,17 @@ class StockAnalyzer:
 
     def run(self):
         """매일 아침 수행하는 종합 분석 및 AI 리포트 전송"""
+        import sys
+        import holidays
+        
+        today = datetime.datetime.now()
+        kr_holidays = holidays.KR()
+        
+        # 주말(5: 토요일, 6: 일요일) 이거나 공휴일인 경우 실행 안 함
+        if today.weekday() >= 5 or today.date() in kr_holidays:
+            print(f"[{today}] 주말 또는 한국 공휴일 휴장일입니다. 종합 분석을 건너뜁니다.")
+            sys.exit(0)
+            
         print("종합 분석 및 AI 리포트 생성 시작...")
         
         # 1.데이터 수집
