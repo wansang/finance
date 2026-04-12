@@ -65,13 +65,12 @@ class StockAnalyzer:
         return {}
 
     def get_market_sentiment(self):
-        """코스피/코스닥 지수의 이평선 기반 시장 심리 분석 (상세 한글 설명 추가)"""
+        """코스피 지수의 이평선 기반 시장 심리 분석 (상세 한글 설명 추가)"""
         try:
             today = datetime.datetime.now()
             start_date = (today - datetime.timedelta(days=100)).strftime('%Y-%m-%d')
             
             ks = fdr.DataReader('KS11', start=start_date)
-            kq = fdr.DataReader('KQ11', start=start_date)
             
             def analyze_index(df, name):
                 if len(df) < 20: return f"{name}: 데이터 부족", False, "데이터 부족"
@@ -101,9 +100,8 @@ class StockAnalyzer:
                 return msg, status == "우호적"
 
             ks_msg, ks_pos = analyze_index(ks, "코스피")
-            kq_msg, kq_pos = analyze_index(kq, "코스닥")
-            full_msg = "[국내 시장 상태 분석]\n" + ks_msg + "\n" + kq_msg
-            return full_msg, (ks_pos or kq_pos)
+            full_msg = "[국내 시장 상태 분석]\n" + ks_msg
+            return full_msg, ks_pos
         except Exception as e:
             return f"⚠️ 시장 분석 오류: {e}", False
 
