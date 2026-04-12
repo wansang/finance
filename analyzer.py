@@ -500,11 +500,11 @@ class StockAnalyzer:
         kr_holidays = holidays.KR()
         is_manual = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
         
-        # 주말(5: 토요일, 6: 일요일) 이거나 공휴일인 경우 스케줄 실행 안함 (수동 강제 실행 시에는 무조건 동작)
-        # [TEMP] 검증을 위해 주말 체크 비활성화
-        # if not is_manual and (today.weekday() >= 5 or today.date() in kr_holidays):
-        #     print(f"[{today}] 주말 또는 한국 공휴일 휴장일입니다. 종합 분석을 건너뜁니다.")
-        #     sys.exit(0)
+        # 주말(5: 토요일, 6: 일요일) 또는 공휴일인 경우 스케줄 실행 안함
+        # 단, 수동 실행(workflow_dispatch)일 경우에는 강제 실행합니다.
+        if not is_manual and (today.weekday() >= 5 or today.date() in kr_holidays):
+            print(f"[{today}] 주말 또는 한국 공휴일 휴장일입니다. 종합 분석을 건너뜁니다.")
+            sys.exit(0)
             
         print("종합 분석 및 AI 리포트 생성 시작...")
         

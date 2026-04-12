@@ -4,8 +4,8 @@ on:
   push:
     branches: [ main ]
   schedule:
-    # Run at 22:50 UTC every day (07:50 KST) to be ready by 08:30 KST
-    - cron: '50 22 * * *'
+    # Run at 23:30 UTC Sunday-Thursday (08:30 KST Monday-Friday)
+    - cron: '30 23 * * 0-4'
   workflow_dispatch: # Allow manual trigger from GitHub Actions tab
 
 jobs:
