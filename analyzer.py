@@ -118,7 +118,7 @@ class StockAnalyzer:
 [데이터 정보]
 1. 시장 상황: {market_data}
 2. 보유 종목 상태: {holding_data}
-3. 관심 종목(Watchlist) 상태: {watch_data}
+3. 추천 종목 상태: {watch_data}
 
 [작성 가이드라인]
 - **어투**: 신뢰감 있고 친숙한 한국어 존댓말로 작성해줘.
@@ -148,7 +148,7 @@ class StockAnalyzer:
                     f"🤖 자동 기술적 분석 리포트 (데이터 원본 전문)\n\n"
                     f"📊 [지수/시장 상황]\n{market_data}\n\n"
                     f"💼 [보유 종목]\n{holding_data}\n\n"
-                    f"👀 [관심 종목]\n{watch_data}"
+                    f"👀 [추천 종목]\n{watch_data}"
                 )
                 return fallback_msg
 
@@ -451,7 +451,7 @@ class StockAnalyzer:
 
         # 결과 포맷팅
         formatted_recs = []
-        tier_names = {1: "🥇 1등급 (Elite Setup)", 2: "🥈 2등급 (Strong Trend)", 3: "🥉 3등급 (Active Signal)"}
+        tier_names = {1: "🥇 지금 매수", 2: "🥈 신중히 매수", 3: "🥉 추가 확인 후 매수"}
         
         for t in [1, 2, 3]:
             if not results[t]: continue
@@ -519,7 +519,7 @@ class StockAnalyzer:
         holding_context = "\n".join(sell_alerts) if sell_alerts else "매도 신호 없음"
         
         # 추천 종목을 'watch_data' 항목으로 전달
-        recommendation_context = "".join(recs_msg) if recs_msg else "추천 종목 없음"
+        recommendation_context = "\n".join(recs_msg) if recs_msg else "추천 종목 없음"
         
         # 3. AI 리포트 생성
         final_report = self.ask_ai_report(
@@ -543,7 +543,7 @@ class StockAnalyzer:
         today = datetime.datetime.now().strftime('%Y-%m-%d')
         
         new_rows = []
-        tier_names = {1: "Elite", 2: "Strong", 3: "Active"}
+        tier_names = {1: "지금 매수", 2: "신중히 매수", 3: "추가 확인 후 매수"}
         
         for tier, stocks in results.items():
             for s in stocks:
