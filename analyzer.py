@@ -366,7 +366,7 @@ class StockAnalyzer:
                     return str(response).strip()
                 elif self.genai_library == 'generativeai' and self.model is not None:
                     if not hasattr(self.model, 'generate_content') and hasattr(genai, 'GenerativeModel'):
-                        self.model = genai.GenerativeModel(self.model_name or model_name)
+                        self.model = genai.GenerativeModel(self.model_name)
                     if hasattr(self.model, 'generate_content'):
                         response = self.model.generate_content([
                             {'type': 'text', 'text': prompt}
