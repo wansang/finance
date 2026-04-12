@@ -52,14 +52,14 @@ class MarketMonitor:
                 
                 if triggered:
                     status = "매도 권장"
-                    reason = f"매수 이후 최고가 대비 {drop_pct:.2f}% 하락하여 매도 조건이 충족되었습니다."
+                    reason = f"매수 이후 최고가 대비 {drop_pct:.2f}% 하락하여 손실 제한 조건이 충족되었습니다."
                     sell_triggered = True
                 else:
                     status = "포지션 유지"
                     if profit_pct >= 0:
-                        reason = "현재 수익 구간이며 트레일링 스톱 조건이 아직 발동하지 않아 추세 유지 관점입니다."
+                        reason = "현재 수익 구간이며 하락 제한 조건이 아직 충족되지 않아 보유를 유지합니다."
                     else:
-                        reason = "손실 구간이지만 매도 기준에는 미달하여 보유를 유지하는 것이 합리적입니다."
+                        reason = "현재는 손실 구간이나 매도 기준에는 미달하여 추가 관찰이 필요합니다."
                 
                 holding_data.append(
                     f"- {name}: 현재가 {current_price:,.0f}원 (수익률 {profit_pct:+.2f}%), 상태: {status}. 이유: {reason}"
@@ -85,9 +85,9 @@ class MarketMonitor:
                 watch_data.append(f"- {code}: 분석 오류")
 
         # 4. AI 리포트 생성
-        market_section = f"📊 [시장 상황]\n{sentiment_msg.strip()}"
-        holding_section = "💼 [보유 종목]\n" + ("\n".join(holding_data) if holding_data else "없음")
-        watch_section = "👀 [관심 종목]\n" + ("\n".join(watch_data) if watch_data else "없음")
+        market_section = sentiment_msg.strip()
+        holding_section = "\n\n".join(holding_data) if holding_data else "없음"
+        watch_section = "\n\n".join(watch_data) if watch_data else "없음"
 
         final_report = self.analyzer.ask_ai_report(
             market_data=market_section,

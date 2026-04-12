@@ -165,14 +165,15 @@ class StockAnalyzer:
 
 [작성 가이드라인]
 - **어투**: 신뢰감 있고 친숙한 한국어 존댓말로 작성해줘.
-- **언어 제약**: 영어 문장을 절대 사용하지 말고, 전문 용어는 한글로 풀어서 설명해줘 (예: SELL -> 매도 권장, HOLD -> 포지션 유지).
+- **언어 제약**: 영어 표현과 전문 용어를 쓰지 말고, 쉬운 한국어로 풀어 설명해줘.
+- **중요**: 입력된 데이터에 이미 제목과 구분 정보가 있으므로 같은 제목을 반복하지 말고, 내용을 해석해서 간결하게 작성해줘.
 - **구조**:
-  1. 현재 시장의 전반적인 분위기를 한눈에 설명 (왜 좋은지 혹은 나쁜지 포함)
-  2. 보유 종목 각각에 대해 왜 지금 팔아야 하는지 또는 계속 보유해야 하는지를 이유 중심으로 설명해줘.
-  3. 관심 종목에 대한 현재 신호를 요약하고, 매수 기다림 또는 추가 관찰 이유를 설명해줘.
-- **금지**: 차트 지표 수치를 그대로 나열하지 말고 그 의미를 해석해서 설명해줘.
-
-가장 중요한 건 '왜'라는 질문에 답하는 거야. 시장 흐름과 보유/관심 종목 상태를 연결해서 명확히 말해줘.
+  1. 현재 시장의 분위기를 한 문단으로 정리해줘.
+  2. 보유 종목 하나씩에 대해 왜 매도할 수 있는지 또는 왜 보유해야 하는지 이유를 설명해줘.
+  3. 관심 종목 하나씩에 대해 지금 사기보다는 기다려야 하는 이유 또는 참고할 점을 설명해줘.
+- **표현 금지**: '트레일링 스톱', '깃발형 패턴', '에너지 응축', '변동성 수렴' 등의 전문 용어를 쓰지 말고, '고점 대비 하락 기준', '급등 후 숨고르기', '거래가 조용해진 구간' 같은 쉬운 설명으로 바꿔줘.
+- **문장 구성**: 각 설명은 새 문단으로 구분하고, 항목 사이에는 빈 줄을 넣어줘.
+- **가장 중요한 것**: 왜 그런 판단을 했는지 이유를 분명하게 설명해줘.
 """
         else:
             prompt = f"""
@@ -185,14 +186,15 @@ class StockAnalyzer:
 
 [작성 가이드라인]
 - **어투**: 신뢰감 있고 친숙한 한국어 존댓말로 작성해줘.
-- **언어 제약**: 영어 문장을 절대 사용하지 말고, 전문 용어는 한글로 풀어서 설명해줘 (예: SELL -> 매도 권장, HOLD -> 포지션 유지).
+- **언어 제약**: 영어 표현과 전문 용어를 쓰지 말고, 쉬운 한국어로 풀어 설명해줘.
+- **중요**: 입력된 데이터에 이미 제목과 구분 정보가 있으므로 같은 제목을 반복하지 말고, 내용을 해석해서 간결하게 작성해줘.
 - **구조**:
-  1. 현재 시장의 전반적인 분위기를 한눈에 설명 (왜 좋은지 혹은 나쁜지 포함)
-  2. 보유 종목에 대해 왜 지금 팔아야 하거나 계속 가지고 있어야 하는지 '이유'를 들어 설명 (이평선, 지지선 등 언급)
-  3. 추천 종목 중 좋은 매수 기회를 판단하는 이유를 설명
-- **금지**: 차트 데이터 수치를 그대로 나열하기보다 그게 '무슨 의미'인지 해석해서 한마디로 요약해줘.
-
-가장 중요한 건 '왜'라는 질문에 답하는 거야. 시장 흐름에 비추어 대응 전략을 명확하게 제시해줘.
+  1. 현재 시장의 분위기를 한 문단으로 정리해줘.
+  2. 보유 종목마다 왜 지금 팔아야 하는지 또는 계속 보유해야 하는지 이유를 설명해줘.
+  3. 추천 종목마다 왜 추천하는지, 왜 사야 하는지 분명하게 설명해줘.
+- **표현 금지**: '트레일링 스톱', '깃발형 패턴', '에너지 응축', '변동성 수렴' 등의 전문 용어 대신, 쉬운 설명으로 바꿔줘.
+- **문장 구성**: 각 설명은 새 문단으로 구분하고, 항목 사이에는 빈 줄을 넣어줘.
+- **가장 중요한 것**: 왜 추천하는지 이유를 분명하게 설명해줘.
 """
         import time
         wait_times = [30, 60]
@@ -310,14 +312,14 @@ class StockAnalyzer:
         
         patterns = []
         if recent_vol < prev_vol * 0.7:
-            patterns.append("에너지 응축 중(수렴 패턴)")
+            patterns.append("거래가 조용해져 다음 움직임을 준비하는 모습입니다.")
             
         # Flag 패턴: 급등 후 횡보
         returns = df_target['Close'].pct_change(5).iloc[-10:-5]
         if len(returns) > 0 and returns.max() > 0.05: # 5일간 5% 이상 급등 후
             curr_returns = df_target['Close'].pct_change(5).iloc[-1]
             if abs(curr_returns) < 0.02: # 현재는 횡보 중
-                patterns.append("급등 후 숨고르기(깃발형 패턴)")
+                patterns.append("최근 급등 뒤 숨고르기 구간에 진입했습니다.")
                 
         return ", ".join(patterns)
 
@@ -391,7 +393,7 @@ class StockAnalyzer:
             
         # 4. 볼린저 밴드 스퀴즈 (변동성 수렴)
         if self.detect_bb_squeeze(df, idx):
-            reasons.append("에너지 응축(변동성 수렴)")
+            reasons.append("거래가 조용해지며 다음 변동성을 준비하는 구간입니다.")
             
         # 5. 거래량 급증
         if self.detect_volume_spike(df, idx):
@@ -480,7 +482,7 @@ class StockAnalyzer:
         stocks = fdr.StockListing('KOSPI')
         kospi_index = fdr.DataReader('KS11', start=(datetime.datetime.now() - datetime.timedelta(days=365)).strftime('%Y-%m-%d'))
         
-        results = {1: [], 2: []}
+        results = {1: [], 2: [], 3: []}
         count = 0
         total = len(stocks)
         
@@ -519,11 +521,13 @@ class StockAnalyzer:
                     'win_rate': win_rate, 'avg_ret': avg_ret, 'rs_score': rs_score
                 }
 
-                # Tier Classification (1/2등급만 추천)
+                # Tier Classification
                 if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60):
                     results[1].append(stock_data)
                 elif is_above_200 and win_rate >= self.config.get('TIER2_WIN_RATE', 50):
                     results[2].append(stock_data)
+                elif win_rate >= 40:
+                    results[3].append(stock_data)
                 
                 count += 1
                 if count % 200 == 0: print(f"Analyzed {count}/{total} stocks...")
@@ -532,9 +536,9 @@ class StockAnalyzer:
 
         # 결과 포맷팅
         formatted_recs = []
-        tier_names = {1: "🥇 지금 매수", 2: "🥈 신중히 매수"}
+        tier_names = {1: "🥇 지금 매수", 2: "🥈 신중히 매수", 3: "🥉 추가 확인 후 매수"}
         
-        for t in [1, 2]:
+        for t in [1, 2, 3]:
             if not results[t]: continue
             # RS_SCORE 기준 정렬
             results[t].sort(key=lambda x: x['rs_score'], reverse=True)
