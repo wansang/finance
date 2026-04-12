@@ -137,6 +137,62 @@ class StockAnalyzer:
                 return json.load(f)
         return {}
 
+    def save_watchlist(self, watchlist):
+        with open('watchlist.json', 'w', encoding='utf-8') as f:
+            json.dump(watchlist, f, ensure_ascii=False, indent=4)
+
+    def clean_watchlist(self):
+        """watchlist 항목 중 1주일 경과 후 holdings에 없는 항목을 자동 삭제"""
+        watchlist = self.load_watchlist()
+        if not watchlist:
+            return
+
+        today = datetime.datetime.now().date()
+        changed = False
+        for code in list(watchlist.keys()):
+            entry = watchlist[code]
+            add_date = entry.get('add_date')
+            if not add_date:
+                continue
+            try:
+                add_date_obj = datetime.datetime.strptime(add_date, '%Y-%m-%d').date()
+            except Exception:
+                continue
+
+            days_passed = (today - add_date_obj).days
+            if days_passed > 7 and code not in self.holdings:
+                del watchlist[code]
+                changed = True
+                print(f"watchlist에서 {code}를 {days_passed}일 경과로 인해 자동 삭제했습니다.")
+
+        if changed:
+            self.save_watchlist(watchlist)
+
+    def add_top_recommendation_to_watchlist(self, results):
+        """Tier 1 추천 종목 중 최상위 1개를 watchlist에 자동 추가"""
+        if not results or 1 not in results or len(results[1]) == 0:
+            return None
+
+        top_stock = results[1][0]
+        if not top_stock.get('code'):
+            return None
+
+        code = top_stock['code']
+        if code in self.holdings:
+            return None
+
+        watchlist = self.load_watchlist()
+        if code in watchlist:
+            return None
+
+        stock_name = html.unescape(top_stock.get('name', code))
+        watchlist[code] = {
+            'name': stock_name,
+            'add_date': datetime.datetime.now().strftime('%Y-%m-%d')
+        }
+        self.save_watchlist(watchlist)
+        return code
+
     def get_market_sentiment(self):
         """코스피 지수의 이평선 기반 시장 심리 분석 (상세 한글 설명 추가)"""
         try:
@@ -639,20 +695,35 @@ class StockAnalyzer:
         today = datetime.datetime.now()
         kr_holidays = holidays.KR()
         is_manual = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
+        force_run = os.environ.get("FORCE_RUN", "").lower() in ("1", "true", "yes")
         
         # 주말(5: 토요일, 6: 일요일) 또는 공휴일인 경우 스케줄 실행 안함
-        # 단, 수동 실행(workflow_dispatch)일 경우에는 강제 실행합니다.
-        if not is_manual and (today.weekday() >= 5 or today.date() in kr_holidays):
-            print(f"[{today}] 주말 또는 한국 공휴일 휴장일입니다. 종합 분석을 건너뜁니다.")
-            sys.exit(0)
-            
+        # 단, 수동 실행(workflow_dispatch) 또는 FORCE_RUN=true일 경우에는 강제 실행합니다.
+        if today.weekday() >= 5 or today.date() in kr_holidays:
+            if is_manual or force_run:
+                print(f"[{today}] 수동 실행/강제 실행 모드로 주말/공휴일 체크를 무시하고 분석을 진행합니다.")
+            else:
+                print(f"[{today}] 주말 또는 한국 공휴일 휴장일입니다. 종합 분석을 건너뜁니다.")
+                sys.exit(0)
+        
+        if force_run and not is_manual:
+            print("FORCE_RUN이 활성화되어 있어 강제 실행합니다.")
+        
         print("종합 분석 및 AI 리포트 생성 시작...")
         
+        # watchlist 정리
+        self.clean_watchlist()
+
         # 1.데이터 수집
         us_summary = self.get_us_market_summary()
         sentiment_msg, is_positive = self.get_market_sentiment()
         recs_msg, recs_raw = self.analyze_kospi()
         sell_alerts = self.analyze_holdings()
+
+        # 추천 종목 1위 자동 추가
+        added_code = self.add_top_recommendation_to_watchlist(recs_raw)
+        if added_code:
+            print(f"추천 종목 최상위 {added_code}을(를) watchlist에 자동 추가했습니다.")
         
         # 2. AI에게 전달할 데이터 정리
         market_context = us_summary + "\n" + sentiment_msg

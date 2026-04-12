@@ -19,16 +19,24 @@ class MarketMonitor:
         today = datetime.datetime.now()
         kr_holidays = holidays.KR()
         is_manual = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
+        force_run = os.environ.get("FORCE_RUN", "").lower() in ("1", "true", "yes")
         
         # 주말(5: 토요일, 6: 일요일) 또는 공휴일인 경우 스케줄 실행 안함
-        # 단, 수동 실행(workflow_dispatch)일 경우에는 강제 실행합니다.
-        if not is_manual and (today.weekday() >= 5 or today.date() in kr_holidays):
-            print(f"[{today}] 주말 또는 한국 공휴일 휴장일입니다. 실시간 감시를 건너뜁니다.")
-            sys.exit(0)
-            
+        # 단, 수동 실행(workflow_dispatch) 또는 FORCE_RUN=true일 경우에는 강제 실행합니다.
+        if today.weekday() >= 5 or today.date() in kr_holidays:
+            if is_manual or force_run:
+                print(f"[{today}] 수동 실행/강제 실행 모드로 주말/공휴일 체크를 무시하고 실시간 감시를 진행합니다.")
+            else:
+                print(f"[{today}] 주말 또는 한국 공휴일 휴장일입니다. 실시간 감시를 건너뜁니다.")
+                sys.exit(0)
+        
+        if force_run and not is_manual:
+            print("FORCE_RUN이 활성화되어 있어 강제 실행합니다.")
+        
         print(f"[{today}] AI 기반 실시간 감시 시작...")
         
         holdings = self.analyzer.load_holdings()
+        self.analyzer.clean_watchlist()
         watchlist = self.analyzer.load_watchlist()
         
         # 1. 시장 심리 요약 데이터 확보
