@@ -387,40 +387,67 @@ class StockAnalyzer:
 
     def get_indicators(self, df, kospi_index=None):
         """기술적 지표 계산 (SMA, RSI, MACD, BB, StochRSI, MFI)"""
+        df = df.copy()
+        if len(df) < 2:
+            return df
+
         # SMAs for Trend Template
-        df['SMA50'] = ta.sma(df['Close'], length=self.config.get('SMA50', 50))
-        df['SMA150'] = ta.sma(df['Close'], length=self.config.get('SMA150', 150))
-        df['SMA200'] = ta.sma(df['Close'], length=self.config.get('SMA200', 200))
-        
+        sma50 = ta.sma(df['Close'], length=self.config.get('SMA50', 50))
+        sma150 = ta.sma(df['Close'], length=self.config.get('SMA150', 150))
+        sma200 = ta.sma(df['Close'], length=self.config.get('SMA200', 200))
+        df['SMA50'] = sma50 if sma50 is not None else np.nan
+        df['SMA150'] = sma150 if sma150 is not None else np.nan
+        df['SMA200'] = sma200 if sma200 is not None else np.nan
+
         # Relative Strength vs KOSPI Index
         if kospi_index is not None:
-            # 주가와 지수의 상대적 수익률 비교 (최근 1년치 기준 가중 평균)
-            # 단순화를 위해 최근 120일간의 지수 대비 초과 수익률 합산
             common_idx = df.index.intersection(kospi_index.index)
             if len(common_idx) > 20:
                 stock_returns = df.loc[common_idx, 'Close'].pct_change(20)
                 index_returns = kospi_index.loc[common_idx, 'Close'].pct_change(20)
                 df.loc[common_idx, 'RS_LINE'] = stock_returns - index_returns
-        
+
         # RSI
-        df['RSI'] = ta.rsi(df['Close'], length=self.config.get('RSI_LENGTH', 14))
-        
+        rsi = ta.rsi(df['Close'], length=self.config.get('RSI_LENGTH', 14))
+        df['RSI'] = rsi if rsi is not None else np.nan
+
         # MACD
+        df['MACD'] = np.nan
+        df['MACDs'] = np.nan
+        df['MACDh'] = np.nan
         macd = ta.macd(df['Close'])
-        df['MACD'] = macd['MACD_12_26_9']
-        df['MACDs'] = macd['MACDs_12_26_9']
-        df['MACDh'] = macd['MACDh_12_26_9']
-        
+        if isinstance(macd, dict):
+            if 'MACD_12_26_9' in macd and macd['MACD_12_26_9'] is not None:
+                df['MACD'] = macd['MACD_12_26_9']
+            if 'MACDs_12_26_9' in macd and macd['MACDs_12_26_9'] is not None:
+                df['MACDs'] = macd['MACDs_12_26_9']
+            if 'MACDh_12_26_9' in macd and macd['MACDh_12_26_9'] is not None:
+                df['MACDh'] = macd['MACDh_12_26_9']
+
         # Bollinger Bands
         bb_length = self.config.get('BB_LENGTH', 20)
         bb_std = self.config.get('BB_STD', 2)
+        df['BBU'] = np.nan
+        df['BBM'] = np.nan
+        df['BBL'] = np.nan
+        df['BBW'] = np.nan
         bbands = ta.bbands(df['Close'], length=bb_length, std=bb_std)
-        df['BBU'] = bbands[f'BBU_{bb_length}_{bb_std}.0']
-        df['BBM'] = bbands[f'BBM_{bb_length}_{bb_std}.0']
-        df['BBL'] = bbands[f'BBL_{bb_length}_{bb_std}.0']
-        df['BBW'] = (df['BBU'] - df['BBL']) / df['BBM']
-        
+        if bbands is not None:
+            bbu_col = f'BBU_{bb_length}_{bb_std}.0'
+            bbm_col = f'BBM_{bb_length}_{bb_std}.0'
+            bbl_col = f'BBL_{bb_length}_{bb_std}.0'
+            if bbu_col in bbands and bbands[bbu_col] is not None:
+                df['BBU'] = bbands[bbu_col]
+            if bbm_col in bbands and bbands[bbm_col] is not None:
+                df['BBM'] = bbands[bbm_col]
+            if bbl_col in bbands and bbands[bbl_col] is not None:
+                df['BBL'] = bbands[bbl_col]
+            if df['BBU'].notna().any() and df['BBL'].notna().any() and df['BBM'].notna().any():
+                df['BBW'] = (df['BBU'] - df['BBL']) / df['BBM']
+
         # Stochastic RSI
+        df['STOCH_K'] = np.nan
+        df['STOCH_D'] = np.nan
         stoch = ta.stochrsi(
             df['Close'],
             length=self.config.get('STOCH_RSI_LENGTH', 14),
@@ -428,15 +455,21 @@ class StockAnalyzer:
             k=self.config.get('STOCH_K', 3),
             d=self.config.get('STOCH_D', 3)
         )
-        df['STOCH_K'] = stoch[f'STOCHRSIk_{self.config.get("STOCH_RSI_LENGTH", 14)}_{self.config.get("RSI_LENGTH", 14)}_{self.config.get("STOCH_K", 3)}_{self.config.get("STOCH_D", 3)}']
-        df['STOCH_D'] = stoch[f'STOCHRSId_{self.config.get("STOCH_RSI_LENGTH", 14)}_{self.config.get("RSI_LENGTH", 14)}_{self.config.get("STOCH_K", 3)}_{self.config.get("STOCH_D", 3)}']
-        
+        if stoch is not None:
+            k_col = f'STOCHRSIk_{self.config.get("STOCH_RSI_LENGTH", 14)}_{self.config.get("RSI_LENGTH", 14)}_{self.config.get("STOCH_K", 3)}_{self.config.get("STOCH_D", 3)}'
+            d_col = f'STOCHRSId_{self.config.get("STOCH_RSI_LENGTH", 14)}_{self.config.get("RSI_LENGTH", 14)}_{self.config.get("STOCH_K", 3)}_{self.config.get("STOCH_D", 3)}'
+            if k_col in stoch and stoch[k_col] is not None:
+                df['STOCH_K'] = stoch[k_col]
+            if d_col in stoch and stoch[d_col] is not None:
+                df['STOCH_D'] = stoch[d_col]
+
         # MFI (Money Flow Index)
-        df['MFI'] = ta.mfi(df['High'], df['Low'], df['Close'], df['Volume'], length=self.config.get('MFI_LENGTH', 14))
-        
+        mfi = ta.mfi(df['High'], df['Low'], df['Close'], df['Volume'], length=self.config.get('MFI_LENGTH', 14))
+        df['MFI'] = mfi if mfi is not None else np.nan
+
         # Volume Average
         df['VOL_AVG'] = df['Volume'].rolling(window=self.config.get('VOL_AVG_WINDOW', 20)).mean()
-        
+
         return df
 
     def detect_divergence(self, df, idx=-1):
