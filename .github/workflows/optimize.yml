@@ -1,0 +1,37 @@
+name: Strategy Optimizer
+
+on:
+  schedule:
+    # Run every Sunday 23:00 UTC (08:00 KST Monday)
+    - cron: '0 23 * * 0'
+  workflow_dispatch:
+
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run optimizer
+        run: |
+          python optimizer.py
+
+      - name: Commit optimized strategy config
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "Auto-optimized strategy config [skip ci]"
+          file_pattern: 'strategy_config.json'
+          branch: main
+          push_options: '--force'

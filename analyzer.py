@@ -18,15 +18,56 @@ class StockAnalyzer:
     def __init__(self):
         self.notifier = TelegramNotifier()
         self.holdings_file = 'holdings.json'
+        self.strategy_config_file = 'strategy_config.json'
         self.holdings = self.load_holdings()
+        self.config = self.load_strategy_config()
         
         # Gemini AI 설정
         api_key = os.environ.get("GEMINI_API_KEY")
-        if api_key:
+        if api_key and genai is not None:
             genai.configure(api_key=api_key)
             self.model = genai.GenerativeModel('gemini-2.0-flash')
         else:
             self.model = None
+
+    def load_strategy_config(self):
+        """전략 파라미터를 외부 JSON 파일로 로드"""
+        default = {
+            "SMA50": 50,
+            "SMA150": 150,
+            "SMA200": 200,
+            "RSI_LENGTH": 14,
+            "BB_LENGTH": 20,
+            "BB_STD": 2,
+            "STOCH_RSI_LENGTH": 14,
+            "STOCH_K": 3,
+            "STOCH_D": 3,
+            "MFI_LENGTH": 14,
+            "VOL_AVG_WINDOW": 20,
+            "TREND_TEMPLATE_LOOKBACK": 20,
+            "TREND_TEMPLATE_PEAK_FACTOR": 0.75,
+            "TIER1_WIN_RATE": 60,
+            "TIER2_WIN_RATE": 50,
+            "TRAILING_STOP_PCT": 0.03,
+            "VALIDATE_LOOKBACK_DAYS": 120,
+            "VALIDATE_MAX_HOLD_DAYS": 20,
+            "VALIDATE_MIN_HISTORY": 200,
+            "VALIDATE_STOP_LOSS_PCT": -0.03,
+            "BACKTEST_SAMPLE_SIZE": 200
+        }
+        if os.path.exists(self.strategy_config_file):
+            try:
+                with open(self.strategy_config_file, 'r', encoding='utf-8') as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    default.update(loaded)
+            except Exception:
+                pass
+        return default
+
+    def save_strategy_config(self, config):
+        with open(self.strategy_config_file, 'w', encoding='utf-8') as f:
+            json.dump(config, f, ensure_ascii=False, indent=4)
 
     def load_holdings(self):
         """보유 종목 데이터 로드"""
@@ -185,9 +226,9 @@ class StockAnalyzer:
     def get_indicators(self, df, kospi_index=None):
         """기술적 지표 계산 (SMA, RSI, MACD, BB, StochRSI, MFI)"""
         # SMAs for Trend Template
-        df['SMA50'] = ta.sma(df['Close'], length=50)
-        df['SMA150'] = ta.sma(df['Close'], length=150)
-        df['SMA200'] = ta.sma(df['Close'], length=200)
+        df['SMA50'] = ta.sma(df['Close'], length=self.config.get('SMA50', 50))
+        df['SMA150'] = ta.sma(df['Close'], length=self.config.get('SMA150', 150))
+        df['SMA200'] = ta.sma(df['Close'], length=self.config.get('SMA200', 200))
         
         # Relative Strength vs KOSPI Index
         if kospi_index is not None:
@@ -200,7 +241,7 @@ class StockAnalyzer:
                 df.loc[common_idx, 'RS_LINE'] = stock_returns - index_returns
         
         # RSI
-        df['RSI'] = ta.rsi(df['Close'], length=14)
+        df['RSI'] = ta.rsi(df['Close'], length=self.config.get('RSI_LENGTH', 14))
         
         # MACD
         macd = ta.macd(df['Close'])
@@ -209,22 +250,30 @@ class StockAnalyzer:
         df['MACDh'] = macd['MACDh_12_26_9']
         
         # Bollinger Bands
-        bbands = ta.bbands(df['Close'], length=20, std=2)
-        df['BBU'] = bbands['BBU_20_2.0']
-        df['BBM'] = bbands['BBM_20_2.0']
-        df['BBL'] = bbands['BBL_20_2.0']
+        bb_length = self.config.get('BB_LENGTH', 20)
+        bb_std = self.config.get('BB_STD', 2)
+        bbands = ta.bbands(df['Close'], length=bb_length, std=bb_std)
+        df['BBU'] = bbands[f'BBU_{bb_length}_{bb_std}.0']
+        df['BBM'] = bbands[f'BBM_{bb_length}_{bb_std}.0']
+        df['BBL'] = bbands[f'BBL_{bb_length}_{bb_std}.0']
         df['BBW'] = (df['BBU'] - df['BBL']) / df['BBM']
         
         # Stochastic RSI
-        stoch = ta.stochrsi(df['Close'], length=14, rsi_length=14, k=3, d=3)
-        df['STOCH_K'] = stoch['STOCHRSIk_14_14_3_3']
-        df['STOCH_D'] = stoch['STOCHRSId_14_14_3_3']
+        stoch = ta.stochrsi(
+            df['Close'],
+            length=self.config.get('STOCH_RSI_LENGTH', 14),
+            rsi_length=self.config.get('RSI_LENGTH', 14),
+            k=self.config.get('STOCH_K', 3),
+            d=self.config.get('STOCH_D', 3)
+        )
+        df['STOCH_K'] = stoch[f'STOCHRSIk_{self.config.get("STOCH_RSI_LENGTH", 14)}_{self.config.get("RSI_LENGTH", 14)}_{self.config.get("STOCH_K", 3)}_{self.config.get("STOCH_D", 3)}']
+        df['STOCH_D'] = stoch[f'STOCHRSId_{self.config.get("STOCH_RSI_LENGTH", 14)}_{self.config.get("RSI_LENGTH", 14)}_{self.config.get("STOCH_K", 3)}_{self.config.get("STOCH_D", 3)}']
         
         # MFI (Money Flow Index)
-        df['MFI'] = ta.mfi(df['High'], df['Low'], df['Close'], df['Volume'], length=14)
+        df['MFI'] = ta.mfi(df['High'], df['Low'], df['Close'], df['Volume'], length=self.config.get('MFI_LENGTH', 14))
         
         # Volume Average
-        df['VOL_AVG'] = df['Volume'].rolling(window=20).mean()
+        df['VOL_AVG'] = df['Volume'].rolling(window=self.config.get('VOL_AVG_WINDOW', 20)).mean()
         
         return df
 
@@ -382,21 +431,25 @@ class StockAnalyzer:
         c1 = last['Close'] > last['SMA150'] and last['Close'] > last['SMA200']
         # 2. 150일 이평선이 200일 이평선 위에 있음
         c2 = last['SMA150'] > last['SMA200']
-        # 3. 200일 이평선이 최소 1개월간 상승 추세 (여기서는 단순하게 현재가 > 20일 전보다 큰지 확인)
-        c3 = last['SMA200'] > df_target['SMA200'].iloc[-20]
+        # 3. 200일 이평선이 최소 1개월간 상승 추세
+        lookback = self.config.get('TREND_TEMPLATE_LOOKBACK', 20)
+        c3 = last['SMA200'] > df_target['SMA200'].iloc[-lookback]
         # 4. 50일 이평선이 150일, 200일 위에 있음
         c4 = last['SMA50'] > last['SMA150'] and last['SMA50'] > last['SMA200']
-        # 5. 현재가가 52주 신고가 대비 25% 이내 (단순화: 최근 250일 최고가 대비)
+        # 5. 현재가가 52주 신고가 대비 일정 비율 이내
+        peak_factor = self.config.get('TREND_TEMPLATE_PEAK_FACTOR', 0.75)
         high_52w = df_target['Close'].tail(250).max()
-        c5 = last['Close'] >= (high_52w * 0.75)
+        c5 = last['Close'] >= (high_52w * peak_factor)
         
         return c1 and c2 and c3 and c4 and c5
 
     def validate_strategy(self, df, current_idx):
         """특정 종목의 과거 6개월 승률 검증 (미니 백테스트)"""
-        # current_idx 기준 과거 120거래일(약 6개월) 분석
-        lookback = 120
-        start_idx = max(200, current_idx - lookback)
+        # current_idx 기준 과거 VALIDATE_LOOKBACK_DAYS 분석
+        lookback = self.config.get('VALIDATE_LOOKBACK_DAYS', 120)
+        start_idx = max(self.config.get('VALIDATE_MIN_HISTORY', 200), current_idx - lookback)
+        max_hold = self.config.get('VALIDATE_MAX_HOLD_DAYS', 20)
+        stop_loss_pct = self.config.get('VALIDATE_STOP_LOSS_PCT', -0.03)
         
         trades = []
         for i in range(start_idx, current_idx):
@@ -404,16 +457,16 @@ class StockAnalyzer:
             # 트렌드 템플릿도 맞아야 함
             if reasons and self.is_trend_template(df, i):
                 buy_price = df.iloc[i]['Close']
-                # 트레일링 스톱 시뮬레이션 (최대 20일간 홀딩)
+                # 트레일링 스톱 시뮬레이션
                 max_p = buy_price
-                result = -0.03 # 기본 손절
-                for j in range(i + 1, min(i + 21, current_idx + 1)):
+                result = stop_loss_pct # 기본 손절
+                for j in range(i + 1, min(i + max_hold + 1, current_idx + 1)):
                     curr_p = df.iloc[j]['Close']
                     if curr_p > max_p: max_p = curr_p
-                    if (max_p - curr_p) / max_p >= 0.03:
+                    if (max_p - curr_p) / max_p >= abs(stop_loss_pct):
                         result = (curr_p - buy_price) / buy_price
                         break
-                    if j == i + 20: # 타임컷
+                    if j == i + max_hold: # 타임컷
                         result = (curr_p - buy_price) / buy_price
                 trades.append(result)
         
@@ -467,9 +520,9 @@ class StockAnalyzer:
                 }
 
                 # Tier Classification (1/2등급만 추천)
-                if is_elite and win_rate >= 60:
+                if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60):
                     results[1].append(stock_data)
-                elif is_above_200 and win_rate >= 50:
+                elif is_above_200 and win_rate >= self.config.get('TIER2_WIN_RATE', 50):
                     results[2].append(stock_data)
                 
                 count += 1

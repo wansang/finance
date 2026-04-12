@@ -19,11 +19,10 @@ class Backtester:
         print(f"Target Date (Buy): {target_date.date()}")
         print(f"Current Date (Sell): {current_date.date()}")
         
-        # 2. 모든 코스피 종목 리스팅 (속도를 위해 상위 300개만 샘플링)
-        stocks = fdr.StockListing('KOSPI')[:300]
-        # 테스트를 위해 상위 200개 종목만 먼저 수행 (속도 문제)
-        # 만약 전체를 원하시면[:200]을 제거하세요.
-        # stocks = stocks.head(200) 
+        # 2. 모든 코스피 종목 리스팅 (전략 설정 파일에서 샘플 개수 제어)
+        sample_size = self.analyzer.config.get('BACKTEST_SAMPLE_SIZE', 200)
+        stocks = fdr.StockListing('KOSPI')[:sample_size]
+        # 테스트를 위해 상위 sample_size개 종목을 샘플링합니다.
         
         results = []
         count = 0
@@ -63,7 +62,9 @@ class Backtester:
                     last = df.iloc[target_idx]
                     is_elite = self.analyzer.is_trend_template(df, target_idx)
                     is_above_200 = last['Close'] > last['SMA200']
-                    if not ((is_elite and win_rate >= 60) or (is_above_200 and win_rate >= 50)):
+                    tier1 = self.analyzer.config.get('TIER1_WIN_RATE', 60)
+                    tier2 = self.analyzer.config.get('TIER2_WIN_RATE', 50)
+                    if not ((is_elite and win_rate >= tier1) or (is_above_200 and win_rate >= tier2)):
                         continue
 
                     buy_price = df.iloc[target_idx]['Close']
@@ -82,10 +83,10 @@ class Backtester:
                             max_price_since_buy = curr_row['Close']
                         
                         # 고점 대비 3% 하락했는지 확인
-                        if (max_price_since_buy - curr_row['Close']) / max_price_since_buy >= 0.03:
+                        if (max_price_since_buy - curr_row['Close']) / max_price_since_buy >= self.analyzer.config.get('TRAILING_STOP_PCT', 0.03):
                             sell_price = curr_row['Close']
                             sell_date = df.index[i]
-                            exit_reason = "Trailing Stop (3%)"
+                            exit_reason = f"Trailing Stop ({self.analyzer.config.get('TRAILING_STOP_PCT', 0.03) * 100:.1f}%)"
                             break
                     # --- 트레일링 스톱 시뮬레이션 종료 ---
                     
