@@ -9,7 +9,10 @@ import time
 import json
 import os
 import html
-import google.generativeai as genai
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
 
 class StockAnalyzer:
     def __init__(self):
@@ -105,13 +108,34 @@ class StockAnalyzer:
         except Exception as e:
             return f"⚠️ 시장 분석 오류: {e}", False
 
-    def ask_ai_report(self, market_data, holding_data, watch_data):
+    def ask_ai_report(self, market_data, holding_data, watch_data, report_mode="monitor"):
         """Gemini AI를 사용하여 주식 전문가 스타일의 한글 리포트 생성"""
         if not self.model:
             return "⚠️ AI 설정(API Key)이 되어 있지 않아 기본 분석 결과만 전송합니다."
 
-        prompt = f"""
-주식 투자 전문가로서 아래 데이터를 바탕으로 30분 단위 실시간 감시 리포트를 작성해줘.
+        if report_mode == "monitor":
+            prompt = f"""
+주식 투자 전문가로서 아래 데이터를 바탕으로 30분 단위 실시간 모니터링 리포트를 작성해줘.
+
+[데이터 정보]
+1. 시장 상황: {market_data}
+2. 보유 종목 상태: {holding_data}
+3. 관심 종목 상태: {watch_data}
+
+[작성 가이드라인]
+- **어투**: 신뢰감 있고 친숙한 한국어 존댓말로 작성해줘.
+- **언어 제약**: 영어 문장을 절대 사용하지 말고, 전문 용어는 한글로 풀어서 설명해줘 (예: SELL -> 매도 권장, HOLD -> 포지션 유지).
+- **구조**:
+  1. 현재 시장의 전반적인 분위기를 한눈에 설명 (왜 좋은지 혹은 나쁜지 포함)
+  2. 보유 종목 각각에 대해 왜 지금 팔아야 하는지 또는 계속 보유해야 하는지를 이유 중심으로 설명해줘.
+  3. 관심 종목에 대한 현재 신호를 요약하고, 매수 기다림 또는 추가 관찰 이유를 설명해줘.
+- **금지**: 차트 지표 수치를 그대로 나열하지 말고 그 의미를 해석해서 설명해줘.
+
+가장 중요한 건 '왜'라는 질문에 답하는 거야. 시장 흐름과 보유/관심 종목 상태를 연결해서 명확히 말해줘.
+"""
+        else:
+            prompt = f"""
+주식 투자 전문가로서 아래 데이터를 바탕으로 일간 종합 투자 리포트를 작성해줘.
 
 [데이터 정보]
 1. 시장 상황: {market_data}
@@ -124,8 +148,8 @@ class StockAnalyzer:
 - **구조**:
   1. 현재 시장의 전반적인 분위기를 한눈에 설명 (왜 좋은지 혹은 나쁜지 포함)
   2. 보유 종목에 대해 왜 지금 팔아야 하거나 계속 가지고 있어야 하는지 '이유'를 들어 설명 (이평선, 지지선 등 언급)
-  3. 관심 종목 중 매수할 만한 것이 있다면 언급하며 추천 이유 설명
-- **금지**: 차트 데이터 수치들(SMA, RSI 등)을 그대로 나열하기보다 그게 '무슨 의미'인지 해석해서 한마디로 요약해줘.
+  3. 추천 종목 중 좋은 매수 기회를 판단하는 이유를 설명
+- **금지**: 차트 데이터 수치를 그대로 나열하기보다 그게 '무슨 의미'인지 해석해서 한마디로 요약해줘.
 
 가장 중요한 건 '왜'라는 질문에 답하는 거야. 시장 흐름에 비추어 대응 전략을 명확하게 제시해줘.
 """
@@ -134,7 +158,7 @@ class StockAnalyzer:
         for attempt in range(3):
             try:
                 response = self.model.generate_content(prompt)
-                return response.text
+                return response.text.strip()
             except Exception as e:
                 err_str = str(e)
                 if "429" in err_str and attempt < 2:
@@ -142,13 +166,21 @@ class StockAnalyzer:
                     print(f"AI 호출 한도 초과, {wait_sec}초 후 재시도... ({attempt+1}/3)")
                     time.sleep(wait_sec)
                     continue
-                fallback_msg = (
-                    f"🤖 자동 기술적 분석 리포트 (데이터 원본 전문)\n\n"
-                    f"📊 [지수/시장 상황]\n{market_data}\n\n"
-                    f"💼 [보유 종목]\n{holding_data}\n\n"
-                    f"👀 [추천 종목]\n{watch_data}"
-                )
-                return fallback_msg
+                if report_mode == "monitor":
+                    fallback_msg = (
+                        f"🤖 자동 기술적 분석 리포트 (데이터 원본 전문)\n\n"
+                        f"📊 [지수/시장 상황]\n{market_data}\n\n"
+                        f"💼 [보유 종목]\n{holding_data}\n\n"
+                        f"👀 [관심 종목]\n{watch_data}"
+                    )
+                else:
+                    fallback_msg = (
+                        f"🤖 자동 기술적 분석 리포트 (데이터 원본 전문)\n\n"
+                        f"📊 [지수/시장 상황]\n{market_data}\n\n"
+                        f"💼 [보유 종목]\n{holding_data}\n\n"
+                        f"👀 [추천 종목]\n{watch_data}"
+                    )
+                return fallback_msg.strip()
 
     def get_indicators(self, df, kospi_index=None):
         """기술적 지표 계산 (SMA, RSI, MACD, BB, StochRSI, MFI)"""
@@ -395,7 +427,7 @@ class StockAnalyzer:
         stocks = fdr.StockListing('KOSPI')
         kospi_index = fdr.DataReader('KS11', start=(datetime.datetime.now() - datetime.timedelta(days=365)).strftime('%Y-%m-%d'))
         
-        results = {1: [], 2: [], 3: []}
+        results = {1: [], 2: []}
         count = 0
         total = len(stocks)
         
@@ -434,13 +466,11 @@ class StockAnalyzer:
                     'win_rate': win_rate, 'avg_ret': avg_ret, 'rs_score': rs_score
                 }
 
-                # Tier Classification
+                # Tier Classification (1/2등급만 추천)
                 if is_elite and win_rate >= 60:
                     results[1].append(stock_data)
                 elif is_above_200 and win_rate >= 50:
                     results[2].append(stock_data)
-                elif win_rate >= 40:
-                    results[3].append(stock_data)
                 
                 count += 1
                 if count % 200 == 0: print(f"Analyzed {count}/{total} stocks...")
@@ -449,18 +479,21 @@ class StockAnalyzer:
 
         # 결과 포맷팅
         formatted_recs = []
-        tier_names = {1: "🥇 지금 매수", 2: "🥈 신중히 매수", 3: "🥉 추가 확인 후 매수"}
+        tier_names = {1: "🥇 지금 매수", 2: "🥈 신중히 매수"}
         
-        for t in [1, 2, 3]:
+        for t in [1, 2]:
             if not results[t]: continue
             # RS_SCORE 기준 정렬
             results[t].sort(key=lambda x: x['rs_score'], reverse=True)
             
-            formatted_recs.append(f"\n<b>{tier_names[t]}</b>")
+            formatted_recs.append(f"<b>{tier_names[t]}</b>")
             for r in results[t][:5]: # 각 등급별 상위 5개만 노출
-                msg = f"• <b>{r['name']}</b>({r['code']}): {r['reasons']}\n"
+                msg = f"• <b>{r['name']}</b>({r['code']}): {r['reasons']}"
                 formatted_recs.append(msg)
+            formatted_recs.append("")
             
+        if formatted_recs and formatted_recs[-1] == "":
+            formatted_recs.pop()
         return formatted_recs, results
 
     def analyze_holdings(self):
@@ -523,9 +556,10 @@ class StockAnalyzer:
         final_report = self.ask_ai_report(
             market_data=market_context,
             holding_data=holding_context,
-            watch_data=recommendation_context
+            watch_data=recommendation_context,
+            report_mode="daily"
         )
-        
+
         # 제목 및 추가 정보 결합
         today = datetime.datetime.now().strftime('%Y-%m-%d')
         styled_report = f"📅 <b>[오늘의 AI 종합 투자 리포트 - {today}]</b>\n\n" + final_report

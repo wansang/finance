@@ -56,9 +56,16 @@ class Backtester:
                     target_idx = df.index.get_loc(target_date)
                     actual_buy_date = target_date
                 
-                # 신호 확인 및 엘리트 트렌드 템플릿 필터링
+                # 신호 확인 및 1/2등급 기준 필터링
                 reasons = self.analyzer.check_signals(df, target_idx)
-                if reasons and self.analyzer.is_trend_template(df, target_idx):
+                if reasons:
+                    win_rate, avg_ret = self.analyzer.validate_strategy(df, target_idx)
+                    last = df.iloc[target_idx]
+                    is_elite = self.analyzer.is_trend_template(df, target_idx)
+                    is_above_200 = last['Close'] > last['SMA200']
+                    if not ((is_elite and win_rate >= 60) or (is_above_200 and win_rate >= 50)):
+                        continue
+
                     buy_price = df.iloc[target_idx]['Close']
                     actual_buy_date = df.index[target_idx]
                     
