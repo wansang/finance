@@ -29,35 +29,86 @@ class StockAnalyzer:
         self.config = self.load_strategy_config()
         
         # Gemini AI 설정
-        self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
+        self.gemini_api_key = self.load_gemini_api_key()
+        self.gemini_source = 'env' if os.environ.get('GEMINI_API_KEY') else ('dotenv' if self.gemini_api_key else None)
         self.model = None
+        self.model_name = None
         self.client = None
         self.ai_enabled = False
         self.genai_library = GENAI_LIBRARY
         if self.gemini_api_key and genai is not None:
-            try:
-                if self.genai_library == 'genai':
-                    # google.genai SDK 사용
-                    self.client = genai.Client(api_key=self.gemini_api_key)
-                    self.model = self.client.chats.create(model='gemini-2.0-flash')
-                else:
-                    # google.generativeai SDK 사용
-                    genai.configure(api_key=self.gemini_api_key)
-                    if hasattr(genai, 'get_model'):
-                        self.model = genai.get_model('gemini-2.0-flash')
-                    else:
-                        self.model = genai.GenerativeModel('gemini-2.0-flash')
-                self.ai_enabled = True
-            except Exception as e:
-                print(f"AI 초기화 실패: {e}")
-                self.model = None
-                self.client = None
-                self.ai_enabled = False
+            for model_name in self.supported_gemini_models():
+                try:
+                    self.model_name = model_name
+                    self.model = self.create_gemini_model(model_name)
+                    self.ai_enabled = True
+                    print(f"AI 초기화 성공: library={self.genai_library}, source={self.gemini_source}, model={model_name}")
+                    break
+                except Exception as e:
+                    err_str = str(e)
+                    if 'NOT_FOUND' in err_str or 'no longer available' in err_str or 'Resource not found' in err_str:
+                        continue
+                    print(f"AI 초기화 실패: {e}")
+                    self.model = None
+                    self.client = None
+                    self.ai_enabled = False
+                    break
+            if not self.ai_enabled:
+                print("Gemini 모델 초기화에 실패했습니다. 사용 가능한 모델과 키 권한을 확인하세요.")
         else:
             if self.gemini_api_key and genai is None:
                 print("AI SDK 패키지가 설치되어 있지 않습니다. google.genai 또는 google.generativeai를 설치하세요.")
             elif not self.gemini_api_key:
-                print("GEMINI_API_KEY가 설정되어 있지 않습니다.")
+                if os.environ.get('GEMINI_API_KEY'):
+                    print("GEMINI_API_KEY 값을 가져왔지만, 초기화에 실패했습니다.")
+                else:
+                    print("GEMINI_API_KEY를 찾지 못했습니다. 환경변수 또는 .env 파일을 확인하세요.")
+            if self.gemini_api_key:
+                print(f"GEMINI_API_KEY present from {self.gemini_source}")
+
+    def supported_gemini_models(self):
+        return [
+            'gemini-flash-latest',
+            'gemini-pro-latest',
+            'gemini-2.5-flash',
+            'gemini-2.5-pro',
+            'gemini-2.5-flash-lite',
+            'gemini-2.0-flash',
+            'gemini-2.0-flash-001'
+        ]
+
+    def create_gemini_model(self, model_name):
+        if self.genai_library == 'genai':
+            self.client = genai.Client(api_key=self.gemini_api_key)
+            return self.client.chats.create(model=model_name)
+        if self.genai_library == 'generativeai':
+            genai.configure(api_key=self.gemini_api_key)
+            if hasattr(genai, 'get_model'):
+                return genai.get_model(model_name)
+            return genai.GenerativeModel(model_name)
+        raise RuntimeError('지원되지 않는 AI 모델 인터페이스입니다.')
+
+    def load_gemini_api_key(self):
+        key = os.environ.get('GEMINI_API_KEY')
+        if key:
+            return key
+
+        env_path = os.path.join(os.getcwd(), '.env')
+        if os.path.exists(env_path):
+            try:
+                with open(env_path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        stripped = line.strip()
+                        if not stripped or stripped.startswith('#'):
+                            continue
+                        if '=' not in stripped:
+                            continue
+                        name, value = stripped.split('=', 1)
+                        if name.strip() == 'GEMINI_API_KEY':
+                            return value.strip().strip('"').strip("'")
+            except Exception:
+                pass
+        return None
 
     def load_strategy_config(self):
         """전략 파라미터를 외부 JSON 파일로 로드"""
@@ -315,7 +366,8 @@ class StockAnalyzer:
                     response = self.model.generate_content(prompt)
                     return response.text.strip()
                 elif hasattr(genai, 'generate_text'):
-                    response = genai.generate_text(model='gemini-2.0-flash', prompt=prompt)
+                    model_name = self.model_name or 'gemini-2.1'
+                    response = genai.generate_text(model=model_name, prompt=prompt)
                     if hasattr(response, 'text'):
                         return response.text.strip()
                     if hasattr(response, 'last'):
