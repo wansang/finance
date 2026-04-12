@@ -368,9 +368,7 @@ class StockAnalyzer:
                     if not hasattr(self.model, 'generate_content') and hasattr(genai, 'GenerativeModel'):
                         self.model = genai.GenerativeModel(self.model_name)
                     if hasattr(self.model, 'generate_content'):
-                        response = self.model.generate_content([
-                            {'type': 'text', 'text': prompt}
-                        ])
+                        response = self.model.generate_content(prompt)
                     elif hasattr(self.model, 'generate_text'):
                         response = self.model.generate_text(prompt)
                     elif hasattr(self.model, 'send_message'):

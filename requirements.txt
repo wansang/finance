@@ -7,4 +7,5 @@ numpy
 matplotlib
 requests
 google-generativeai
+google-genai
 holidays
