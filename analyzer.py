@@ -305,6 +305,63 @@ class StockAnalyzer:
 
         return "\n\n".join(sections).strip()
 
+    @staticmethod
+    def extract_text_from_content(content):
+        """Convert a Gemini Content object or candidate content to plain text."""
+        if content is None:
+            return None
+        if isinstance(content, str):
+            return content
+        if isinstance(content, (list, tuple)):
+            text_parts = []
+            for part in content:
+                part_text = StockAnalyzer.extract_text_from_content(part)
+                if part_text:
+                    text_parts.append(part_text)
+            return "".join(text_parts).strip() or None
+        if isinstance(content, dict):
+            if 'text' in content:
+                return StockAnalyzer.extract_text_from_content(content['text'])
+            if 'content' in content:
+                return StockAnalyzer.extract_text_from_content(content['content'])
+            if 'parts' in content:
+                return StockAnalyzer.extract_text_from_content(content['parts'])
+            return str(content)
+        if hasattr(content, 'text'):
+            return StockAnalyzer.extract_text_from_content(content.text)
+        if hasattr(content, 'content'):
+            return StockAnalyzer.extract_text_from_content(content.content)
+        if hasattr(content, 'parts') and content.parts:
+            text_parts = []
+            for part in content.parts:
+                if not part:
+                    continue
+                part_text = StockAnalyzer.extract_text_from_content(part)
+                if part_text:
+                    text_parts.append(part_text)
+            return "".join(text_parts).strip() or None
+        if hasattr(content, 'inline_data') and content.inline_data is not None:
+            return None
+        return str(content)
+
+    def _normalize_ai_response(self, response):
+        text = StockAnalyzer.extract_text_from_content(response)
+        if text:
+            return text.strip()
+        if hasattr(response, 'text'):
+            text = StockAnalyzer.extract_text_from_content(response.text)
+            if text:
+                return text.strip()
+        if hasattr(response, 'candidates') and response.candidates:
+            text = StockAnalyzer.extract_text_from_content(response.candidates[0].content)
+            if text:
+                return text.strip()
+        if hasattr(response, 'parts'):
+            text = StockAnalyzer.extract_text_from_content(response.parts)
+            if text:
+                return text.strip()
+        return None
+
     def ask_ai_report(self, market_data, holding_data, watch_data, report_mode="monitor"):
         """Gemini AI를 사용하여 주식 전문가 스타일의 한글 리포트 생성"""
         if not self.model:
@@ -358,12 +415,10 @@ class StockAnalyzer:
             try:
                 if self.genai_library == 'genai' and self.model is not None:
                     response = self.model.send_message(prompt)
-                    if hasattr(response, 'candidates') and response.candidates:
-                        content = response.candidates[0].content
-                        return content.strip() if content else str(response).strip()
-                    if hasattr(response, 'text'):
-                        return response.text.strip()
-                    return str(response).strip()
+                    normalized = self._normalize_ai_response(response)
+                    if normalized:
+                        return normalized
+                    return self.build_local_report(market_data, holding_data, watch_data, report_mode)
                 elif self.genai_library == 'generativeai' and self.model is not None:
                     if not hasattr(self.model, 'generate_content') and hasattr(genai, 'GenerativeModel'):
                         self.model = genai.GenerativeModel(self.model_name)
@@ -375,19 +430,17 @@ class StockAnalyzer:
                         response = self.model.send_message(prompt)
                     else:
                         raise RuntimeError('google.generativeai 모델 객체에서 지원되는 호출 메서드가 없습니다.')
-                    if hasattr(response, 'text'):
-                        return response.text.strip()
-                    if hasattr(response, 'candidates') and response.candidates:
-                        return response.candidates[0].content.strip()
-                    return str(response).strip()
+                    normalized = self._normalize_ai_response(response)
+                    if normalized:
+                        return normalized
+                    return self.build_local_report(market_data, holding_data, watch_data, report_mode)
                 elif hasattr(genai, 'generate_text'):
                     model_name = self.model_name or 'gemini-2.1'
                     response = genai.generate_text(model=model_name, prompt=prompt)
-                    if hasattr(response, 'text'):
-                        return response.text.strip()
-                    if hasattr(response, 'last'):
-                        return response.last.strip()
-                    return str(response).strip()
+                    normalized = self._normalize_ai_response(response)
+                    if normalized:
+                        return normalized
+                    return self.build_local_report(market_data, holding_data, watch_data, report_mode)
                 else:
                     raise RuntimeError('지원되지 않는 AI 모델 인터페이스입니다.')
             except Exception as e:
