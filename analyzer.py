@@ -10,9 +10,15 @@ import json
 import os
 import html
 try:
-    import google.generativeai as genai
+    import google.genai as genai
+    GENAI_LIBRARY = 'genai'
 except ImportError:
-    genai = None
+    try:
+        import google.generativeai as genai
+        GENAI_LIBRARY = 'generativeai'
+    except ImportError:
+        genai = None
+        GENAI_LIBRARY = None
 
 class StockAnalyzer:
     def __init__(self):
@@ -23,12 +29,35 @@ class StockAnalyzer:
         self.config = self.load_strategy_config()
         
         # Gemini AI 설정
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if api_key and genai is not None:
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel('gemini-2.0-flash')
+        self.gemini_api_key = os.environ.get("GEMINI_API_KEY")
+        self.model = None
+        self.client = None
+        self.ai_enabled = False
+        self.genai_library = GENAI_LIBRARY
+        if self.gemini_api_key and genai is not None:
+            try:
+                if self.genai_library == 'genai':
+                    # google.genai SDK 사용
+                    self.client = genai.Client(api_key=self.gemini_api_key)
+                    self.model = self.client.chats.create(model='gemini-2.0-flash')
+                else:
+                    # google.generativeai SDK 사용
+                    genai.configure(api_key=self.gemini_api_key)
+                    if hasattr(genai, 'get_model'):
+                        self.model = genai.get_model('gemini-2.0-flash')
+                    else:
+                        self.model = genai.GenerativeModel('gemini-2.0-flash')
+                self.ai_enabled = True
+            except Exception as e:
+                print(f"AI 초기화 실패: {e}")
+                self.model = None
+                self.client = None
+                self.ai_enabled = False
         else:
-            self.model = None
+            if self.gemini_api_key and genai is None:
+                print("AI SDK 패키지가 설치되어 있지 않습니다. google.genai 또는 google.generativeai를 설치하세요.")
+            elif not self.gemini_api_key:
+                print("GEMINI_API_KEY가 설정되어 있지 않습니다.")
 
     def load_strategy_config(self):
         """전략 파라미터를 외부 JSON 파일로 로드"""
@@ -149,10 +178,28 @@ class StockAnalyzer:
         except Exception as e:
             return f"⚠️ 시장 분석 오류: {e}", False
 
+    def build_local_report(self, market_data, holding_data, watch_data, report_mode="monitor"):
+        """AI 미사용 시에도 읽기 쉬운 로컬 요약 리포트를 생성"""
+        header = "🤖 자동 기술적 분석 리포트 (로컬 요약)"
+        if report_mode == "monitor":
+            title = "[실시간 모니터링 요약]"
+            watch_label = "관심 종목"
+        else:
+            title = "[일간 종합 투자 요약]"
+            watch_label = "추천 종목"
+
+        sections = [header, title, "[시장 요약]", market_data.strip()]
+        if holding_data:
+            sections.extend(["[보유 종목]", holding_data.strip()])
+        if watch_data:
+            sections.extend([f"[{watch_label}]", watch_data.strip()])
+
+        return "\n\n".join(sections).strip()
+
     def ask_ai_report(self, market_data, holding_data, watch_data, report_mode="monitor"):
         """Gemini AI를 사용하여 주식 전문가 스타일의 한글 리포트 생성"""
         if not self.model:
-            return "⚠️ AI 설정(API Key)이 되어 있지 않아 기본 분석 결과만 전송합니다."
+            return self.build_local_report(market_data, holding_data, watch_data, report_mode)
 
         if report_mode == "monitor":
             prompt = f"""
@@ -200,8 +247,26 @@ class StockAnalyzer:
         wait_times = [30, 60]
         for attempt in range(3):
             try:
-                response = self.model.generate_content(prompt)
-                return response.text.strip()
+                if self.genai_library == 'genai' and self.model is not None:
+                    response = self.model.send_message(prompt)
+                    if hasattr(response, 'candidates') and response.candidates:
+                        content = response.candidates[0].content
+                        return content.strip() if content else str(response).strip()
+                    if hasattr(response, 'text'):
+                        return response.text.strip()
+                    return str(response).strip()
+                elif self.genai_library == 'generativeai' and self.model is not None:
+                    response = self.model.generate_content(prompt)
+                    return response.text.strip()
+                elif hasattr(genai, 'generate_text'):
+                    response = genai.generate_text(model='gemini-2.0-flash', prompt=prompt)
+                    if hasattr(response, 'text'):
+                        return response.text.strip()
+                    if hasattr(response, 'last'):
+                        return response.last.strip()
+                    return str(response).strip()
+                else:
+                    raise RuntimeError('지원되지 않는 AI 모델 인터페이스입니다.')
             except Exception as e:
                 err_str = str(e)
                 if "429" in err_str and attempt < 2:
@@ -209,21 +274,8 @@ class StockAnalyzer:
                     print(f"AI 호출 한도 초과, {wait_sec}초 후 재시도... ({attempt+1}/3)")
                     time.sleep(wait_sec)
                     continue
-                if report_mode == "monitor":
-                    fallback_msg = (
-                        f"🤖 자동 기술적 분석 리포트 (데이터 원본 전문)\n\n"
-                        f"📊 [지수/시장 상황]\n{market_data}\n\n"
-                        f"💼 [보유 종목]\n{holding_data}\n\n"
-                        f"👀 [관심 종목]\n{watch_data}"
-                    )
-                else:
-                    fallback_msg = (
-                        f"🤖 자동 기술적 분석 리포트 (데이터 원본 전문)\n\n"
-                        f"📊 [지수/시장 상황]\n{market_data}\n\n"
-                        f"💼 [보유 종목]\n{holding_data}\n\n"
-                        f"👀 [추천 종목]\n{watch_data}"
-                    )
-                return fallback_msg.strip()
+                print(f"AI 호출 중 오류 발생: {e}")
+                return self.build_local_report(market_data, holding_data, watch_data, report_mode)
 
     def get_indicators(self, df, kospi_index=None):
         """기술적 지표 계산 (SMA, RSI, MACD, BB, StochRSI, MFI)"""
