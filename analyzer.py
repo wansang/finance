@@ -83,9 +83,11 @@ class StockAnalyzer:
             return self.client.chats.create(model=model_name)
         if self.genai_library == 'generativeai':
             genai.configure(api_key=self.gemini_api_key)
+            if hasattr(genai, 'GenerativeModel'):
+                return genai.GenerativeModel(model_name)
             if hasattr(genai, 'get_model'):
                 return genai.get_model(model_name)
-            return genai.GenerativeModel(model_name)
+            raise RuntimeError('google.generativeai에서 모델을 생성할 수 없습니다.')
         raise RuntimeError('지원되지 않는 AI 모델 인터페이스입니다.')
 
     def load_gemini_api_key(self):
@@ -363,8 +365,23 @@ class StockAnalyzer:
                         return response.text.strip()
                     return str(response).strip()
                 elif self.genai_library == 'generativeai' and self.model is not None:
-                    response = self.model.generate_content(prompt)
-                    return response.text.strip()
+                    if not hasattr(self.model, 'generate_content') and hasattr(genai, 'GenerativeModel'):
+                        self.model = genai.GenerativeModel(self.model_name or model_name)
+                    if hasattr(self.model, 'generate_content'):
+                        response = self.model.generate_content([
+                            {'type': 'text', 'text': prompt}
+                        ])
+                    elif hasattr(self.model, 'generate_text'):
+                        response = self.model.generate_text(prompt)
+                    elif hasattr(self.model, 'send_message'):
+                        response = self.model.send_message(prompt)
+                    else:
+                        raise RuntimeError('google.generativeai 모델 객체에서 지원되는 호출 메서드가 없습니다.')
+                    if hasattr(response, 'text'):
+                        return response.text.strip()
+                    if hasattr(response, 'candidates') and response.candidates:
+                        return response.candidates[0].content.strip()
+                    return str(response).strip()
                 elif hasattr(genai, 'generate_text'):
                     model_name = self.model_name or 'gemini-2.1'
                     response = genai.generate_text(model=model_name, prompt=prompt)
