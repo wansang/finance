@@ -236,7 +236,7 @@ class StockAnalyzer:
         amount = current_price - previous_price
         percent = (amount / previous_price) * 100
         label = self.get_price_label(code)
-        arrow = '�' if amount > 0 else ('🔽' if amount < 0 else '⏺')
+        arrow = '🔺' if amount > 0 else ('🔽' if amount < 0 else '⏺')
         amount_text = f"{amount:+,.0f}{label}"
         percent_text = f"{percent:+.2f}%"
         return f"{arrow} 등락가 {amount_text}, 등락율 {percent_text}"
