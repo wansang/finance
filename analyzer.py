@@ -198,7 +198,7 @@ class StockAnalyzer:
         code = str(code).upper()
         if code.isdigit() or code.endswith(('.KS', '.KQ', '.KR')):
             return '원'
-        if code.endswith('.TO'):
+        if code.endswith('.TO') or code.endswith(':TO') or code.startswith('TSX:'):
             return 'CAD'
         if code.endswith(('.US', '.O', '.N', '.A')) or code.startswith(('NASDAQ:', 'NYSE:', 'AMEX:')):
             return '달러'
@@ -206,6 +206,8 @@ class StockAnalyzer:
             return '홍콩달러'
         if code.endswith('.L'):
             return '파운드'
+        if code.isalpha():
+            return '달러'
         return '원'
 
     def get_price_label(self, code):
@@ -224,6 +226,8 @@ class StockAnalyzer:
 
     def format_price(self, price, code):
         label = self.get_price_label(code)
+        if isinstance(price, float) and price != int(price):
+            return f"{price:,.2f}{label}"
         return f"{price:,.0f}{label}"
 
     def format_price_change(self, current_price, previous_price, code):
@@ -232,11 +236,10 @@ class StockAnalyzer:
         amount = current_price - previous_price
         percent = (amount / previous_price) * 100
         label = self.get_price_label(code)
-        arrow = '🔺' if amount > 0 else ('🔻' if amount < 0 else '⏺')
         color_dot = '🔴' if amount > 0 else ('🔵' if amount < 0 else '⏺')
         amount_text = f"{amount:+,.0f}{label}"
         percent_text = f"{percent:+.2f}%"
-        return f"{color_dot} {arrow} <b>{amount_text}</b> ({percent_text})"
+        return f"{color_dot} 등락가 {amount_text}, 등락율 {percent_text}"
 
     def clean_watchlist(self):
         """watchlist 항목 중 1주일 경과 후 holdings에 없는 항목을 자동 삭제"""
