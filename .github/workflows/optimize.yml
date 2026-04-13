@@ -2,8 +2,8 @@ name: Strategy Optimizer
 
 on:
   schedule:
-    # Run every weekend day at 09:00 KST (00:00 UTC Sat/Sun)
-    - cron: '0 0 * * 6,0'
+    # Run every Saturday at 09:00 KST (00:00 UTC Saturday)
+    - cron: '0 0 * * 6'
   workflow_dispatch:
 
 jobs:
