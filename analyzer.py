@@ -958,11 +958,6 @@ class StockAnalyzer:
         # 제목 및 추가 정보 결합
         today = datetime.datetime.now().strftime('%Y-%m-%d')
         styled_report = f"📅 <b>[오늘의 AI 종합 투자 리포트 - {today}]</b>\n\n" + final_report
-        styled_report += (
-            "\n\n---\n\n"
-            "<b>원본 추천 종목 데이터</b>\n\n"
-            + recommendation_context
-        )
         
         # 4. 내역 기록 및 전송
         self.log_recommendations(recs_raw)

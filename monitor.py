@@ -118,13 +118,6 @@ class MarketMonitor:
         else:
             final_report = "🕒 <b>[실시간 모니터링 알림]</b>\n\n" + final_report.strip()
 
-        # AI가 요약 과정에서 숫자 정보를 생략할 수 있으므로, 원본 보유/관심 종목 데이터를 함께 첨부합니다.
-        final_report += (
-            "\n\n---\n\n"
-            "<b>원본 보유/관심 종목 데이터</b>\n\n"
-            "<b>보유 종목</b>\n" + holding_section + "\n\n"
-            "<b>관심 종목</b>\n" + watch_section
-        )
         self.analyzer.notifier.send_message(final_report)
         print("AI 감시 보고서 전송 완료.")
 
