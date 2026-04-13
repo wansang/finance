@@ -861,8 +861,7 @@ class StockAnalyzer:
             formatted_recs.append(f"<b>{tier_names[t]}</b>")
             for r in results[t][:5]: # 각 등급별 상위 5개만 노출
                 price_text = self.format_price(r['last'], r['code']) if r.get('last') is not None else '가격 정보 없음'
-                change_text = self.format_price_change(r['last'], r.get('prev_close'), r['code']) if r.get('last') is not None and r.get('prev_close') is not None else ''
-                msg = f"• <b>{r['name']}</b>({r['code']}): 현재가 {price_text} {change_text} - {r['reasons']}"
+                msg = f"• <b>{r['name']}</b>({r['code']}): 현재가 {price_text} - {r['reasons']}"
                 formatted_recs.append(msg)
             formatted_recs.append("")
             
