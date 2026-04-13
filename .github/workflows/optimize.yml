@@ -2,13 +2,14 @@ name: Strategy Optimizer
 
 on:
   schedule:
-    # Run every Sunday 23:00 UTC (08:00 KST Monday)
-    - cron: '0 23 * * 0'
+    # Run every Saturday 09:00 KST (00:00 UTC Saturday)
+    - cron: '0 0 * * 6'
   workflow_dispatch:
 
 jobs:
   optimize:
     runs-on: ubuntu-latest
+    timeout-minutes: 180
     permissions:
       contents: write
     steps:
