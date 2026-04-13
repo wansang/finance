@@ -233,7 +233,10 @@ class StockAnalyzer:
         percent = (amount / previous_price) * 100
         label = self.get_price_label(code)
         arrow = '🔺' if amount > 0 else ('🔻' if amount < 0 else '⏺')
-        return f"{arrow} {amount:+,.0f}{label} ({percent:+.2f}%)"
+        color_dot = '🔴' if amount > 0 else ('🔵' if amount < 0 else '⏺')
+        amount_text = f"{amount:+,.0f}{label}"
+        percent_text = f"{percent:+.2f}%"
+        return f"{color_dot} {arrow} <b>{amount_text}</b> ({percent_text})"
 
     def clean_watchlist(self):
         """watchlist 항목 중 1주일 경과 후 holdings에 없는 항목을 자동 삭제"""
