@@ -4,8 +4,8 @@ on:
   push:
     branches: [ main ]
   schedule:
-    # Run every 30 minutes from 09:00 to 18:00 KST (00:00 to 09:00 UTC) to include after-market
-    - cron: '*/30 00-09 * * 1-5'
+    # Run every 30 minutes from 09:00 to 20:00 KST on weekdays
+    - cron: '0,30 00-11 * * 1-5'
   workflow_dispatch: # Allow manual trigger
 
 jobs:

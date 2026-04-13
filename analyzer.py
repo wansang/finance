@@ -194,6 +194,47 @@ class StockAnalyzer:
         with open('watchlist.json', 'w', encoding='utf-8') as f:
             json.dump(watchlist, f, ensure_ascii=False, indent=4)
 
+    def detect_price_unit(self, code):
+        code = str(code).upper()
+        if code.isdigit() or code.endswith(('.KS', '.KQ', '.KR')):
+            return '원'
+        if code.endswith('.TO'):
+            return 'CAD'
+        if code.endswith(('.US', '.O', '.N', '.A')) or code.startswith(('NASDAQ:', 'NYSE:', 'AMEX:')):
+            return '달러'
+        if code.endswith('.HK'):
+            return '홍콩달러'
+        if code.endswith('.L'):
+            return '파운드'
+        return '원'
+
+    def get_price_label(self, code):
+        unit = self.detect_price_unit(code)
+        if unit == '원':
+            return '원'
+        if unit == 'CAD':
+            return 'CAD'
+        if unit == '달러':
+            return '달러'
+        if unit == '홍콩달러':
+            return 'HKD'
+        if unit == '파운드':
+            return 'GBP'
+        return unit
+
+    def format_price(self, price, code):
+        label = self.get_price_label(code)
+        return f"{price:,.0f}{label}"
+
+    def format_price_change(self, current_price, previous_price, code):
+        if previous_price is None or previous_price == 0:
+            return "(변동 없음)"
+        amount = current_price - previous_price
+        percent = (amount / previous_price) * 100
+        label = self.get_price_label(code)
+        arrow = '🔺' if amount > 0 else ('🔻' if amount < 0 else '⏺')
+        return f"{arrow} {amount:+,.0f}{label} ({percent:+.2f}%)"
+
     def clean_watchlist(self):
         """watchlist 항목 중 1주일 경과 후 holdings에 없는 항목을 자동 삭제"""
         watchlist = self.load_watchlist()
@@ -777,9 +818,16 @@ class StockAnalyzer:
                 safe_name = html.escape(name)
                 safe_reasons = html.escape(", ".join(reasons))
                 
+                prev_close = float(df.iloc[target_idx - 1]['Close']) if target_idx > 0 else float(last['Close'])
                 stock_data = {
-                    'name': safe_name, 'code': code, 'reasons': safe_reasons,
-                    'win_rate': win_rate, 'avg_ret': avg_ret, 'rs_score': rs_score
+                    'name': safe_name,
+                    'code': code,
+                    'reasons': safe_reasons,
+                    'win_rate': win_rate,
+                    'avg_ret': avg_ret,
+                    'rs_score': rs_score,
+                    'last': float(last['Close']),
+                    'prev_close': prev_close
                 }
 
                 # Tier Classification
@@ -806,7 +854,9 @@ class StockAnalyzer:
             
             formatted_recs.append(f"<b>{tier_names[t]}</b>")
             for r in results[t][:5]: # 각 등급별 상위 5개만 노출
-                msg = f"• <b>{r['name']}</b>({r['code']}): {r['reasons']}"
+                price_text = self.format_price(r['last'], r['code']) if r.get('last') is not None else '가격 정보 없음'
+                change_text = self.format_price_change(r['last'], r.get('prev_close'), r['code']) if r.get('last') is not None and r.get('prev_close') is not None else ''
+                msg = f"• <b>{r['name']}</b>({r['code']}): 현재가 {price_text} {change_text} - {r['reasons']}"
                 formatted_recs.append(msg)
             formatted_recs.append("")
             
@@ -877,6 +927,11 @@ class StockAnalyzer:
         added_code = self.add_top_recommendation_to_watchlist(recs_raw)
         if added_code:
             print(f"추천 종목 최상위 {added_code}을(를) watchlist에 자동 추가했습니다.")
+        else:
+            if recs_raw and 1 in recs_raw and len(recs_raw[1]) == 0:
+                print("오늘은 1등급 추천 종목이 없습니다. watchlist 자동 추가를 건너뜁니다.")
+            else:
+                print("추천 종목 최상위 1등급 종목이 없거나 이미 watchlist에 있는 항목이어서 자동 추가가 수행되지 않았습니다.")
         
         # 2. AI에게 전달할 데이터 정리
         market_context = us_summary + "\n" + sentiment_msg

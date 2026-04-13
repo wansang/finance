@@ -56,8 +56,11 @@ class MarketMonitor:
                 
                 triggered, drop_pct = self.analyzer.check_trailing_stop(df, buy_date)
                 current_price = df.iloc[-1]['Close']
+                prev_price = df.iloc[-2]['Close'] if len(df) > 1 else current_price
                 profit_pct = (current_price - buy_price) / buy_price * 100
-                
+                price_text = self.analyzer.format_price(current_price, code)
+                change_text = self.analyzer.format_price_change(current_price, prev_price, code)
+
                 if triggered:
                     status = "매도 권장"
                     reason = f"매수 이후 최고가 대비 {drop_pct:.2f}% 하락하여 손실 제한 조건이 충족되었습니다."
@@ -68,9 +71,9 @@ class MarketMonitor:
                         reason = "현재 수익 구간이며 하락 제한 조건이 아직 충족되지 않아 보유를 유지합니다."
                     else:
                         reason = "현재는 손실 구간이나 매도 기준에는 미달하여 추가 관찰이 필요합니다."
-                
+
                 holding_data.append(
-                    f"- {name}: 현재가 {current_price:,.0f}원 (수익률 {profit_pct:+.2f}%), 상태: {status}. 이유: {reason}"
+                    f"- {name}: 현재가 {price_text} {change_text}, 수익률 {profit_pct:+.2f}%, 상태: {status}. 이유: {reason}"
                 )
             except Exception:
                 holding_data.append(f"- {code}: 분석 오류")
@@ -83,12 +86,17 @@ class MarketMonitor:
                 df = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=100)).strftime('%Y-%m-%d'))
                 df = self.analyzer.get_indicators(df)
                 
+                current_price = df.iloc[-1]['Close']
+                prev_price = df.iloc[-2]['Close'] if len(df) > 1 else current_price
+                price_text = self.analyzer.format_price(current_price, code)
+                change_text = self.analyzer.format_price_change(current_price, prev_price, code)
+
                 reasons = self.analyzer.check_signals(df, -1)
                 if reasons:
                     sig_text = " / ".join(reasons)
                 else:
                     sig_text = "현재 매수 신호는 없습니다."
-                watch_data.append(f"- {name}: {sig_text}")
+                watch_data.append(f"- {name}: 현재가 {price_text} {change_text}. 신호: {sig_text}")
             except Exception:
                 watch_data.append(f"- {code}: 분석 오류")
 
@@ -104,9 +112,9 @@ class MarketMonitor:
             report_mode="monitor"
         )
         
-        # 매도 신호가 있을 경우 제목 추가
+        # 제목은 항상 동일하게 유지하고, 매도 조건이 충족된 경우 알림 문구만 추가합니다.
         if sell_triggered:
-            final_report = "🚨 <b>[실시간 모니터링 알림 - 보유 종목 매도 조건 충족]</b>\n\n" + final_report.strip()
+            final_report = "🕒 <b>[실시간 모니터링 알림]</b>\n\n🚨 보유 종목 매도 조건이 충족되었습니다. 아래 내용을 확인해주세요.\n\n" + final_report.strip()
         else:
             final_report = "🕒 <b>[실시간 모니터링 알림]</b>\n\n" + final_report.strip()
             
