@@ -19,63 +19,10 @@
   "VALIDATE_MAX_HOLD_DAYS": 20,
   "VALIDATE_MIN_HISTORY": 200,
   "VALIDATE_STOP_LOSS_PCT": -0.03,
-  "BACKTEST_SAMPLE_SIZE": 200
-}
-{
-  "indicators": {
-    "sma_short": 50,
-    "sma_mid": 150,
-    "sma_long": 200,
-    "rsi_length": 14,
-    "bb_length": 20,
-    "bb_std": 2.0,
-    "stoch_length": 14,
-    "stoch_k": 3,
-    "stoch_d": 3,
-    "mfi_length": 14,
-    "vol_ma": 20
-  },
-  "trend_template": {
-    "min_history": 200,
-    "high_52w_ratio": 0.75,
-    "sma200_trend_days": 20
-  },
-  "entry": {
-    "validation_lookback_days": 120,
-    "max_hold_days": 20,
-    "min_win_rate": 60,
-    "trailing_stop_pct": 0.03
-  },
-  "optimizer": {
-    "min_sampled_stocks": 20,
-    "win_rate_weight": 0.6,
-    "avg_return_weight": 0.4,
-    "sample_score_cap": 150
-  },
-  "backtest": {
-    "sample_stock_count": 200,
-    "lookback_days": 180,
-    "transaction_cost_pct": 0.0005,
-    "slippage_pct": 0.0005,
-    "initial_capital": 10000000
-  },
-  "risk": {
-    "max_position_pct": 0.10,
-    "use_atr_trailing_stop": true,
-    "atr_multiplier": 1.5,
-    "profit_target_pct": 0.06,
-    "min_hold_days": 5
-  },
-  "report": {
-    "verbosity": "normal",
-    "action_items": true
-  },
-  "data": {
-    "fetch_retries": 3,
-    "fetch_pause_seconds": 5,
-    "default_lookback_days": 400
-  },
-  "ai": {
-    "mode": "free"
-  }
+  "BACKTEST_SAMPLE_SIZE": 200,
+  "BACKTEST_REQUIRE_US_MARKET_POSITIVE": true,
+  "INTRADAY_ENABLED": true,
+  "INTRADAY_TIMEOUT": 8,
+  "INTRADAY_INTERVALS": ["1m", "2m", "5m", "15m"],
+  "INTRADAY_MAX_RETRIES": 1
 }
