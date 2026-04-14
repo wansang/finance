@@ -112,11 +112,7 @@ class MarketMonitor:
             report_mode="monitor"
         )
         
-        # 제목은 항상 동일하게 유지하고, 매도 조건이 충족된 경우 알림 문구만 추가합니다.
-        if sell_triggered:
-            final_report = "🕒 <b>[실시간 모니터링 알림]</b>\n\n🚨 보유 종목 매도 조건이 충족되었습니다. 아래 내용을 확인해주세요.\n\n" + final_report.strip()
-        else:
-            final_report = "🕒 <b>[실시간 모니터링 알림]</b>\n\n" + final_report.strip()
+        final_report = "🕒 <b>[실시간 모니터링 알림]</b>\n\n" + final_report.strip()
 
         self.analyzer.notifier.send_message(final_report)
         print("AI 감시 보고서 전송 완료.")

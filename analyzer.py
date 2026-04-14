@@ -979,7 +979,11 @@ class StockAnalyzer:
         holding_context = "\n".join(sell_alerts) if sell_alerts else "매도 신호 없음"
         
         # 추천 종목을 'watch_data' 항목으로 전달
-        recommendation_context = "\n".join(recs_msg) if recs_msg else "추천 종목 없음"
+        us_recommendation_note = "[미국 주요 지수 참고]\n" + us_summary
+        if recs_msg:
+            recommendation_context = "\n".join(recs_msg) + "\n\n" + us_recommendation_note
+        else:
+            recommendation_context = "추천 종목 없음\n\n" + us_recommendation_note
         
         # 3. AI 리포트 생성
         final_report = self.ask_ai_report(
