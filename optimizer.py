@@ -3,6 +3,7 @@ import json
 import os
 from analyzer import StockAnalyzer
 from backtester import Backtester
+from algorithm_update_report import AlgorithmUpdateReport, compute_config_changes, describe_issues, summarize_backtest
 
 class StrategyOptimizer:
     def __init__(self, config_file='strategy_config.json'):
@@ -33,6 +34,9 @@ class StrategyOptimizer:
         print("[Optimizer] 현재 전략을 평가합니다...")
         current_df = self.backtester.run_backtest(days_ago=30)
         current_score = self.score_results(current_df)
+        current_metrics = summarize_backtest(current_df)
+        current_notes = describe_issues(current_metrics)
+
         if current_score is None:
             print("[Optimizer] 현재 전략으로는 유효한 백테스트 결과를 얻지 못했습니다.")
             current_score = -999
@@ -76,8 +80,28 @@ class StrategyOptimizer:
                                 print(f"[Optimizer] 새로운 최고 전략 발견: score={score:.2f}, tier1={tier1}, tier2={tier2}, peak={peak_factor}, stop={stop_pct}, hold={max_hold}, count={len(result_df)}")
 
         if best_score > current_score:
+            print("[Optimizer] 더 나은 전략을 찾았습니다. 최종 검증을 수행합니다...")
+            self.analyzer.config = best_config
+            self.backtester.analyzer = self.analyzer
+            optimized_df = self.backtester.run_backtest(days_ago=30)
+            optimized_metrics = summarize_backtest(optimized_df)
+            changes = compute_config_changes(self.base_config, best_config)
+            notes = current_notes
+
+            report = AlgorithmUpdateReport(
+                title='이번주 분석 알고리즘 업데이트 내용',
+                before_metrics=current_metrics,
+                after_metrics=optimized_metrics,
+                changes=changes,
+                notes=notes
+            )
+            summary_path = report.save_markdown()
+            log_path = report.save_log()
+            report.send_telegram()
+
             self.save_config(best_config)
             print(f"[Optimizer] 전략을 최적화하여 {self.config_file}에 저장했습니다. 최종 점수: {best_score:.2f}")
+            print(f"[Optimizer] 업데이트 요약을 파일로 저장했습니다: {summary_path}, {log_path}")
         else:
             print("[Optimizer] 현재 전략이 가장 우수합니다. 구성 변경 없이 종료합니다.")
 
