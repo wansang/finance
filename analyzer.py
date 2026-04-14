@@ -10,6 +10,7 @@ import json
 import os
 import html
 import requests
+import re
 import xml.etree.ElementTree as ET
 try:
     import google.genai as genai
@@ -137,7 +138,11 @@ class StockAnalyzer:
             "VALIDATE_MAX_HOLD_DAYS": 20,
             "VALIDATE_MIN_HISTORY": 200,
             "VALIDATE_STOP_LOSS_PCT": -0.03,
-            "BACKTEST_SAMPLE_SIZE": 200
+            "BACKTEST_SAMPLE_SIZE": 200,
+            "INTRADAY_ENABLED": True,
+            "INTRADAY_TIMEOUT": 8,
+            "INTRADAY_INTERVALS": ["1m", "2m", "5m", "15m"],
+            "INTRADAY_MAX_RETRIES": 1
         }
         if os.path.exists(self.strategy_config_file):
             try:
@@ -165,6 +170,166 @@ class StockAnalyzer:
         with open(self.holdings_file, 'w', encoding='utf-8') as f:
             json.dump(holdings, f, ensure_ascii=False, indent=4)
 
+    def _normalize_yahoo_symbol(self, code):
+        token = str(code).strip().upper()
+        if token in ['US500', 'SP500', 'S&P500']:
+            return '^GSPC'
+        if token == 'DJI':
+            return '^DJI'
+        if token in ['IXIC', 'NASDAQ']:
+            return '^IXIC'
+        if token.startswith('^'):
+            return token
+        if token.endswith('.US'):
+            return token[:-3]
+        if token.endswith('.KS') or token.endswith('.KQ') or token.endswith('.HK') or token.endswith('.L'):
+            return token
+        if token.isdigit():
+            return token + '.KS'
+        return token
+
+    def _fetch_yahoo_intraday(self, code, intervals=None, range_='1d', timeout=8):
+        if intervals is None:
+            intervals = self.config.get('INTRADAY_INTERVALS', ['1m', '2m', '5m', '15m'])
+        symbol = self._normalize_yahoo_symbol(code)
+        candidates = [symbol]
+        if symbol.endswith('.KS'):
+            alt = symbol.replace('.KS', '.KQ')
+            if alt != symbol:
+                candidates.append(alt)
+        for symbol in candidates:
+            for interval in intervals:
+                url = (
+                    f'https://query2.finance.yahoo.com/v8/finance/chart/{symbol}?'
+                    f'range={range_}&interval={interval}&includePrePost=false'
+                )
+                response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=timeout)
+                response.raise_for_status()
+                payload = response.json()
+                chart = payload.get('chart', {})
+                error = chart.get('error')
+                if error:
+                    continue
+                result = chart.get('result')
+                if not result:
+                    continue
+                result = result[0]
+                timestamps = result.get('timestamp') or []
+                quote = result.get('indicators', {}).get('quote', [{}])[0]
+                if not timestamps or not quote:
+                    continue
+                df = pd.DataFrame({
+                    'Open': quote.get('open', []),
+                    'High': quote.get('high', []),
+                    'Low': quote.get('low', []),
+                    'Close': quote.get('close', []),
+                    'Volume': quote.get('volume', [])
+                }, index=pd.to_datetime(timestamps, unit='s'))
+                df = df.dropna(subset=['Close'])
+                if df.empty:
+                    continue
+                return df
+        raise ValueError(f'Yahoo intraday data not available for {code}')
+
+    def _is_kr_stock_code(self, code):
+        token = str(code).upper()
+        return token.isdigit() or token.endswith(('.KS', '.KQ'))
+
+    def _naver_symbol(self, code):
+        token = str(code).upper()
+        if token.endswith('.KS') or token.endswith('.KQ'):
+            return token.split('.')[0]
+        if token.isdigit():
+            return token
+        return None
+
+    def _fetch_naver_intraday(self, code, timeout=8):
+        symbol = self._naver_symbol(code)
+        if not symbol:
+            raise ValueError(f'Naver intraday unavailable for {code}')
+        url = f'https://fchart.stock.naver.com/sise.nhn?symbol={symbol}&timeframe=minute&count=120&requestType=0'
+        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=timeout)
+        response.raise_for_status()
+        text = response.text
+        items = re.findall(r'<item data="(.*?)" />', text)
+        if not items:
+            raise ValueError(f'Naver intraday returned no data for {code}')
+        records = []
+        for item in items:
+            parts = item.split('|')
+            if len(parts) < 6:
+                continue
+            dt_text, open_text, high_text, low_text, close_text, volume_text = parts[:6]
+            try:
+                dt = datetime.datetime.strptime(dt_text, '%Y%m%d%H%M')
+                close = float(close_text)
+                open_p = float(open_text) if open_text not in ('null', '') else close
+                high_p = float(high_text) if high_text not in ('null', '') else close
+                low_p = float(low_text) if low_text not in ('null', '') else close
+                volume = float(volume_text) if volume_text not in ('null', '') else 0.0
+                records.append((dt, open_p, high_p, low_p, close, volume))
+            except Exception:
+                continue
+        if not records:
+            raise ValueError(f'Naver intraday parsed no valid rows for {code}')
+        df = pd.DataFrame(records, columns=['Datetime', 'Open', 'High', 'Low', 'Close', 'Volume'])
+        df = df.set_index('Datetime')
+        return df
+
+    def _fetch_intraday(self, code, timeout=8):
+        intervals = self.config.get('INTRADAY_INTERVALS', ['1m', '2m', '5m', '15m'])
+        try:
+            return self._fetch_yahoo_intraday(code, intervals=intervals, timeout=timeout)
+        except Exception:
+            if self._is_kr_stock_code(code):
+                return self._fetch_naver_intraday(code, timeout=timeout)
+            raise
+
+    def get_latest_price(self, code):
+        """15분 지연 인트라데이 데이터를 우선 사용하고, 실패 시 일별 데이터로 폴백합니다."""
+        if not self.config.get('INTRADAY_ENABLED', True):
+            raise RuntimeError('Intraday data is disabled in configuration.')
+        timeout = self.config.get('INTRADAY_TIMEOUT', 8)
+        try:
+            df = self._fetch_intraday(code, timeout=timeout)
+            if len(df) >= 2:
+                last = df.iloc[-1]
+                prev = df.iloc[-2]
+                return {
+                    'source': 'intraday',
+                    'last': float(last['Close']),
+                    'previous': float(prev['Close']),
+                    'time': df.index[-1]
+                }
+            if len(df) == 1:
+                last = df.iloc[-1]
+                return {
+                    'source': 'intraday',
+                    'last': float(last['Close']),
+                    'previous': float(last['Close']),
+                    'time': df.index[-1]
+                }
+        except Exception:
+            pass
+        try:
+            df = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d'))
+            if len(df) >= 2:
+                last = df.iloc[-1]
+                prev = df.iloc[-2]
+                return {
+                    'source': 'daily',
+                    'last': float(last['Close']),
+                    'previous': float(prev['Close']),
+                    'time': df.index[-1]
+                }
+        except Exception:
+            pass
+        return None
+
+    def fetch_price_history(self, code, start=None, end=None):
+        """기존 일별 시세를 그대로 호출하는 헬퍼."""
+        return fdr.DataReader(code, start=start, end=end)
+
     def get_us_market_summary(self):
         """미국 주요 지수 요약 (S&P 500, Nasdaq, Dow)"""
         indices = {
@@ -175,22 +340,26 @@ class StockAnalyzer:
         summary = "<b>[미국 시장 요약]</b>\n"
         for name, symbol in indices.items():
             try:
-                df = fdr.DataReader(symbol)
-                last_row = df.iloc[-1]
-                prev_row = df.iloc[-2]
-                change = last_row['Close'] - prev_row['Close']
-                pct_change = (change / prev_row['Close']) * 100
-                emoji = "📈" if change > 0 else "📉"
-                summary += f"{emoji} {name}: {last_row['Close']:.2f} ({pct_change:+.2f}%)\n"
-            except Exception as e:
-                summary += f"⚠️ {name}: 데이터 오류\n"
+                latest = self.get_latest_price(symbol)
+                if latest:
+                    change = latest['last'] - latest['previous']
+                    pct_change = (change / latest['previous']) * 100 if latest['previous'] else 0
+                    emoji = "📈" if change > 0 else "📉"
+                    summary += f"{emoji} {name}: {latest['last']:.2f} ({pct_change:+.2f}%)\n"
+                else:
+                    raise ValueError('Intraday unavailable')
+            except Exception:
+                try:
+                    df = fdr.DataReader(symbol)
+                    last_row = df.iloc[-1]
+                    prev_row = df.iloc[-2]
+                    change = last_row['Close'] - prev_row['Close']
+                    pct_change = (change / prev_row['Close']) * 100
+                    emoji = "📈" if change > 0 else "📉"
+                    summary += f"{emoji} {name}: {last_row['Close']:.2f} ({pct_change:+.2f}%)\n"
+                except Exception:
+                    summary += f"⚠️ {name}: 데이터 오류\n"
         return summary
-
-    def load_watchlist(self):
-        if os.path.exists('watchlist.json'):
-            with open('watchlist.json', 'r', encoding='utf-8') as f:
-                return json.load(f)
-        return {}
 
     def save_watchlist(self, watchlist):
         with open('watchlist.json', 'w', encoding='utf-8') as f:
@@ -895,7 +1064,11 @@ class StockAnalyzer:
             
             formatted_recs.append(f"<b>{tier_names[t]}</b>")
             for r in results[t][:5]: # 각 등급별 상위 5개만 노출
-                price_text = self.format_price(r['last'], r['code']) if r.get('last') is not None else '가격 정보 없음'
+                current_price = r.get('last')
+                intraday = self.get_latest_price(r['code'])
+                if intraday:
+                    current_price = intraday.get('last', current_price)
+                price_text = self.format_price(current_price, r['code']) if current_price is not None else '가격 정보 없음'
                 msg = f"• <b>{r['name']}</b>({r['code']}): 현재가 {price_text} - {r['reasons']}"
                 formatted_recs.append(msg)
             formatted_recs.append("")

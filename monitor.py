@@ -55,8 +55,13 @@ class MarketMonitor:
                 df = self.analyzer.get_indicators(df)
                 
                 triggered, drop_pct = self.analyzer.check_trailing_stop(df, buy_date)
-                current_price = df.iloc[-1]['Close']
-                prev_price = df.iloc[-2]['Close'] if len(df) > 1 else current_price
+                latest_price = self.analyzer.get_latest_price(code)
+                if latest_price:
+                    current_price = latest_price['last']
+                    prev_price = latest_price['previous']
+                else:
+                    current_price = df.iloc[-1]['Close']
+                    prev_price = df.iloc[-2]['Close'] if len(df) > 1 else current_price
                 profit_pct = (current_price - buy_price) / buy_price * 100
                 price_text = self.analyzer.format_price(current_price, code)
                 change_text = self.analyzer.format_price_change(current_price, prev_price, code)
@@ -86,8 +91,13 @@ class MarketMonitor:
                 df = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=100)).strftime('%Y-%m-%d'))
                 df = self.analyzer.get_indicators(df)
                 
-                current_price = df.iloc[-1]['Close']
-                prev_price = df.iloc[-2]['Close'] if len(df) > 1 else current_price
+                latest_price = self.analyzer.get_latest_price(code)
+                if latest_price:
+                    current_price = latest_price['last']
+                    prev_price = latest_price['previous']
+                else:
+                    current_price = df.iloc[-1]['Close']
+                    prev_price = df.iloc[-2]['Close'] if len(df) > 1 else current_price
                 price_text = self.analyzer.format_price(current_price, code)
                 change_text = self.analyzer.format_price_change(current_price, prev_price, code)
 
