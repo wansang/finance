@@ -171,6 +171,12 @@ class StockAnalyzer:
         with open(self.holdings_file, 'w', encoding='utf-8') as f:
             json.dump(holdings, f, ensure_ascii=False, indent=4)
 
+    def load_watchlist(self):
+        if os.path.exists('watchlist.json'):
+            with open('watchlist.json', 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return {}
+
     def _normalize_yahoo_symbol(self, code):
         token = str(code).strip().upper()
         if token in ['US500', 'SP500', 'S&P500']:
