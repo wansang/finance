@@ -139,6 +139,7 @@ class StockAnalyzer:
             "VALIDATE_MIN_HISTORY": 200,
             "VALIDATE_STOP_LOSS_PCT": -0.03,
             "BACKTEST_SAMPLE_SIZE": 200,
+            "BACKTEST_REQUIRE_US_MARKET_POSITIVE": False,
             "INTRADAY_ENABLED": True,
             "INTRADAY_TIMEOUT": 8,
             "INTRADAY_INTERVALS": ["1m", "2m", "5m", "15m"],
@@ -360,6 +361,67 @@ class StockAnalyzer:
                 except Exception:
                     summary += f"⚠️ {name}: 데이터 오류\n"
         return summary
+
+    def get_us_market_condition(self, target_date=None):
+        """타겟 날짜 기준 미국 주요 지수(Dow, Nasdaq, S&P 500) 상태를 반환합니다."""
+        if target_date is None:
+            target_date = datetime.datetime.now().date()
+        if isinstance(target_date, datetime.datetime):
+            target_date = target_date.date()
+
+        indices = {
+            'S&P 500': 'US500',
+            'Nasdaq': 'IXIC',
+            'Dow': 'DJI'
+        }
+        condition = {}
+        overall_positive = True
+        for name, symbol in indices.items():
+            try:
+                start = (target_date - datetime.timedelta(days=10)).strftime('%Y-%m-%d')
+                end = target_date.strftime('%Y-%m-%d')
+                df = fdr.DataReader(symbol, start=start, end=end)
+                if df.empty:
+                    raise ValueError('No data')
+                if target_date not in df.index:
+                    df = df[df.index <= target_date]
+                    if df.empty:
+                        raise ValueError('No trading day before target')
+                last = df.iloc[-1]
+                prev = df.iloc[-2]
+                change = float(last['Close'] - prev['Close'])
+                pct = float((change / prev['Close']) * 100) if prev['Close'] != 0 else 0.0
+                positive = change >= 0
+                condition[name] = {
+                    'symbol': symbol,
+                    'date': last.name.date() if hasattr(last.name, 'date') else last.name,
+                    'last': float(last['Close']),
+                    'previous': float(prev['Close']),
+                    'change': change,
+                    'pct_change': pct,
+                    'positive': positive
+                }
+                if not positive:
+                    overall_positive = False
+            except Exception:
+                condition[name] = {
+                    'symbol': symbol,
+                    'date': None,
+                    'last': None,
+                    'previous': None,
+                    'change': None,
+                    'pct_change': None,
+                    'positive': False
+                }
+                overall_positive = False
+        condition['all_positive'] = overall_positive
+        condition['summary'] = " | ".join(
+            [
+                f"{name}: {'+' if info['positive'] else '-'}{info['pct_change']:+.2f}%" if info['pct_change'] is not None else f"{name}: 데이터 없음"
+                for name, info in condition.items() if name in indices
+            ]
+        )
+        return condition
 
     def save_watchlist(self, watchlist):
         with open('watchlist.json', 'w', encoding='utf-8') as f:

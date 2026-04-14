@@ -18,6 +18,20 @@ class Backtester:
         
         print(f"Target Date (Buy): {target_date.date()}")
         print(f"Current Date (Sell): {current_date.date()}")
+
+        # 미국 주요 지수 상황을 백테스트 기준일에 참고
+        us_market = self.analyzer.get_us_market_condition(target_date)
+        print("US Market condition on buy date:")
+        for name in ['S&P 500', 'Nasdaq', 'Dow']:
+            info = us_market.get(name, {})
+            if info.get('date') is not None:
+                trend = 'Up' if info['positive'] else 'Down'
+                print(f"  {name}: {trend} ({info['pct_change']:+.2f}%) on {info['date']}")
+            else:
+                print(f"  {name}: 데이터 없음")
+        if self.analyzer.config.get('BACKTEST_REQUIRE_US_MARKET_POSITIVE', False) and not us_market.get('all_positive', False):
+            print("US market was not broadly positive on the buy date. BACKTEST_REQUIRE_US_MARKET_POSITIVE is enabled, so backtest is skipped.")
+            return pd.DataFrame([])
         
         # 2. 모든 코스피 종목 리스팅 (전략 설정 파일에서 샘플 개수 제어)
         sample_size = self.analyzer.config.get('BACKTEST_SAMPLE_SIZE', 200)
@@ -101,7 +115,11 @@ class Backtester:
                         'SellDate': sell_date.date(),
                         'SellPrice': sell_price,
                         'Return(%)': ret,
-                        'ExitReason': exit_reason
+                        'ExitReason': exit_reason,
+                        'US_SP500_Positive': us_market.get('S&P 500', {}).get('positive', False),
+                        'US_Nasdaq_Positive': us_market.get('Nasdaq', {}).get('positive', False),
+                        'US_Dow_Positive': us_market.get('Dow', {}).get('positive', False),
+                        'US_MarketSummary': us_market.get('summary', '')
                     })
                 
                 count += 1
@@ -118,6 +136,10 @@ class Backtester:
         if df_results.empty:
             print("\n[백테스트 결과] 조건에 맞는 종목이 없었습니다.")
             return
+        
+        if 'US_MarketSummary' in df_results.columns and not df_results['US_MarketSummary'].empty:
+            us_summary = df_results['US_MarketSummary'].iloc[0]
+            print(f"US Market summary on buy date: {us_summary}")
         
         print("\n" + "="*50)
         print("           [30일 백테스트 요약 결과]")
