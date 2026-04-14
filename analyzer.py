@@ -9,6 +9,8 @@ import time
 import json
 import os
 import html
+import requests
+import xml.etree.ElementTree as ET
 try:
     import google.genai as genai
     GENAI_LIBRARY = 'genai'
@@ -292,6 +294,37 @@ class StockAnalyzer:
         }
         self.save_watchlist(watchlist)
         return code
+
+    def get_stock_news(self):
+        """오늘의 주요 주식 관련 뉴스를 수집합니다."""
+        try:
+            query = "주식 증시"
+            url = f"https://news.google.com/rss/search?q={requests.utils.quote(query + ' when:1d')}&hl=ko&gl=KR&ceid=KR:ko"
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+            }
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()
+            root = ET.fromstring(response.text)
+            items = root.findall('.//item')
+            if not items:
+                return "[오늘의 주요 주식 뉴스] 관련 뉴스가 없습니다."
+
+            news_lines = ["[오늘의 주요 주식 뉴스]"]
+            for item in items[:3]:
+                title_el = item.find('title')
+                link_el = item.find('link')
+                pub_el = item.find('pubDate')
+                title = title_el.text if title_el is not None else '제목 없음'
+                link = link_el.text if link_el is not None else None
+                pub = pub_el.text if pub_el is not None else ''
+                if link:
+                    news_lines.append(f"- {title} ({pub})\n  {link}")
+                else:
+                    news_lines.append(f"- {title} ({pub})")
+            return "\n".join(news_lines)
+        except Exception:
+            return "[오늘의 주요 주식 뉴스] 뉴스를 가져오는 데 실패했습니다."
 
     def get_market_sentiment(self):
         """코스피 지수의 이평선 기반 시장 심리 분석 (상세 한글 설명 추가)"""
@@ -941,7 +974,8 @@ class StockAnalyzer:
                 print("추천 종목 최상위 1등급 종목이 없거나 이미 watchlist에 있는 항목이어서 자동 추가가 수행되지 않았습니다.")
         
         # 2. AI에게 전달할 데이터 정리
-        market_context = us_summary + "\n" + sentiment_msg
+        news_msg = self.get_stock_news()
+        market_context = us_summary + "\n" + sentiment_msg + "\n" + news_msg
         holding_context = "\n".join(sell_alerts) if sell_alerts else "매도 신호 없음"
         
         # 추천 종목을 'watch_data' 항목으로 전달

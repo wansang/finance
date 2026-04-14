@@ -33,6 +33,7 @@
 
 ### ⚙️ 자동화 설정 (GitHub Actions)
 - `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`를 GitHub Secrets에 등록하면 매일 아침 자동으로 리포트가 전송됩니다.
+- `Elite Stock Analysis` 리포트에는 오늘의 주요 주식/증시 관련 뉴스 요약도 포함됩니다.
 
 ## 🚀 기술 스택
 - **Language**: Python 3.9+
