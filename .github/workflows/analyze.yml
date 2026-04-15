@@ -1,9 +1,6 @@
 name: Elite Stock Analysis
 
 on:
-  schedule:
-    # Run at 23:30 UTC Sunday-Thursday (08:30 KST Monday-Friday)
-    - cron: '30 23 * * 0-4'
   workflow_dispatch: # Allow manual trigger from GitHub Actions tab
 
 jobs:

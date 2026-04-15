@@ -42,5 +42,42 @@
 - **Notification**: python-telegram-bot
 - **Platform**: GitHub Actions (Automation)
 
+## ⏰ 정시 실행 설정 (외부 스케줄러 권장)
+- GitHub `schedule`은 지연될 수 있으므로, 정시 실행이 필요하면 외부 스케줄러에서 `workflow_dispatch` API를 호출하세요.
+- 이 저장소 워크플로우는 현재 `workflow_dispatch`만 허용됩니다.
+
+### 1) GitHub 토큰 준비
+- GitHub PAT(Fine-grained) 생성
+- 권한: `Actions: Read and write`, `Contents: Read`
+- 대상 저장소: `wansang/finance`
+
+### 2) 호출 URL
+- Elite Stock Analysis:
+  - `POST https://api.github.com/repos/wansang/finance/actions/workflows/analyze.yml/dispatches`
+- Real-Time Market Monitor:
+  - `POST https://api.github.com/repos/wansang/finance/actions/workflows/monitor.yml/dispatches`
+
+### 3) 요청 헤더/바디
+```bash
+curl -X POST "https://api.github.com/repos/wansang/finance/actions/workflows/analyze.yml/dispatches" \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer <YOUR_GITHUB_PAT>" \
+  -d '{"ref":"main"}'
+```
+
+```bash
+curl -X POST "https://api.github.com/repos/wansang/finance/actions/workflows/monitor.yml/dispatches" \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer <YOUR_GITHUB_PAT>" \
+  -d '{"ref":"main"}'
+```
+
+### 4) 크론 설정 (Asia/Seoul 기준)
+- Elite Stock Analysis: 평일 08:30
+  - `30 8 * * 1-5`
+- Real-Time Market Monitor: 평일 09:00~20:00 30분 간격
+  - `0,30 9-19 * * 1-5`
+  - `0 20 * * 1-5`
+
 ---
 *본 프로그램은 기술적 분석을 통한 보조 도구이며, 모든 투자의 책임은 투자자 본인에게 있습니다.*
