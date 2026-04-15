@@ -491,7 +491,7 @@ class StockAnalyzer:
         return f"{marker} 등락가 {amount_text}, 등락율 {percent_text}"
 
     def clean_watchlist(self):
-        """watchlist 항목 중 1주일 경과 후 holdings에 없는 항목을 자동 삭제"""
+        """자동 추천으로 추가된 watchlist 항목 중 1주일 경과 후 holdings에 없는 항목만 삭제"""
         watchlist = self.load_watchlist()
         if not watchlist:
             return
@@ -500,6 +500,8 @@ class StockAnalyzer:
         changed = False
         for code in list(watchlist.keys()):
             entry = watchlist[code]
+            if entry.get('source') != 'auto_recommendation':
+                continue
             add_date = entry.get('add_date')
             if not add_date:
                 continue
@@ -512,7 +514,7 @@ class StockAnalyzer:
             if days_passed > 7 and code not in self.holdings:
                 del watchlist[code]
                 changed = True
-                print(f"watchlist에서 {code}를 {days_passed}일 경과로 인해 자동 삭제했습니다.")
+                print(f"watchlist에서 자동추천 항목 {code}를 {days_passed}일 경과로 인해 자동 삭제했습니다.")
 
         if changed:
             self.save_watchlist(watchlist)
@@ -536,7 +538,8 @@ class StockAnalyzer:
             stock_name = html.unescape(stock.get('name', code))
             watchlist[code] = {
                 'name': stock_name,
-                'add_date': today
+                'add_date': today,
+                'source': 'auto_recommendation'
             }
             added_codes.append(code)
 
