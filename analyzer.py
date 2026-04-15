@@ -518,29 +518,31 @@ class StockAnalyzer:
             self.save_watchlist(watchlist)
 
     def add_top_recommendation_to_watchlist(self, results):
-        """Tier 1 추천 종목 중 최상위 1개를 watchlist에 자동 추가"""
+        """Tier 1 추천 종목을 watchlist에 자동 추가"""
         if not results or 1 not in results or len(results[1]) == 0:
-            return None
-
-        top_stock = results[1][0]
-        if not top_stock.get('code'):
-            return None
-
-        code = top_stock['code']
-        if code in self.holdings:
-            return None
+            return []
 
         watchlist = self.load_watchlist()
-        if code in watchlist:
-            return None
+        added_codes = []
+        today = datetime.datetime.now().strftime('%Y-%m-%d')
 
-        stock_name = html.unescape(top_stock.get('name', code))
-        watchlist[code] = {
-            'name': stock_name,
-            'add_date': datetime.datetime.now().strftime('%Y-%m-%d')
-        }
-        self.save_watchlist(watchlist)
-        return code
+        for stock in results[1]:
+            code = stock.get('code')
+            if not code:
+                continue
+            if code in self.holdings or code in watchlist:
+                continue
+
+            stock_name = html.unescape(stock.get('name', code))
+            watchlist[code] = {
+                'name': stock_name,
+                'add_date': today
+            }
+            added_codes.append(code)
+
+        if added_codes:
+            self.save_watchlist(watchlist)
+        return added_codes
 
     def get_stock_news(self):
         """오늘의 주요 주식/국제정세 뉴스를 함께 수집합니다."""
@@ -1361,15 +1363,15 @@ class StockAnalyzer:
         recs_raw = self.merge_tier_results(recs_raw_kr, recs_raw_us)
         sell_alerts = self.analyze_holdings()
 
-        # 추천 종목 1위 자동 추가
-        added_code = self.add_top_recommendation_to_watchlist(recs_raw)
-        if added_code:
-            print(f"추천 종목 최상위 {added_code}을(를) watchlist에 자동 추가했습니다.")
+        # 추천 종목 1등급 자동 추가
+        added_codes = self.add_top_recommendation_to_watchlist(recs_raw)
+        if added_codes:
+            print(f"추천 종목 1등급 {', '.join(added_codes)}을(를) watchlist에 자동 추가했습니다.")
         else:
             if recs_raw and 1 in recs_raw and len(recs_raw[1]) == 0:
                 print("오늘은 1등급 추천 종목이 없습니다. watchlist 자동 추가를 건너뜁니다.")
             else:
-                print("추천 종목 최상위 1등급 종목이 없거나 이미 watchlist에 있는 항목이어서 자동 추가가 수행되지 않았습니다.")
+                print("추천 종목 1등급 종목이 없거나 이미 watchlist/holdings에 있는 항목이어서 자동 추가가 수행되지 않았습니다.")
         
         # 2. AI에게 전달할 데이터 정리
         news_msg = self.get_stock_news()
