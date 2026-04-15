@@ -144,6 +144,7 @@ class StockAnalyzer:
             "INTRADAY_TIMEOUT": 8,
             "INTRADAY_INTERVALS": ["1m", "2m", "5m", "15m"],
             "INTRADAY_MAX_RETRIES": 1,
+            "PRICE_CHANGE_BASIS": "prev_close",
             "US_RECOMMENDATION_ENABLED": True,
             "US_DOW_TICKERS": [
                 "AAPL", "AMGN", "AMZN", "AXP", "BA", "CAT", "CRM", "CSCO", "CVX", "DIS",
@@ -302,6 +303,56 @@ class StockAnalyzer:
                 return self._fetch_naver_intraday(code, timeout=timeout)
             raise
 
+    def _resolve_reference_price(self, code, current_price, intraday_time=None):
+        """
+        등락 계산 기준 가격을 반환합니다.
+        - prev_close: 전일 종가 대비 (기본)
+        - open: 당일 시가 대비
+        """
+        basis = str(self.config.get("PRICE_CHANGE_BASIS", "prev_close")).strip().lower()
+        session_date = intraday_time.date() if intraday_time is not None else None
+
+        prev_close = None
+        open_price = None
+        try:
+            daily = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=20)).strftime('%Y-%m-%d'))
+            if not daily.empty:
+                daily = daily.sort_index()
+                if session_date is None:
+                    session_date = daily.index[-1].date()
+
+                same_day = daily[daily.index.date == session_date]
+                if not same_day.empty:
+                    open_val = same_day.iloc[-1].get('Open')
+                    if pd.notna(open_val):
+                        open_price = float(open_val)
+                    prev_rows = daily[daily.index.date < session_date]
+                    if not prev_rows.empty:
+                        prev_close = float(prev_rows.iloc[-1]['Close'])
+                else:
+                    open_val = daily.iloc[-1].get('Open')
+                    if pd.notna(open_val):
+                        open_price = float(open_val)
+                    if len(daily) >= 2:
+                        prev_close = float(daily.iloc[-2]['Close'])
+                    else:
+                        prev_close = float(daily.iloc[-1]['Close'])
+        except Exception:
+            pass
+
+        reference = prev_close
+        if basis == "open":
+            reference = open_price if open_price not in (None, 0) else prev_close
+        if reference in (None, 0):
+            reference = current_price
+
+        return {
+            'basis': basis,
+            'reference': float(reference),
+            'prev_close': float(prev_close) if prev_close not in (None, 0) else None,
+            'open': float(open_price) if open_price not in (None, 0) else None
+        }
+
     def get_latest_price(self, code):
         """15분 지연 인트라데이 데이터를 우선 사용하고, 실패 시 일별 데이터로 폴백합니다."""
         if not self.config.get('INTRADAY_ENABLED', True):
@@ -311,19 +362,28 @@ class StockAnalyzer:
             df = self._fetch_intraday(code, timeout=timeout)
             if len(df) >= 2:
                 last = df.iloc[-1]
-                prev = df.iloc[-2]
+                current_price = float(last['Close'])
+                refs = self._resolve_reference_price(code, current_price, intraday_time=df.index[-1])
                 return {
                     'source': 'intraday',
-                    'last': float(last['Close']),
-                    'previous': float(prev['Close']),
+                    'last': current_price,
+                    'previous': refs['reference'],
+                    'prev_close': refs['prev_close'],
+                    'open': refs['open'],
+                    'basis': refs['basis'],
                     'time': df.index[-1]
                 }
             if len(df) == 1:
                 last = df.iloc[-1]
+                current_price = float(last['Close'])
+                refs = self._resolve_reference_price(code, current_price, intraday_time=df.index[-1])
                 return {
                     'source': 'intraday',
-                    'last': float(last['Close']),
-                    'previous': float(last['Close']),
+                    'last': current_price,
+                    'previous': refs['reference'],
+                    'prev_close': refs['prev_close'],
+                    'open': refs['open'],
+                    'basis': refs['basis'],
                     'time': df.index[-1]
                 }
         except Exception:
@@ -332,11 +392,15 @@ class StockAnalyzer:
             df = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=7)).strftime('%Y-%m-%d'))
             if len(df) >= 2:
                 last = df.iloc[-1]
-                prev = df.iloc[-2]
+                current_price = float(last['Close'])
+                refs = self._resolve_reference_price(code, current_price, intraday_time=df.index[-1])
                 return {
                     'source': 'daily',
-                    'last': float(last['Close']),
-                    'previous': float(prev['Close']),
+                    'last': current_price,
+                    'previous': refs['reference'],
+                    'prev_close': refs['prev_close'],
+                    'open': refs['open'],
+                    'basis': refs['basis'],
                     'time': df.index[-1]
                 }
         except Exception:
@@ -486,7 +550,10 @@ class StockAnalyzer:
         percent = (amount / previous_price) * 100
         label = self.get_price_label(code)
         marker = '🔴' if amount > 0 else ('🔵' if amount < 0 else '⏺')
-        amount_text = f"{amount:+,.0f}{label}"
+        if label == '원':
+            amount_text = f"{amount:+,.0f}{label}"
+        else:
+            amount_text = f"{amount:+,.2f}{label}"
         percent_text = f"{percent:+.2f}%"
         return f"{marker} 등락가 {amount_text}, 등락율 {percent_text}"
 
