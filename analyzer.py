@@ -543,35 +543,58 @@ class StockAnalyzer:
         return code
 
     def get_stock_news(self):
-        """오늘의 주요 주식 관련 뉴스를 수집합니다."""
+        """오늘의 주요 주식/국제정세 뉴스를 함께 수집합니다."""
         try:
-            query = "주식 증시"
-            url = f"https://news.google.com/rss/search?q={requests.utils.quote(query + ' when:1d')}&hl=ko&gl=KR&ceid=KR:ko"
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
-            }
-            response = requests.get(url, headers=headers, timeout=10)
-            response.raise_for_status()
-            root = ET.fromstring(response.text)
-            items = root.findall('.//item')
-            if not items:
-                return "[오늘의 주요 주식 뉴스] 관련 뉴스가 없습니다."
+            market_news = self._fetch_google_news_items("주식 증시", limit=3)
+            geo_news = self._fetch_google_news_items(
+                "국제정세 전쟁 분쟁 관세 제재 유가 환율 금리 중앙은행",
+                limit=3
+            )
 
-            news_lines = ["[오늘의 주요 주식 뉴스]"]
-            for item in items[:3]:
-                title_el = item.find('title')
-                link_el = item.find('link')
-                pub_el = item.find('pubDate')
-                title = title_el.text if title_el is not None else '제목 없음'
-                link = link_el.text if link_el is not None else None
-                pub = pub_el.text if pub_el is not None else ''
-                if link:
-                    news_lines.append(f"- {title} ({pub})\n  {link}")
-                else:
-                    news_lines.append(f"- {title} ({pub})")
-            return "\n".join(news_lines)
+            lines = []
+            lines.append("[오늘의 주요 주식 뉴스]")
+            if market_news:
+                lines.extend(market_news)
+            else:
+                lines.append("- 관련 뉴스가 없습니다.")
+
+            lines.append("")
+            lines.append("[국제정세 뉴스 (시장 영향 가능)]")
+            if geo_news:
+                lines.extend(geo_news)
+            else:
+                lines.append("- 관련 뉴스가 없습니다.")
+
+            return "\n".join(lines)
         except Exception:
-            return "[오늘의 주요 주식 뉴스] 뉴스를 가져오는 데 실패했습니다."
+            return (
+                "[오늘의 주요 주식 뉴스]\n- 뉴스를 가져오는 데 실패했습니다.\n\n"
+                "[국제정세 뉴스 (시장 영향 가능)]\n- 뉴스를 가져오는 데 실패했습니다."
+            )
+
+    def _fetch_google_news_items(self, query, limit=3):
+        url = f"https://news.google.com/rss/search?q={requests.utils.quote(query + ' when:1d')}&hl=ko&gl=KR&ceid=KR:ko"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
+        }
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        root = ET.fromstring(response.text)
+        items = root.findall('.//item')
+
+        lines = []
+        for item in items[:limit]:
+            title_el = item.find('title')
+            link_el = item.find('link')
+            pub_el = item.find('pubDate')
+            title = title_el.text if title_el is not None else '제목 없음'
+            link = link_el.text if link_el is not None else None
+            pub = pub_el.text if pub_el is not None else ''
+            if link:
+                lines.append(f"- {title} ({pub})\n  {link}")
+            else:
+                lines.append(f"- {title} ({pub})")
+        return lines
 
     def get_market_sentiment(self):
         """코스피 지수의 이평선 기반 시장 심리 분석 (상세 한글 설명 추가)"""
@@ -730,10 +753,12 @@ class StockAnalyzer:
 - **언어 제약**: 영어 표현과 전문 용어를 쓰지 말고, 쉬운 한국어로 풀어 설명해줘.
 - **핵심 요구**: 각 추천 종목 설명에 반드시 입력된 `현재가` 수치를 포함해줘. 전달된 숫자를 변경하지 말고, 가능한 한 그대로 반영해서 작성해줘.
 - **중요**: 보유 종목과 추천 종목 정보를 명확히 구분해서 작성해줘. 각 섹션은 분리되어 있어야 하며, 제목을 지나치게 생략하지 말고 구분이 쉽게 유지되도록 해줘.
+- **필수 섹션**: `[국제정세 뉴스 요약]` 섹션을 반드시 포함하고, 입력 데이터의 국제정세 뉴스에서 시장에 영향이 큰 2~3개를 간단히 요약해줘.
 - **구조**:
   1. 현재 시장의 분위기를 한 문단으로 정리해줘.
-  2. [보유 종목] 섹션을 만들어서, 각 종목에 대해 왜 매도/보유 판단을 했는지 설명해줘.
-  3. [추천 종목] 섹션을 만들어서, 각 종목에 대해 왜 추천하는지, 왜 지금 매수 또는 매수를 보류해야 하는지 설명해줘.
+  2. [국제정세 뉴스 요약] 섹션을 만들어서, 오늘 시장에 영향을 줄 수 있는 이슈를 정리해줘.
+  3. [보유 종목] 섹션을 만들어서, 각 종목에 대해 왜 매도/보유 판단을 했는지 설명해줘.
+  4. [추천 종목] 섹션을 만들어서, 각 종목에 대해 왜 추천하는지, 왜 지금 매수 또는 매수를 보류해야 하는지 설명해줘.
 - **표현 금지**: '트레일링 스톱', '깃발형 패턴', '에너지 응축', '변동성 수렴' 등의 전문 용어를 쓰지 말고, 쉬운 설명으로 바꿔줘.
 - **문장 구성**: 각 설명은 새 문단으로 구분하고, 항목 사이에는 빈 줄을 넣어줘.
 - **가장 중요한 것**: 왜 추천하는지 이유를 분명하게 설명해줘.
