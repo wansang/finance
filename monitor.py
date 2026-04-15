@@ -6,6 +6,7 @@ import datetime
 import json
 import os
 import html
+from zoneinfo import ZoneInfo
 
 class MarketMonitor:
     def __init__(self):
@@ -16,7 +17,7 @@ class MarketMonitor:
         import holidays
         import os
         
-        today = datetime.datetime.now()
+        today = datetime.datetime.now(ZoneInfo("Asia/Seoul"))
         kr_holidays = holidays.KR()
         is_manual = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
         force_run = os.environ.get("FORCE_RUN", "").lower() in ("1", "true", "yes")
