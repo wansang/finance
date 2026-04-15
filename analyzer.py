@@ -364,10 +364,11 @@ class StockAnalyzer:
                 last = df.iloc[-1]
                 current_price = float(last['Close'])
                 refs = self._resolve_reference_price(code, current_price, intraday_time=df.index[-1])
+                previous_price = refs['prev_close'] if refs['prev_close'] is not None else refs['reference']
                 return {
                     'source': 'intraday',
                     'last': current_price,
-                    'previous': refs['reference'],
+                    'previous': previous_price,
                     'prev_close': refs['prev_close'],
                     'open': refs['open'],
                     'basis': refs['basis'],
@@ -377,10 +378,11 @@ class StockAnalyzer:
                 last = df.iloc[-1]
                 current_price = float(last['Close'])
                 refs = self._resolve_reference_price(code, current_price, intraday_time=df.index[-1])
+                previous_price = refs['prev_close'] if refs['prev_close'] is not None else refs['reference']
                 return {
                     'source': 'intraday',
                     'last': current_price,
-                    'previous': refs['reference'],
+                    'previous': previous_price,
                     'prev_close': refs['prev_close'],
                     'open': refs['open'],
                     'basis': refs['basis'],
@@ -394,10 +396,11 @@ class StockAnalyzer:
                 last = df.iloc[-1]
                 current_price = float(last['Close'])
                 refs = self._resolve_reference_price(code, current_price, intraday_time=df.index[-1])
+                previous_price = refs['prev_close'] if refs['prev_close'] is not None else refs['reference']
                 return {
                     'source': 'daily',
                     'last': current_price,
-                    'previous': refs['reference'],
+                    'previous': previous_price,
                     'prev_close': refs['prev_close'],
                     'open': refs['open'],
                     'basis': refs['basis'],

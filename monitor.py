@@ -59,7 +59,7 @@ class MarketMonitor:
                 latest_price = self.analyzer.get_latest_price(code)
                 if latest_price:
                     current_price = latest_price['last']
-                    prev_price = latest_price['previous']
+                    prev_price = latest_price.get('prev_close') or latest_price.get('previous')
                 else:
                     current_price = df.iloc[-1]['Close']
                     prev_price = df.iloc[-2]['Close'] if len(df) > 1 else current_price
@@ -95,7 +95,7 @@ class MarketMonitor:
                 latest_price = self.analyzer.get_latest_price(code)
                 if latest_price:
                     current_price = latest_price['last']
-                    prev_price = latest_price['previous']
+                    prev_price = latest_price.get('prev_close') or latest_price.get('previous')
                 else:
                     current_price = df.iloc[-1]['Close']
                     prev_price = df.iloc[-2]['Close'] if len(df) > 1 else current_price
