@@ -143,7 +143,17 @@ class StockAnalyzer:
             "INTRADAY_ENABLED": True,
             "INTRADAY_TIMEOUT": 8,
             "INTRADAY_INTERVALS": ["1m", "2m", "5m", "15m"],
-            "INTRADAY_MAX_RETRIES": 1
+            "INTRADAY_MAX_RETRIES": 1,
+            "US_RECOMMENDATION_ENABLED": True,
+            "US_DOW_TICKERS": [
+                "AAPL", "AMGN", "AMZN", "AXP", "BA", "CAT", "CRM", "CSCO", "CVX", "DIS",
+                "GS", "HD", "HON", "IBM", "JNJ", "JPM", "KO", "MCD", "MMM", "MRK",
+                "MSFT", "NKE", "NVDA", "PG", "SHW", "TRV", "UNH", "V", "VZ", "WMT"
+            ],
+            "US_NASDAQ_TICKERS": [
+                "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "GOOG", "TSLA", "AVGO", "ADBE",
+                "NFLX", "COST", "AMD", "QCOM", "INTC", "AMAT", "MU", "PANW", "CRWD", "ASML"
+            ]
         }
         if os.path.exists(self.strategy_config_file):
             try:
@@ -1145,6 +1155,118 @@ class StockAnalyzer:
             formatted_recs.pop()
         return formatted_recs, results
 
+    def merge_tier_results(self, left, right):
+        merged = {1: [], 2: [], 3: []}
+        for tier in [1, 2, 3]:
+            merged[tier].extend(left.get(tier, []))
+            merged[tier].extend(right.get(tier, []))
+            merged[tier].sort(key=lambda x: x.get('rs_score', 0), reverse=True)
+        return merged
+
+    def analyze_us_candidates(self, target_date=None):
+        """다우/나스닥 대표 종목 후보군 분석"""
+        if not self.config.get("US_RECOMMENDATION_ENABLED", True):
+            return [], {1: [], 2: [], 3: []}
+
+        dow_candidates = self.config.get("US_DOW_TICKERS", [])
+        nasdaq_candidates = self.config.get("US_NASDAQ_TICKERS", [])
+        dow_set = {str(x).strip().upper() for x in dow_candidates}
+        candidates = []
+        seen = set()
+        for code in dow_candidates + nasdaq_candidates:
+            token = str(code).strip().upper()
+            if not token or token in seen:
+                continue
+            seen.add(token)
+            market = "DOW" if token in dow_set else "NASDAQ"
+            candidates.append((token, market))
+
+        if not candidates:
+            return [], {1: [], 2: [], 3: []}
+
+        results = {1: [], 2: [], 3: []}
+        start = (datetime.datetime.now() - datetime.timedelta(days=400)).strftime('%Y-%m-%d')
+        try:
+            dow_index = fdr.DataReader('DJI', start=start)
+        except Exception:
+            dow_index = None
+        try:
+            nasdaq_index = fdr.DataReader('IXIC', start=start)
+        except Exception:
+            nasdaq_index = None
+
+        print(f"Starting US candidate analysis for {len(candidates)} stocks...")
+        for code, market in candidates:
+            try:
+                df = fdr.DataReader(code, start=start)
+                if len(df) < 200:
+                    continue
+
+                benchmark = dow_index if market == "DOW" else nasdaq_index
+                df = self.get_indicators(df, benchmark)
+                target_idx = len(df) - 1
+                if target_date:
+                    df_target = df[df.index <= target_date]
+                    if len(df_target) < 1:
+                        continue
+                    target_idx = len(df_target) - 1
+
+                reasons = self.check_signals(df, target_idx)
+                if not reasons:
+                    continue
+
+                last = df.iloc[target_idx]
+                win_rate, avg_ret = self.validate_strategy(df, target_idx)
+                is_elite = self.is_trend_template(df, target_idx)
+                is_above_200 = last['Close'] > last['SMA200']
+                rs_score = last['RS_LINE'] if 'RS_LINE' in last else 0
+                safe_reasons = html.escape(", ".join(reasons))
+                prev_close = float(df.iloc[target_idx - 1]['Close']) if target_idx > 0 else float(last['Close'])
+
+                stock_data = {
+                    'name': html.escape(code),
+                    'code': code,
+                    'market': market,
+                    'reasons': safe_reasons,
+                    'win_rate': win_rate,
+                    'avg_ret': avg_ret,
+                    'rs_score': rs_score,
+                    'last': float(last['Close']),
+                    'prev_close': prev_close
+                }
+
+                if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60):
+                    results[1].append(stock_data)
+                elif is_above_200 and win_rate >= self.config.get('TIER2_WIN_RATE', 50):
+                    results[2].append(stock_data)
+                elif win_rate >= 40:
+                    results[3].append(stock_data)
+            except Exception:
+                continue
+
+        for t in [1, 2, 3]:
+            results[t].sort(key=lambda x: x.get('rs_score', 0), reverse=True)
+
+        formatted = []
+        tier_names = {1: "🥇 지금 매수", 2: "🥈 신중히 매수", 3: "🥉 추가 확인 후 매수"}
+        for t in [1, 2, 3]:
+            if not results[t]:
+                continue
+            formatted.append(f"<b>{tier_names[t]} (미국)</b>")
+            for r in results[t][:5]:
+                current_price = r.get('last')
+                intraday = self.get_latest_price(r['code'])
+                if intraday:
+                    current_price = intraday.get('last', current_price)
+                price_text = self.format_price(current_price, r['code']) if current_price is not None else '가격 정보 없음'
+                msg = f"• <b>{r['name']}</b>({r['code']}, {r.get('market', 'US')}): 현재가 {price_text} - {r['reasons']}"
+                formatted.append(msg)
+            formatted.append("")
+
+        if formatted and formatted[-1] == "":
+            formatted.pop()
+        return formatted, results
+
     def analyze_holdings(self):
         """보유 종목의 매도 타이밍(트레일링 스톱) 분석"""
         sell_alerts = []
@@ -1201,7 +1323,17 @@ class StockAnalyzer:
         # 1.데이터 수집
         us_summary = self.get_us_market_summary()
         sentiment_msg, is_positive = self.get_market_sentiment()
-        recs_msg, recs_raw = self.analyze_kospi()
+        recs_msg_kr, recs_raw_kr = self.analyze_kospi()
+        recs_msg_us, recs_raw_us = self.analyze_us_candidates()
+        recs_msg = []
+        if recs_msg_kr:
+            recs_msg.append("<b>[국내 추천]</b>")
+            recs_msg.extend(recs_msg_kr)
+        if recs_msg_us:
+            recs_msg.append("")
+            recs_msg.append("<b>[미국 추천: Dow/Nasdaq 후보군]</b>")
+            recs_msg.extend(recs_msg_us)
+        recs_raw = self.merge_tier_results(recs_raw_kr, recs_raw_us)
         sell_alerts = self.analyze_holdings()
 
         # 추천 종목 1위 자동 추가
