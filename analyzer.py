@@ -144,7 +144,7 @@ class StockAnalyzer:
             "INTRADAY_TIMEOUT": 8,
             "INTRADAY_INTERVALS": ["1m", "2m", "5m", "15m"],
             "INTRADAY_MAX_RETRIES": 1,
-            "PRICE_CHANGE_BASIS": "prev_close",
+            "PRICE_CHANGE_BASIS": "open",
             "US_RECOMMENDATION_ENABLED": True,
             "US_DOW_TICKERS": [
                 "AAPL", "AMGN", "AMZN", "AXP", "BA", "CAT", "CRM", "CSCO", "CVX", "DIS",
@@ -309,7 +309,7 @@ class StockAnalyzer:
         - prev_close: 전일 종가 대비 (기본)
         - open: 당일 시가 대비
         """
-        basis = str(self.config.get("PRICE_CHANGE_BASIS", "prev_close")).strip().lower()
+        basis = str(self.config.get("PRICE_CHANGE_BASIS", "open")).strip().lower()
         session_date = intraday_time.date() if intraday_time is not None else None
 
         prev_close = None
