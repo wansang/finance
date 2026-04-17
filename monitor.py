@@ -12,6 +12,10 @@ class MarketMonitor:
     def __init__(self):
         self.analyzer = StockAnalyzer()
         
+    def _format_monitor_line(self, name, price_text, change_text, high_text, detail):
+        high_segment = f", 조회시간 기준 최고가 {high_text}" if high_text else ""
+        return f"- {name}: 현재가 {price_text} {change_text}{high_segment}. {detail}"
+
     def run(self):
         import sys
         import holidays
@@ -66,6 +70,8 @@ class MarketMonitor:
                 profit_pct = (current_price - buy_price) / buy_price * 100
                 price_text = self.analyzer.format_price(current_price, code)
                 change_text = self.analyzer.format_price_change(current_price, prev_price, code)
+                high_price = self.analyzer.get_intraday_high(code)
+                high_text = self.analyzer.format_price(high_price, code) if high_price is not None else None
 
                 if triggered:
                     status = "매도 권장"
@@ -79,7 +85,13 @@ class MarketMonitor:
                         reason = "현재는 손실 구간이나 매도 기준에는 미달하여 추가 관찰이 필요합니다."
 
                 holding_data.append(
-                    f"- {name}: 현재가 {price_text} {change_text}, 수익률 {profit_pct:+.2f}%, 상태: {status}. 이유: {reason}"
+                    self._format_monitor_line(
+                        name,
+                        price_text,
+                        change_text,
+                        high_text,
+                        f"수익률 {profit_pct:+.2f}%, 상태: {status}. 이유: {reason}"
+                    )
                 )
             except Exception:
                 holding_data.append(f"- {code}: 분석 오류")
@@ -101,13 +113,23 @@ class MarketMonitor:
                     prev_price = df.iloc[-2]['Close'] if len(df) > 1 else current_price
                 price_text = self.analyzer.format_price(current_price, code)
                 change_text = self.analyzer.format_price_change(current_price, prev_price, code)
+                high_price = self.analyzer.get_intraday_high(code)
+                high_text = self.analyzer.format_price(high_price, code) if high_price is not None else None
 
                 reasons = self.analyzer.check_signals(df, -1)
                 if reasons:
                     sig_text = " / ".join(reasons)
                 else:
                     sig_text = "현재 매수 신호는 없습니다."
-                watch_data.append(f"- {name}: 현재가 {price_text} {change_text}. 신호: {sig_text}")
+                watch_data.append(
+                    self._format_monitor_line(
+                        name,
+                        price_text,
+                        change_text,
+                        high_text,
+                        f"신호: {sig_text}"
+                    )
+                )
             except Exception:
                 watch_data.append(f"- {code}: 분석 오류")
 

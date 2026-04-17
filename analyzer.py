@@ -26,8 +26,10 @@ except ImportError:
 class StockAnalyzer:
     def __init__(self):
         self.notifier = TelegramNotifier()
-        self.holdings_file = 'holdings.json'
-        self.strategy_config_file = 'strategy_config.json'
+        self.base_dir = os.path.dirname(os.path.abspath(__file__))
+        self.holdings_file = os.path.join(self.base_dir, 'holdings.json')
+        self.strategy_config_file = os.path.join(self.base_dir, 'strategy_config.json')
+        self.watchlist_file = os.path.join(self.base_dir, 'watchlist.json')
         self.holdings = self.load_holdings()
         self.config = self.load_strategy_config()
         
@@ -183,8 +185,8 @@ class StockAnalyzer:
             json.dump(holdings, f, ensure_ascii=False, indent=4)
 
     def load_watchlist(self):
-        if os.path.exists('watchlist.json'):
-            with open('watchlist.json', 'r', encoding='utf-8') as f:
+        if os.path.exists(self.watchlist_file):
+            with open(self.watchlist_file, 'r', encoding='utf-8') as f:
                 return json.load(f)
         return {}
 
@@ -410,6 +412,27 @@ class StockAnalyzer:
             pass
         return None
 
+    def get_intraday_high(self, code):
+        """조회 시점 기준 최고가를 가져옵니다."""
+        try:
+            df = self._fetch_intraday(code, timeout=self.config.get('INTRADAY_TIMEOUT', 8))
+            if not df.empty and 'High' in df.columns:
+                return float(df['High'].max())
+        except Exception:
+            pass
+
+        try:
+            today = datetime.datetime.now().date()
+            df = fdr.DataReader(code, start=today.strftime('%Y-%m-%d'))
+            if not df.empty:
+                same_day = df[df.index.date == today]
+                if not same_day.empty:
+                    return float(same_day['High'].max())
+        except Exception:
+            pass
+
+        return None
+
     def fetch_price_history(self, code, start=None, end=None):
         """기존 일별 시세를 그대로 호출하는 헬퍼."""
         return fdr.DataReader(code, start=start, end=end)
@@ -507,7 +530,7 @@ class StockAnalyzer:
         return condition
 
     def save_watchlist(self, watchlist):
-        with open('watchlist.json', 'w', encoding='utf-8') as f:
+        with open(self.watchlist_file, 'w', encoding='utf-8') as f:
             json.dump(watchlist, f, ensure_ascii=False, indent=4)
 
     def detect_price_unit(self, code):
