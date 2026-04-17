@@ -56,6 +56,8 @@
   - `POST https://api.github.com/repos/wansang/finance/actions/workflows/analyze.yml/dispatches`
 - Real-Time Market Monitor:
   - `POST https://api.github.com/repos/wansang/finance/actions/workflows/monitor.yml/dispatches`
+- Strategy Optimizer:
+  - `POST https://api.github.com/repos/wansang/finance/actions/workflows/optimize.yml/dispatches`
 
 ### 3) 요청 헤더/바디
 ```bash
@@ -72,12 +74,21 @@ curl -X POST "https://api.github.com/repos/wansang/finance/actions/workflows/mon
   -d '{"ref":"main"}'
 ```
 
+```bash
+curl -X POST "https://api.github.com/repos/wansang/finance/actions/workflows/optimize.yml/dispatches" \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer <YOUR_GITHUB_PAT>" \
+  -d '{"ref":"main"}'
+```
+
 ### 4) 크론 설정 (Asia/Seoul 기준)
 - Elite Stock Analysis: 평일 08:30
   - `30 8 * * 1-5`
 - Real-Time Market Monitor: 평일 09:00~20:00 30분 간격
   - `0,30 9-19 * * 1-5`
   - `0 20 * * 1-5`
+- Strategy Optimizer: 매주 토요일 09:00
+  - `0 0 * * 6`
 
 ---
 *본 프로그램은 기술적 분석을 통한 보조 도구이며, 모든 투자의 책임은 투자자 본인에게 있습니다.*
