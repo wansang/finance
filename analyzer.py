@@ -156,7 +156,9 @@ class StockAnalyzer:
             "US_NASDAQ_TICKERS": [
                 "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "GOOG", "TSLA", "AVGO", "ADBE",
                 "NFLX", "COST", "AMD", "QCOM", "INTC", "AMAT", "MU", "PANW", "CRWD", "ASML"
-            ]
+            ],
+            "KOSPI_ETF_TICKERS": ["069500", "091170", "305720", "233740"],
+            "US_ETF_TICKERS": ["SPY", "QQQ", "DIA"]
         }
         if os.path.exists(self.strategy_config_file):
             try:
@@ -1208,15 +1210,20 @@ class StockAnalyzer:
         """코스피 전 종목 정밀 분석 (Tiered System)"""
         stocks = fdr.StockListing('KOSPI')
         kospi_index = fdr.DataReader('KS11', start=(datetime.datetime.now() - datetime.timedelta(days=365)).strftime('%Y-%m-%d'))
+        etf_tickers = [str(x).strip() for x in self.config.get('KOSPI_ETF_TICKERS', []) if str(x).strip()]
+        stock_codes = {str(code).strip() for code in stocks['Code']}
+        extra_etfs = [code for code in etf_tickers if code not in stock_codes]
         
         results = {1: [], 2: [], 3: []}
         count = 0
-        total = len(stocks)
+        total = len(stocks) + len(extra_etfs)
         
-        print(f"Starting Tiered Analysis for {total} stocks...")
+        if extra_etfs:
+            print(f"Adding {len(extra_etfs)} extra KOSPI ETF candidates: {', '.join(extra_etfs)}")
+        print(f"Starting Tiered Analysis for {total} candidates...")
         
         for _, stock in stocks.iterrows():
-            code = stock['Code']
+            code = str(stock['Code']).strip()
             name = stock['Name']
             
             try:
@@ -1268,6 +1275,54 @@ class StockAnalyzer:
             except Exception:
                 continue
 
+        for code in extra_etfs:
+            name = code
+            try:
+                df = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=400)).strftime('%Y-%m-%d'))
+                if len(df) < 200:
+                    continue
+
+                df = self.get_indicators(df, kospi_index)
+                target_idx = len(df) - 1
+                if target_date:
+                    df_target = df[df.index <= target_date]
+                    if len(df_target) < 1: continue
+                    target_idx = len(df_target) - 1
+
+                reasons = self.check_signals(df, target_idx)
+                if not reasons: continue
+
+                last = df.iloc[target_idx]
+                win_rate, avg_ret = self.validate_strategy(df, target_idx)
+                is_elite = self.is_trend_template(df, target_idx)
+                is_above_200 = last['Close'] > last['SMA200']
+                rs_score = last['RS_LINE'] if 'RS_LINE' in last else 0
+                safe_name = html.escape(name)
+                safe_reasons = html.escape(", ".join(reasons))
+                prev_close = float(df.iloc[target_idx - 1]['Close']) if target_idx > 0 else float(last['Close'])
+                stock_data = {
+                    'name': safe_name,
+                    'code': code,
+                    'reasons': safe_reasons,
+                    'win_rate': win_rate,
+                    'avg_ret': avg_ret,
+                    'rs_score': rs_score,
+                    'last': float(last['Close']),
+                    'prev_close': prev_close
+                }
+
+                if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60):
+                    results[1].append(stock_data)
+                elif is_above_200 and win_rate >= self.config.get('TIER2_WIN_RATE', 50):
+                    results[2].append(stock_data)
+                elif win_rate >= 40:
+                    results[3].append(stock_data)
+
+                count += 1
+                if count % 200 == 0: print(f"Analyzed {count}/{total} candidates...")
+            except Exception:
+                continue
+
         # 결과 포맷팅
         formatted_recs = []
         tier_names = {1: "🥇 지금 매수", 2: "🥈 신중히 매수", 3: "🥉 추가 확인 후 매수"}
@@ -1307,10 +1362,11 @@ class StockAnalyzer:
 
         dow_candidates = self.config.get("US_DOW_TICKERS", [])
         nasdaq_candidates = self.config.get("US_NASDAQ_TICKERS", [])
+        us_etf_tickers = self.config.get("US_ETF_TICKERS", [])
         dow_set = {str(x).strip().upper() for x in dow_candidates}
         candidates = []
         seen = set()
-        for code in dow_candidates + nasdaq_candidates:
+        for code in dow_candidates + nasdaq_candidates + us_etf_tickers:
             token = str(code).strip().upper()
             if not token or token in seen:
                 continue
