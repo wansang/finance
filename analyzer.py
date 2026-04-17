@@ -627,10 +627,19 @@ class StockAnalyzer:
             code = stock.get('code')
             if not code:
                 continue
-            if code in self.holdings or code in watchlist:
+            if code in self.holdings:
                 continue
 
             stock_name = html.unescape(stock.get('name', code))
+            entry = watchlist.get(code)
+            if entry:
+                if entry.get('source') == 'auto_recommendation':
+                    entry['name'] = stock_name
+                    entry['add_date'] = today
+                    watchlist[code] = entry
+                    added_codes.append(code)
+                continue
+
             watchlist[code] = {
                 'name': stock_name,
                 'add_date': today,
@@ -1511,6 +1520,7 @@ class StockAnalyzer:
         print("종합 분석 및 AI 리포트 생성 시작...")
         
         # watchlist 정리
+        self.holdings = self.load_holdings()
         self.clean_watchlist()
 
         # 1.데이터 수집
@@ -1537,7 +1547,14 @@ class StockAnalyzer:
             if recs_raw and 1 in recs_raw and len(recs_raw[1]) == 0:
                 print("오늘은 1등급 추천 종목이 없습니다. watchlist 자동 추가를 건너뜁니다.")
             else:
-                print("추천 종목 1등급 종목이 없거나 이미 watchlist/holdings에 있는 항목이어서 자동 추가가 수행되지 않았습니다.")
+                current_watchlist = self.load_watchlist()
+                skipped = [stock.get('code') for stock in recs_raw[1]
+                           if stock.get('code') in self.holdings or stock.get('code') in current_watchlist]
+                if skipped:
+                    print("추천 종목 1등급 종목이 없거나 이미 watchlist/holdings에 있는 항목이어서 자동 추가가 수행되지 않았습니다.")
+                    print(f"이미 watchlist/holdings에 있는 종목: {', '.join(skipped)}")
+                else:
+                    print("추천 종목 1등급 종목이 없거나 1등급 결과가 올바르지 않아 자동 추가가 수행되지 않았습니다.")
         
         # 2. AI에게 전달할 데이터 정리
         news_msg = self.get_stock_news()
