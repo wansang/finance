@@ -10,6 +10,56 @@ class Backtester:
         self.data_cache = {}
         self.us_market_cache = {}
 
+    def _simulate_trade(self, df, target_idx, reasons, max_hold_days=None):
+        """
+        단일 거래 시뮬레이션: 하드 손절 + 트레일링 스톱 + 목표가 + 타임컷
+        매수가에서 max_hold_days 이내 청산. None이면 데이터 끝까지.
+        """
+        if max_hold_days is None:
+            max_hold_days = self.analyzer.config.get('VALIDATE_MAX_HOLD_DAYS', 20)
+
+        trailing_stop = self.analyzer.config.get('TRAILING_STOP_PCT', 0.035)
+        hard_stop = abs(self.analyzer.config.get('VALIDATE_STOP_LOSS_PCT', -0.05))
+        profit_target = self.analyzer.config.get('PROFIT_TARGET_PCT', 0.08)
+
+        has_premium = any(s in reasons for s in [
+            "RSI 반전 신호(상승 가능성)", "바닥권 반등 신호(BB 하단)"
+        ])
+        effective_target = profit_target * 1.5 if has_premium else profit_target
+
+        buy_price = float(df.iloc[target_idx]['Close'])
+        max_p = buy_price
+        sell_price = buy_price
+        exit_reason = "TimeOut"
+        end_idx = min(target_idx + max_hold_days + 1, len(df))
+
+        for j in range(target_idx + 1, end_idx):
+            curr_p = float(df.iloc[j]['Close'])
+            if curr_p > max_p:
+                max_p = curr_p
+
+            pct = (curr_p - buy_price) / buy_price
+
+            # 하드 손절
+            if pct <= -hard_stop:
+                sell_price = curr_p
+                exit_reason = f"HardStop(-{hard_stop*100:.0f}%)"
+                break
+            # 목표가
+            if pct >= effective_target:
+                sell_price = curr_p
+                exit_reason = f"Target(+{effective_target*100:.0f}%)"
+                break
+            # 트레일링 스톱 (고점 대비)
+            if max_p > buy_price and (max_p - curr_p) / max_p >= trailing_stop:
+                sell_price = curr_p
+                exit_reason = f"TrailingStop({trailing_stop*100:.0f}%)"
+                break
+        else:
+            sell_price = float(df.iloc[end_idx - 1]['Close'])
+
+        return (sell_price - buy_price) / buy_price * 100, exit_reason, buy_price, sell_price
+
     def _load_us_candidates(self):
         dow_candidates = self.analyzer.config.get('US_DOW_TICKERS', [])
         nasdaq_candidates = self.analyzer.config.get('US_NASDAQ_TICKERS', [])
@@ -31,6 +81,8 @@ class Backtester:
             print(f"⚠️ {market_name} 하락장 감지: Power Combo(RSI다이버전스+타지마할) 종목만 Tier1 허용")
         print(f"Analyzing {total} {market_name} stocks for signals on {target_date.date()}...")
 
+        max_hold = self.analyzer.config.get('VALIDATE_MAX_HOLD_DAYS', 20)
+
         for item in universe:
             if isinstance(item, tuple):
                 code, name = item
@@ -41,13 +93,12 @@ class Backtester:
                 continue
 
             try:
-                # Cache key includes benchmark to handle different indicators
                 cache_key = (code, benchmark_symbol)
-                
+
                 if cache_key in self.data_cache:
                     df = self.data_cache[cache_key]
                 else:
-                    history_window_days = max(350, self.analyzer.config.get('VALIDATE_MIN_HISTORY', 200) * 2 + 30)
+                    history_window_days = max(550, self.analyzer.config.get('VALIDATE_MIN_HISTORY', 252) * 2 + 60)
                     start_date = (target_date - datetime.timedelta(days=history_window_days)).strftime('%Y-%m-%d')
                     df = fdr.DataReader(code, start=start_date)
                     min_history = max(50, self.analyzer.config.get('SMA200', 200))
@@ -56,7 +107,6 @@ class Backtester:
 
                     if benchmark_symbol:
                         try:
-                            # Benchmark also cached globally per symbol to save calls
                             bench_key = ("BENCHMARK", benchmark_symbol)
                             if bench_key in self.data_cache:
                                 benchmark = self.data_cache[bench_key]
@@ -68,7 +118,7 @@ class Backtester:
                         df = self.analyzer.get_indicators(df, benchmark)
                     else:
                         df = self.analyzer.get_indicators(df)
-                    
+
                     self.data_cache[cache_key] = df
 
                 if target_date not in df.index:
@@ -81,6 +131,10 @@ class Backtester:
                     target_idx = df.index.get_loc(target_date)
                     actual_buy_date = target_date
 
+                # 매도 구간 데이터가 충분한지 확인
+                if target_idx + max_hold >= len(df):
+                    continue
+
                 reasons = self.analyzer.check_signals(df, target_idx)
                 if not reasons:
                     continue
@@ -92,7 +146,6 @@ class Backtester:
                 tier1 = self.analyzer.config.get('TIER1_WIN_RATE', 60)
                 tier2 = self.analyzer.config.get('TIER2_WIN_RATE', 50)
 
-                # 시장 필터: 하락장에서 Power Combo 아닌 Tier1 종목 제외
                 has_divergence = "RSI 반전 신호(상승 가능성)" in reasons
                 has_taj_mahal = "바닥권 반등 신호(BB 하단)" in reasons
                 power_combo = has_divergence and has_taj_mahal
@@ -101,23 +154,9 @@ class Backtester:
                 if not ((is_elite and win_rate >= tier1 and market_ok) or (is_above_200 and win_rate >= tier2)):
                     continue
 
-                buy_price = float(last['Close'])
-                sell_price = float(df.iloc[-1]['Close'])
-                sell_date = df.index[-1]
-                max_price_since_buy = buy_price
-                exit_reason = "Max Hold (30d+)"
+                ret, exit_reason, buy_price, sell_price = self._simulate_trade(df, target_idx, reasons, max_hold)
+                sell_date = df.index[min(target_idx + max_hold, len(df) - 1)]
 
-                for i in range(target_idx + 1, len(df)):
-                    curr_row = df.iloc[i]
-                    if curr_row['Close'] > max_price_since_buy:
-                        max_price_since_buy = curr_row['Close']
-                    if (max_price_since_buy - curr_row['Close']) / max_price_since_buy >= self.analyzer.config.get('TRAILING_STOP_PCT', 0.03):
-                        sell_price = float(curr_row['Close'])
-                        sell_date = df.index[i]
-                        exit_reason = f"Trailing Stop ({self.analyzer.config.get('TRAILING_STOP_PCT', 0.03) * 100:.1f}%)"
-                        break
-
-                ret = (sell_price - buy_price) / buy_price * 100
                 results.append({
                     'Market': market_name,
                     'Code': code,
@@ -128,7 +167,10 @@ class Backtester:
                     'SellDate': sell_date.date(),
                     'SellPrice': sell_price,
                     'Return(%)': ret,
-                    'ExitReason': exit_reason
+                    'ExitReason': exit_reason,
+                    'WinRate_Hist': win_rate,
+                    'PowerCombo': power_combo,
+                    'MarketUptrend': market_uptrend,
                 })
 
                 count += 1
@@ -140,7 +182,8 @@ class Backtester:
         return results
 
     def run_backtest(self, days_ago=30):
-        print(f"Starting {days_ago}-day backtest...")
+        """단일 기간 백테스트 (기존 방식, 빠른 확인용)"""
+        print(f"Starting single-period backtest (매수일: {days_ago}거래일 전)...")
 
         ks11_key = ('KS11', None)
         if ks11_key in self.data_cache:
@@ -149,32 +192,24 @@ class Backtester:
             ks11 = fdr.DataReader('KS11')
             self.data_cache[ks11_key] = ks11
         target_date = ks11.index[-(days_ago + 1)]
-        current_date = ks11.index[-1]
 
-        # 목표일 기준 시장 상태 판단
+        print(f"Target Date (Buy): {target_date.date()}")
+        print(f"Current Date: {ks11.index[-1].date()}")
+
         kospi_uptrend = self.analyzer._is_market_in_uptrend(ks11, target_idx=len(ks11[ks11.index <= target_date]) - 1)
         try:
             sp500 = fdr.DataReader('US500', start=(target_date - datetime.timedelta(days=300)).strftime('%Y-%m-%d'), end=target_date.strftime('%Y-%m-%d'))
             us_uptrend = self.analyzer._is_market_in_uptrend(sp500)
         except Exception:
             us_uptrend = True
-        market_cache_key = str(target_date.date())
-        if market_cache_key in self.us_market_cache:
-            us_market = self.us_market_cache[market_cache_key]
-        else:
-            us_market = self.analyzer.get_us_market_condition(target_date)
-            self.us_market_cache[market_cache_key] = us_market
+
+        us_market = self.analyzer.get_us_market_condition(target_date)
         print("US Market condition on buy date:")
         for name in ['S&P 500', 'Nasdaq', 'Dow']:
             info = us_market.get(name, {})
             if info.get('date') is not None:
                 trend = 'Up' if info['positive'] else 'Down'
                 print(f"  {name}: {trend} ({info['pct_change']:+.2f}%) on {info['date']}")
-            else:
-                print(f"  {name}: 데이터 없음")
-        if self.analyzer.config.get('BACKTEST_REQUIRE_US_MARKET_POSITIVE', False) and not us_market.get('all_positive', False):
-            print("US market was not broadly positive on the buy date. BACKTEST_REQUIRE_US_MARKET_POSITIVE is enabled, so backtest is skipped.")
-            return pd.DataFrame([])
 
         sample_size = self.analyzer.config.get('BACKTEST_SAMPLE_SIZE', 200)
         stocks = fdr.StockListing('KOSPI')[:sample_size]
@@ -187,43 +222,161 @@ class Backtester:
                 results.extend(self._backtest_universe(us_candidates, target_date, 'US', benchmark_symbol='IXIC', market_uptrend=us_uptrend))
 
         df_results = pd.DataFrame(results)
-        df_results['US_SP500_Positive'] = us_market.get('S&P 500', {}).get('positive', False)
-        df_results['US_Nasdaq_Positive'] = us_market.get('Nasdaq', {}).get('positive', False)
-        df_results['US_Dow_Positive'] = us_market.get('Dow', {}).get('positive', False)
-        df_results['US_MarketSummary'] = us_market.get('summary', '')
-
+        if not df_results.empty:
+            df_results['US_MarketSummary'] = us_market.get('summary', '')
         return df_results
 
-    def print_summary(self, df_results):
-        if df_results.empty:
+    def run_walkforward_backtest(self, periods=8, interval_weeks=6):
+        """
+        워크포워드 백테스트: 과거 N개 구간에서 각각 신호 포착 → max_hold_days 보유 → 청산
+        - periods: 테스트할 기간 수 (기본 8개 구간)
+        - interval_weeks: 구간 간격 (기본 6주)
+        - 각 구간은 독립적으로 시뮬레이션 (데이터 미래 참조 없음)
+        - 통계: 전체·시장별·상승장/하락장·신호별 승률·수익률
+        """
+        print(f"\n{'='*60}")
+        print(f"  워크포워드 백테스트: {periods}개 구간 × {interval_weeks}주 간격")
+        print(f"{'='*60}")
+
+        ks11 = fdr.DataReader('KS11', start=(datetime.datetime.now() - datetime.timedelta(days=900)).strftime('%Y-%m-%d'))
+        max_hold = self.analyzer.config.get('VALIDATE_MAX_HOLD_DAYS', 20)
+        sample_size = self.analyzer.config.get('BACKTEST_SAMPLE_SIZE', 200)
+
+        # 테스트 날짜 선정: 최근부터 interval_weeks 간격으로 거슬러 올라감
+        # 각 구간은 매수 후 max_hold일 청산이 가능해야 하므로 최소 max_hold일 이전 날짜
+        trading_dates = ks11.index
+        min_offset = max_hold + 5  # 청산 여유
+        test_dates = []
+        for p in range(periods):
+            offset_days = min_offset + p * interval_weeks * 7
+            cutoff = trading_dates[-offset_days] if offset_days < len(trading_dates) else trading_dates[0]
+            test_dates.append(cutoff)
+        test_dates = sorted(test_dates)
+
+        all_results = []
+        stocks = fdr.StockListing('KOSPI')[:sample_size]
+        kospi_universe = [(row['Code'], row['Name']) for _, row in stocks.iterrows()]
+        us_candidates = self._load_us_candidates() if self.analyzer.config.get('US_RECOMMENDATION_ENABLED', True) else []
+
+        for i, target_date in enumerate(test_dates):
+            period_label = f"Period {i+1}/{periods} ({target_date.date()})"
+            print(f"\n[{period_label}]")
+
+            kospi_uptrend = self.analyzer._is_market_in_uptrend(
+                ks11, target_idx=len(ks11[ks11.index <= target_date]) - 1
+            )
+            market_label = "상승장" if kospi_uptrend else "하락장"
+            print(f"  코스피 시장 상태: {market_label}")
+
+            try:
+                sp500 = fdr.DataReader('US500', start=(target_date - datetime.timedelta(days=300)).strftime('%Y-%m-%d'))
+                us_uptrend = self.analyzer._is_market_in_uptrend(sp500)
+            except Exception:
+                us_uptrend = True
+
+            period_results = self._backtest_universe(
+                kospi_universe, target_date, 'KOSPI', market_uptrend=kospi_uptrend
+            )
+            if us_candidates:
+                period_results.extend(self._backtest_universe(
+                    us_candidates, target_date, 'US', benchmark_symbol='IXIC', market_uptrend=us_uptrend
+                ))
+
+            for r in period_results:
+                r['Period'] = period_label
+                r['PeriodDate'] = target_date.date()
+
+            trades = len(period_results)
+            if trades > 0:
+                df_p = pd.DataFrame(period_results)
+                wr = (df_p['Return(%)'] > 0).sum() / trades * 100
+                avg = df_p['Return(%)'].mean()
+                print(f"  → 신호: {trades}개, 승률: {wr:.0f}%, 평균수익: {avg:+.2f}%")
+            else:
+                print(f"  → 신호 없음")
+
+            all_results.extend(period_results)
+
+        return pd.DataFrame(all_results)
+
+    def print_summary(self, df_results, title="백테스트"):
+        if df_results is None or df_results.empty:
             print("\n[백테스트 결과] 조건에 맞는 종목이 없었습니다.")
             return
 
-        if 'US_MarketSummary' in df_results.columns and not df_results['US_MarketSummary'].empty:
-            us_summary = df_results['US_MarketSummary'].iloc[0]
-            print(f"US Market summary on buy date: {us_summary}")
+        total = len(df_results)
+        wins = (df_results['Return(%)'] > 0).sum()
+        avg_ret = df_results['Return(%)'].mean()
+        win_rate = wins / total * 100
+        best = df_results.loc[df_results['Return(%)'].idxmax()]
+        worst = df_results.loc[df_results['Return(%)'].idxmin()]
 
-        print("\n" + "="*50)
-        print("           [30일 백테스트 요약 결과]")
-        print("="*50)
-        print(f"총 추천 종목 수: {len(df_results)}개")
-        print(f"평균 수익률: {df_results['Return(%)'].mean():.2f}%")
-        print(f"최고 수익률: {df_results['Return(%)'].max():.2f}% ({df_results.loc[df_results['Return(%)'].idxmax(), 'Name']})")
-        print(f"최저 수익률: {df_results['Return(%)'].min():.2f}% ({df_results.loc[df_results['Return(%)'].idxmin(), 'Name']})")
-        print(f"승률(수익 발생): {(df_results['Return(%)'] > 0).sum() / len(df_results) * 100:.1f}%")
-        print("-" * 50)
+        print(f"\n{'='*60}")
+        print(f"  [{title} 종합 결과]")
+        print(f"{'='*60}")
+        print(f"  총 거래 수:   {total}개  (통계 신뢰도: {'높음 ✅' if total >= 80 else '보통 ⚠️' if total >= 30 else '낮음 ❌'})")
+        print(f"  승률:         {win_rate:.1f}%  ({wins}승 {total-wins}패)")
+        print(f"  평균 수익률:  {avg_ret:+.2f}%")
+        print(f"  최고 수익:    {best['Return(%)']:+.2f}%  ({best['Name']})")
+        print(f"  최저 수익:    {worst['Return(%)']:+.2f}%  ({worst['Name']})")
+        print(f"{'─'*60}")
 
+        # 시장별
         if 'Market' in df_results.columns:
-            print("\n[시장별 요약]")
-            for market, group in df_results.groupby('Market'):
-                print(f"{market}: {len(group)}개, 평균 {group['Return(%)'].mean():.2f}%, 승률 {(group['Return(%)'] > 0).sum() / len(group) * 100:.1f}%")
-            print("-" * 50)
+            print("\n  [시장별]")
+            for market, g in df_results.groupby('Market'):
+                wr = (g['Return(%)'] > 0).sum() / len(g) * 100
+                print(f"    {market:6s}: {len(g):3d}건  승률 {wr:5.1f}%  평균 {g['Return(%)'].mean():+.2f}%")
 
-        print("\n[상위 10개 종목 상세]")
-        print(df_results.sort_values(by='Return(%)', ascending=False).head(10)[['Market','Name', 'Reasons', 'Return(%)']].to_string(index=False))
-        print("="*50)
+        # 상승장 vs 하락장
+        if 'MarketUptrend' in df_results.columns:
+            print("\n  [시장 상태별]")
+            for uptrend, label in [(True, '상승장'), (False, '하락장')]:
+                g = df_results[df_results['MarketUptrend'] == uptrend]
+                if len(g) == 0:
+                    continue
+                wr = (g['Return(%)'] > 0).sum() / len(g) * 100
+                print(f"    {label}: {len(g):3d}건  승률 {wr:5.1f}%  평균 {g['Return(%)'].mean():+.2f}%")
+
+        # Power Combo (RSI 다이버전스 + 타지마할)
+        if 'PowerCombo' in df_results.columns:
+            pc = df_results[df_results['PowerCombo'] == True]
+            if len(pc) > 0:
+                wr = (pc['Return(%)'] > 0).sum() / len(pc) * 100
+                print(f"\n  [⭐ PowerCombo(RSI다이버전스+타지마할)]")
+                print(f"    {len(pc):3d}건  승률 {wr:5.1f}%  평균 {pc['Return(%)'].mean():+.2f}%")
+
+        # 청산 사유별
+        if 'ExitReason' in df_results.columns:
+            print("\n  [청산 사유별]")
+            for reason, g in df_results.groupby(df_results['ExitReason'].str.split('(').str[0]):
+                wr = (g['Return(%)'] > 0).sum() / len(g) * 100
+                print(f"    {reason:20s}: {len(g):3d}건  승률 {wr:5.1f}%  평균 {g['Return(%)'].mean():+.2f}%")
+
+        # 기간별 (워크포워드)
+        if 'Period' in df_results.columns:
+            print("\n  [기간별 성과]")
+            for period, g in df_results.groupby('PeriodDate'):
+                wr = (g['Return(%)'] > 0).sum() / len(g) * 100
+                trend_mark = '↑' if g['MarketUptrend'].iloc[0] else '↓'
+                print(f"    {period} {trend_mark}  {len(g):2d}건  승률 {wr:5.1f}%  평균 {g['Return(%)'].mean():+.2f}%")
+
+        print(f"\n  [상위 10개 거래]")
+        cols = ['Name', 'Return(%)', 'ExitReason', 'Reasons']
+        if 'PeriodDate' in df_results.columns:
+            cols = ['PeriodDate', 'Name', 'Return(%)', 'ExitReason']
+        top10 = df_results.sort_values('Return(%)', ascending=False).head(10)[cols]
+        print(top10.to_string(index=False))
+        print(f"{'='*60}")
+
 
 if __name__ == "__main__":
     backtester = Backtester()
-    results = backtester.run_backtest(days_ago=30)
-    backtester.print_summary(results)
+
+    print("\n▶ 워크포워드 백테스트 실행 중 (8개 구간, 6주 간격)...")
+    wf_results = backtester.run_walkforward_backtest(periods=8, interval_weeks=6)
+    backtester.print_summary(wf_results, title="워크포워드 백테스트 (8구간)")
+
+    print("\n\n▶ 최근 30거래일 단일 백테스트...")
+    single_results = backtester.run_backtest(days_ago=30)
+    backtester.print_summary(single_results, title="최근 30거래일 단일 백테스트")
