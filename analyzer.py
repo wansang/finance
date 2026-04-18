@@ -1604,7 +1604,8 @@ class StockAnalyzer:
                     'Code': s['code'],
                     'Reasons': s['reasons'],
                     'WinRate': f"{s['win_rate']:.1f}%",
-                    'AvgReturn': f"{s['avg_ret']:.1f}%"
+                    'AvgReturn': f"{s['avg_ret']:.1f}%",
+                    'BuyPrice': s.get('last', '')
                 })
         
         if new_rows:

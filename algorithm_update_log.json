@@ -1,0 +1,33 @@
+[
+  {
+    "title": "이번주 추천 종목 실적 기반 알고리즘 업데이트",
+    "timestamp": "2026-04-18 22:32:24",
+    "changes": {
+      "TIER1_WIN_RATE": {
+        "before": 60,
+        "after": 40
+      },
+      "TRAILING_STOP_PCT": {
+        "before": 0.03,
+        "after": 0.02
+      }
+    },
+    "before_metrics": {
+      "count": 45,
+      "avg_return": 1.0750117896926183,
+      "win_rate": 51.11111111111111,
+      "max_return": 9.379310344827587,
+      "min_return": -5.701754385964912
+    },
+    "after_metrics": {
+      "count": 45,
+      "avg_return": 1.1247480948565973,
+      "win_rate": 51.11111111111111,
+      "max_return": 9.379310344827587,
+      "min_return": -5.701754385964912
+    },
+    "notes": [
+      "실제 추천 종목 45개 성과 기반 최적화"
+    ]
+  }
+]

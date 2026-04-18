@@ -7,6 +7,8 @@ import time
 class Backtester:
     def __init__(self):
         self.analyzer = StockAnalyzer()
+        self.data_cache = {}
+        self.us_market_cache = {}
 
     def _load_us_candidates(self):
         dow_candidates = self.analyzer.config.get('US_DOW_TICKERS', [])
@@ -36,19 +38,35 @@ class Backtester:
                 continue
 
             try:
-                start_date = (target_date - datetime.timedelta(days=350)).strftime('%Y-%m-%d')
-                df = fdr.DataReader(code, start=start_date)
-                if len(df) < 50:
-                    continue
-
-                if benchmark_symbol:
-                    try:
-                        benchmark = fdr.DataReader(benchmark_symbol, start=start_date)
-                    except Exception:
-                        benchmark = None
-                    df = self.analyzer.get_indicators(df, benchmark)
+                # Cache key includes benchmark to handle different indicators
+                cache_key = (code, benchmark_symbol)
+                
+                if cache_key in self.data_cache:
+                    df = self.data_cache[cache_key]
                 else:
-                    df = self.analyzer.get_indicators(df)
+                    history_window_days = max(350, self.analyzer.config.get('VALIDATE_MIN_HISTORY', 200) * 2 + 30)
+                    start_date = (target_date - datetime.timedelta(days=history_window_days)).strftime('%Y-%m-%d')
+                    df = fdr.DataReader(code, start=start_date)
+                    min_history = max(50, self.analyzer.config.get('SMA200', 200))
+                    if len(df) < min_history:
+                        continue
+
+                    if benchmark_symbol:
+                        try:
+                            # Benchmark also cached globally per symbol to save calls
+                            bench_key = ("BENCHMARK", benchmark_symbol)
+                            if bench_key in self.data_cache:
+                                benchmark = self.data_cache[bench_key]
+                            else:
+                                benchmark = fdr.DataReader(benchmark_symbol, start=start_date)
+                                self.data_cache[bench_key] = benchmark
+                        except Exception:
+                            benchmark = None
+                        df = self.analyzer.get_indicators(df, benchmark)
+                    else:
+                        df = self.analyzer.get_indicators(df)
+                    
+                    self.data_cache[cache_key] = df
 
                 if target_date not in df.index:
                     df_target_subset = df[df.index <= target_date]
@@ -64,6 +82,8 @@ class Backtester:
                 if not reasons:
                     continue
 
+                # These depend on TIER rates and TREND_TEMPLATE_PEAK_FACTOR, but
+                # we call them anyway - the optimization inner loop will be in optimizer.py
                 win_rate, avg_ret = self.analyzer.validate_strategy(df, target_idx)
                 last = df.iloc[target_idx]
                 is_elite = self.analyzer.is_trend_template(df, target_idx)
@@ -114,14 +134,24 @@ class Backtester:
     def run_backtest(self, days_ago=30):
         print(f"Starting {days_ago}-day backtest...")
 
-        ks11 = fdr.DataReader('KS11')
+        ks11_key = ('KS11', None)
+        if ks11_key in self.data_cache:
+            ks11 = self.data_cache[ks11_key]
+        else:
+            ks11 = fdr.DataReader('KS11')
+            self.data_cache[ks11_key] = ks11
         target_date = ks11.index[-(days_ago + 1)]
         current_date = ks11.index[-1]
 
         print(f"Target Date (Buy): {target_date.date()}")
         print(f"Current Date (Sell): {current_date.date()}")
 
-        us_market = self.analyzer.get_us_market_condition(target_date)
+        market_cache_key = str(target_date.date())
+        if market_cache_key in self.us_market_cache:
+            us_market = self.us_market_cache[market_cache_key]
+        else:
+            us_market = self.analyzer.get_us_market_condition(target_date)
+            self.us_market_cache[market_cache_key] = us_market
         print("US Market condition on buy date:")
         for name in ['S&P 500', 'Nasdaq', 'Dow']:
             info = us_market.get(name, {})
