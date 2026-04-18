@@ -1384,6 +1384,7 @@ class StockAnalyzer:
                 
                 safe_name = html.escape(name)
                 safe_reasons = html.escape(", ".join(reasons))
+                sector = str(stock.get('Sector', '') or '기타').strip()
                 
                 prev_close = float(df.iloc[target_idx - 1]['Close']) if target_idx > 0 else float(last['Close'])
                 stock_data = {
@@ -1395,7 +1396,8 @@ class StockAnalyzer:
                     'rs_score': rs_score,
                     'last': float(last['Close']),
                     'prev_close': prev_close,
-                    'avg_vol': avg_vol
+                    'avg_vol': avg_vol,
+                    'sector': sector,
                 }
 
                 # Tier Classification
@@ -1476,7 +1478,8 @@ class StockAnalyzer:
                     'rs_score': rs_score,
                     'last': float(last['Close']),
                     'prev_close': prev_close,
-                    'avg_vol': avg_vol
+                    'avg_vol': avg_vol,
+                    'sector': 'ETF',
                 }
 
                 min_signals = self.config.get('TIER1_MIN_SIGNALS', 2)
@@ -1521,7 +1524,18 @@ class StockAnalyzer:
             if not results[t]: continue
             # power_combo(RSI다이버전스+타지마할) 우선, 그 다음 RS 점수 순 정렬
             results[t].sort(key=lambda x: (x.get('power_combo', False), x['rs_score']), reverse=True)
-            
+            # Tier1: 섹터 분산 + 포지션 한도 적용 (포트폴리오 리스크 관리)
+            if t == 1:
+                max_pos = self.config.get('MAX_POSITIONS', 10)
+                max_sec = self.config.get('MAX_SECTOR_POSITIONS', 2)
+                available = max(0, max_pos - len(self.holdings))
+                diversified, sec_cnt = [], {}
+                for s in results[1]:
+                    sec = s.get('sector', '기타')
+                    if sec_cnt.get(sec, 0) < max_sec and len(diversified) < available:
+                        diversified.append(s)
+                        sec_cnt[sec] = sec_cnt.get(sec, 0) + 1
+                results[1] = diversified
             formatted_recs.append(f"<b>{tier_names[t]}</b>")
             for r in results[t][:5]: # 각 등급별 상위 5개만 노출
                 current_price = r.get('last')
@@ -1659,7 +1673,11 @@ class StockAnalyzer:
                 continue
 
         for t in [1, 2, 3]:
-            results[t].sort(key=lambda x: x.get('rs_score', 0), reverse=True)
+            results[t].sort(key=lambda x: (x.get('power_combo', False), x.get('rs_score', 0)), reverse=True)
+
+        # Tier1 포지션 한도 적용 (MAX_POSITIONS, 최대 5개)
+        max_us_pos = min(5, self.config.get('MAX_POSITIONS', 10))
+        results[1] = results[1][:max_us_pos]
 
         formatted = []
         tier_names = {1: "🥇 지금 매수", 2: "🥈 신중히 매수", 3: "🥉 추가 확인 후 매수"}

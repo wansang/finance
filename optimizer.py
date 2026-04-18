@@ -146,58 +146,95 @@ class StrategyOptimizer:
     # ------------------------------------------------------------------
     def fetch_actual_performance(self, recs, trailing_stop_pct):
         """
-        각 추천 종목을 추천일 종가에 매수, 오늘까지 보유 또는 트레일링 스톱 발동 시 매도.
-        실제 수익률 목록을 반환합니다.
+        각 추천 종목을 다음날 시가에 매수, ATR 기반 손절/목표가 + 트레일링 스톱 + 거래비용 반영.
+        backtester.py의 _simulate_trade 로직과 동일하게 통일.
         """
         results = []
+        tx_buy = self.base_config.get('TRANSACTION_COST_BUY_PCT', 0.00015)
+        tx_sell = self.base_config.get('TRANSACTION_COST_SELL_PCT', 0.005)
+        atr_stop_mult = self.base_config.get('ATR_STOP_MULTIPLIER', 2.0)
+        atr_target_mult = self.base_config.get('ATR_TARGET_MULTIPLIER', 3.0)
+        fallback_stop = abs(self.base_config.get('VALIDATE_STOP_LOSS_PCT', -0.05))
+        fallback_target = self.base_config.get('PROFIT_TARGET_PCT', 0.08)
+        max_hold = self.base_config.get('VALIDATE_MAX_HOLD_DAYS', 20)
+
         for rec in recs:
             code = rec['code']
             try:
-                start_str = (rec['date'] - datetime.timedelta(days=7)).strftime('%Y-%m-%d')
+                start_str = (rec['date'] - datetime.timedelta(days=40)).strftime('%Y-%m-%d')
                 df = fdr.DataReader(code, start=start_str)
                 if df.empty or len(df) < 2:
                     continue
 
-                # 매수가 결정
-                buy_price = rec.get('buy_price')
-                if not buy_price or buy_price <= 0:
-                    rec_ts = pd.Timestamp(rec['date']).normalize()
-                    on_day = df[df.index.normalize() == rec_ts]
-                    if not on_day.empty:
-                        buy_price = float(on_day.iloc[0]['Close'])
-                    else:
-                        buy_price = float(df.iloc[0]['Close'])
+                rec_ts = pd.Timestamp(rec['date']).normalize()
 
-                if not buy_price or buy_price <= 0:
-                    continue
+                # 추천일 이전 데이터로 ATR 계산
+                df_before = df[df.index.normalize() <= rec_ts]
+                atr_val = None
+                if len(df_before) >= 14:
+                    try:
+                        import pandas_ta_classic as ta
+                        atr_series = ta.atr(df_before['High'], df_before['Low'], df_before['Close'], length=14)
+                        if atr_series is not None and not atr_series.empty:
+                            v = float(atr_series.iloc[-1])
+                            if v > 0:
+                                atr_val = v
+                    except Exception:
+                        pass
 
-                # 추천일 이후 데이터만 사용
-                df_after = df[df.index >= pd.Timestamp(rec['date'])]
+                # 다음 거래일 시가 매수 (현실적 진입)
+                df_after = df[df.index.normalize() > rec_ts]
                 if df_after.empty:
-                    df_after = df
+                    continue
+                open_col = 'Open' if 'Open' in df_after.columns else 'Close'
+                raw_buy = float(df_after.iloc[0][open_col])
+                if raw_buy <= 0:
+                    raw_buy = float(df_after.iloc[0]['Close'])
+                buy_price = raw_buy * (1 + tx_buy)
 
-                sell_price = float(df_after.iloc[-1]['Close'])
-                sell_date = df_after.index[-1]
-                max_price = buy_price
-                exit_reason = '현재 보유'
+                # ATR 기반 손절/목표가 (ATR 없으면 고정값 폴백)
+                if atr_val:
+                    hard_stop_pct = atr_stop_mult * atr_val / raw_buy
+                    profit_target_pct = atr_target_mult * atr_val / raw_buy
+                else:
+                    hard_stop_pct = fallback_stop
+                    profit_target_pct = fallback_target
 
-                for i in range(len(df_after)):
+                max_price = raw_buy
+                end_idx = min(max_hold, len(df_after))
+                sell_raw = float(df_after.iloc[end_idx - 1]['Close'])
+                sell_date = df_after.index[end_idx - 1]
+                exit_reason = f'타임컷({max_hold}일)'
+
+                for i in range(end_idx):
                     curr_p = float(df_after.iloc[i]['Close'])
                     if curr_p > max_price:
                         max_price = curr_p
-                    if max_price > 0 and (max_price - curr_p) / max_price >= trailing_stop_pct:
-                        sell_price = curr_p
+                    pct = (curr_p - raw_buy) / raw_buy
+                    if pct <= -hard_stop_pct:
+                        sell_raw = curr_p
                         sell_date = df_after.index[i]
-                        exit_reason = f'트레일링 스톱 {trailing_stop_pct * 100:.1f}%'
+                        exit_reason = f'하드손절(-{hard_stop_pct*100:.1f}%)'
+                        break
+                    if pct >= profit_target_pct:
+                        sell_raw = curr_p
+                        sell_date = df_after.index[i]
+                        exit_reason = f'목표달성(+{profit_target_pct*100:.1f}%)'
+                        break
+                    if max_price > raw_buy and (max_price - curr_p) / max_price >= trailing_stop_pct:
+                        sell_raw = curr_p
+                        sell_date = df_after.index[i]
+                        exit_reason = f'트레일링스톱({trailing_stop_pct*100:.1f}%)'
                         break
 
-                ret = (sell_price - buy_price) / buy_price * 100
+                sell_price_net = sell_raw * (1 - tx_sell)
+                ret = (sell_price_net - buy_price) / buy_price * 100
                 results.append({
                     'code': code,
                     'name': rec['name'],
                     'buy_date': rec['date'].date(),
                     'buy_price': buy_price,
-                    'sell_price': sell_price,
+                    'sell_price': sell_raw,
                     'sell_date': sell_date.date() if hasattr(sell_date, 'date') else sell_date,
                     'return_pct': ret,
                     'stored_win_rate': rec.get('stored_win_rate'),
