@@ -1020,27 +1020,58 @@ class StockAnalyzer:
         return df
 
     def detect_divergence(self, df, idx=-1):
-        """RSI 상승 다이버전스 감지 (가격은 하락, RSI는 상승)"""
-        if len(df[:idx if idx != -1 else len(df)]) < 20: return False
+        """RSI 상승 다이버전스 감지 (정석: 실제 저점 2개 비교)
         
-        # 기준 시점까지의 데이터
+        조건:
+        1. 가격 저점2 < 저점1 (더 낮은 저점)
+        2. RSI 저점2 > RSI 저점1 (더 높은 RSI) → 다이버전스
+        3. RSI가 현재 상승 중 (추가 확인)
+        4. 최근 RSI가 과매도권(40 이하)에서 발생한 경우만 유효
+        """
         df_target = df.iloc[:idx+1] if idx != -1 else df
-        df_recent = df_target.tail(20)
+        if len(df_target) < 40: return False
         
-        lows = df_recent['Close'].values
-        rsi_vals = df_recent['RSI'].values
+        closes = df_target['Close'].values
+        rsi_vals = df_target['RSI'].values
         
-        if len(lows) < 20: return False
+        # NaN 제거 확인
+        if any(v != v for v in rsi_vals[-40:]):  # NaN check
+            return False
         
-        # 최근 5일 vs 그 전 15일
-        p1 = lows[:-5].min()
-        p2 = lows[-5:].min()
-        r1 = rsi_vals[:-5][lows[:-5].argmin()]
-        r2 = rsi_vals[-5:][lows[-5:].argmin()]
+        # 최근 40일에서 로컬 저점 찾기 (최소 5봉 간격)
+        recent_closes = closes[-40:]
+        recent_rsi = rsi_vals[-40:]
         
-        if p2 < p1 and r2 > r1:
-            return True
-        return False
+        local_lows = []
+        for i in range(2, len(recent_closes) - 2):
+            if (recent_closes[i] < recent_closes[i-1] and
+                recent_closes[i] < recent_closes[i-2] and
+                recent_closes[i] < recent_closes[i+1] and
+                recent_closes[i] < recent_closes[i+2]):
+                local_lows.append((i, recent_closes[i], recent_rsi[i]))
+        
+        if len(local_lows) < 2:
+            return False
+        
+        # 가장 최근 두 저점 비교
+        p1_idx, p1_price, p1_rsi = local_lows[-2]
+        p2_idx, p2_price, p2_rsi = local_lows[-1]
+        
+        # 다이버전스 조건: 가격은 하락, RSI는 상승
+        if p2_price >= p1_price:
+            return False
+        if p2_rsi <= p1_rsi:
+            return False
+        
+        # RSI가 과매도권(45 이하)에서 발생해야 유효
+        if p2_rsi > 45:
+            return False
+        
+        # 두 번째 저점이 최근 10봉 이내여야 함 (타이밍 유효성)
+        if p2_idx < len(recent_closes) - 10:
+            return False
+        
+        return True
 
     def detect_patterns(self, df, idx=-1):
         """Wedge & Flag 패턴 감지 (단순화된 로직)"""
@@ -1064,18 +1095,50 @@ class StockAnalyzer:
         return ", ".join(patterns)
 
     def is_taj_mahal_signal(self, df, idx=-1):
-        """타지마할 밴드 유사 로직 (BB 하단 지지 + RSI 반등)"""
+        """타지마할 밴드 (BB 하단 지지 + RSI 반등) - 강화 버전
+        
+        조건 (모두 충족 필요):
+        1. 최근 3일 내 가격이 BB 하단에 터치 또는 하단 아래로 내려갔다가 회복
+        2. 현재 가격이 BB 하단 위에 있음 (반등 확인)
+        3. RSI가 35 이하 과매도 후 현재 상승 중
+        4. 거래량이 평균 이상 (가짜 반등 필터)
+        5. 캔들이 양봉 (현재가 > 시가)
+        """
         df_target = df.iloc[:idx+1] if idx != -1 else df
-        if len(df_target) < 2: return False
+        if len(df_target) < 5: return False
         
         last = df_target.iloc[-1]
-        prev = df_target.iloc[-2]
         
-        # 가격이 BB 하단 부근에서 반등하고 RSI가 40 이상으로 올라올 때
-        if prev['Close'] <= prev['BBL'] * 1.01 and last['Close'] > last['BBL']:
-            if last['RSI'] > 40 and last['RSI'] > prev['RSI']:
-                return True
-        return False
+        # 필수값 유효성 확인
+        for col in ['Close', 'BBL', 'RSI', 'Volume', 'VOL_AVG', 'Open']:
+            if col not in df_target.columns:
+                return False
+            if last[col] != last[col]:  # NaN
+                return False
+        
+        # 조건 1+2: 최근 3일 내 BB 하단 터치 후 현재 위에 있음
+        recent_3 = df_target.iloc[-3:]
+        touched_lower = any(row['Close'] <= row['BBL'] * 1.02 for _, row in recent_3.iterrows())
+        above_lower_now = last['Close'] > last['BBL']
+        if not (touched_lower and above_lower_now):
+            return False
+        
+        # 조건 3: RSI 과매도 후 반등
+        rsi_recent = df_target['RSI'].iloc[-5:].values
+        rsi_was_oversold = any(r <= 38 for r in rsi_recent if r == r)
+        rsi_rising = last['RSI'] > df_target['RSI'].iloc[-2]
+        if not (rsi_was_oversold and rsi_rising):
+            return False
+        
+        # 조건 4: 거래량 평균 이상
+        if last['Volume'] < last['VOL_AVG'] * 0.8:
+            return False
+        
+        # 조건 5: 양봉
+        if last['Close'] <= last['Open']:
+            return False
+        
+        return True
 
     def detect_bb_squeeze(self, df, idx=-1):
         """Bollinger Band Squeeze 감지 (변동성 수렴)"""
@@ -1280,11 +1343,20 @@ class StockAnalyzer:
                 min_signals = self.config.get('TIER1_MIN_SIGNALS', 2)
                 min_rs = self.config.get('TIER1_MIN_RS', 0.0)
                 min_vol = self.config.get('MIN_AVG_VOLUME', 50000)
+                
+                # 강력 콤비 신호: RSI 다이버전스 + 타지마할 동시 발생 시 신호 개수 폈널티 면제
+                has_divergence = "RSI 반전 신호(상승 가능성)" in reasons
+                has_taj_mahal = "바닥권 반등 신호(BB 하단)" in reasons
+                power_combo = has_divergence and has_taj_mahal
+                
+                effective_min_signals = 1 if power_combo else min_signals
                 tier1_quality = (
-                    len(reasons) >= min_signals and
+                    len(reasons) >= effective_min_signals and
                     rs_score >= min_rs and
                     (avg_vol >= min_vol or min_vol <= 0)
                 )
+                
+                stock_data['power_combo'] = power_combo  # 정렬 우선순위용
                 if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality:
                     results[1].append(stock_data)
                 elif is_above_200 and win_rate >= self.config.get('TIER2_WIN_RATE', 50):
@@ -1338,11 +1410,16 @@ class StockAnalyzer:
                 min_signals = self.config.get('TIER1_MIN_SIGNALS', 2)
                 min_rs = self.config.get('TIER1_MIN_RS', 0.0)
                 min_vol = self.config.get('MIN_AVG_VOLUME', 50000)
+                has_divergence = "RSI 반전 신호(상승 가능성)" in reasons
+                has_taj_mahal = "바닥권 반등 신호(BB 하단)" in reasons
+                power_combo = has_divergence and has_taj_mahal
+                effective_min_signals = 1 if power_combo else min_signals
                 tier1_quality = (
-                    len(reasons) >= min_signals and
+                    len(reasons) >= effective_min_signals and
                     rs_score >= min_rs and
                     (avg_vol >= min_vol or min_vol <= 0)
                 )
+                stock_data['power_combo'] = power_combo
                 if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality:
                     results[1].append(stock_data)
                 elif is_above_200 and win_rate >= self.config.get('TIER2_WIN_RATE', 50):
@@ -1361,8 +1438,8 @@ class StockAnalyzer:
         
         for t in [1, 2, 3]:
             if not results[t]: continue
-            # RS_SCORE 기준 정렬
-            results[t].sort(key=lambda x: x['rs_score'], reverse=True)
+            # power_combo(RSI다이버전스+타지마할) 우선, 그 다음 RS 점수 순 정렬
+            results[t].sort(key=lambda x: (x.get('power_combo', False), x['rs_score']), reverse=True)
             
             formatted_recs.append(f"<b>{tier_names[t]}</b>")
             for r in results[t][:5]: # 각 등급별 상위 5개만 노출
@@ -1371,7 +1448,8 @@ class StockAnalyzer:
                 if intraday:
                     current_price = intraday.get('last', current_price)
                 price_text = self.format_price(current_price, r['code']) if current_price is not None else '가격 정보 없음'
-                msg = f"• <b>{r['name']}</b>({r['code']}): 현재가 {price_text} - {r['reasons']}"
+                combo_mark = " ⭐" if r.get('power_combo') else ""
+                msg = f"• <b>{r['name']}</b>({r['code']}): 현재가 {price_text} - {r['reasons']}{combo_mark}"
                 formatted_recs.append(msg)
             formatted_recs.append("")
             
@@ -1464,10 +1542,15 @@ class StockAnalyzer:
 
                 min_signals = self.config.get('TIER1_MIN_SIGNALS', 2)
                 min_rs = self.config.get('TIER1_MIN_RS', 0.0)
+                has_divergence = "RSI 반전 신호(상승 가능성)" in reasons
+                has_taj_mahal = "바닥권 반등 신호(BB 하단)" in reasons
+                power_combo = has_divergence and has_taj_mahal
+                effective_min_signals = 1 if power_combo else min_signals
                 tier1_quality = (
-                    len(reasons) >= min_signals and
+                    len(reasons) >= effective_min_signals and
                     rs_score >= min_rs
                 )
+                stock_data['power_combo'] = power_combo
                 if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality:
                     results[1].append(stock_data)
                 elif is_above_200 and win_rate >= self.config.get('TIER2_WIN_RATE', 50):
