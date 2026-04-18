@@ -22,10 +22,13 @@ class Backtester:
                 candidates.append(token)
         return candidates
 
-    def _backtest_universe(self, universe, target_date, market_name, benchmark_symbol=None):
+    def _backtest_universe(self, universe, target_date, market_name, benchmark_symbol=None, market_uptrend=True):
         results = []
         count = 0
         total = len(universe)
+        market_filter = self.analyzer.config.get('MARKET_FILTER_ENABLED', True)
+        if market_filter and not market_uptrend:
+            print(f"⚠️ {market_name} 하락장 감지: Power Combo(RSI다이버전스+타지마할) 종목만 Tier1 허용")
         print(f"Analyzing {total} {market_name} stocks for signals on {target_date.date()}...")
 
         for item in universe:
@@ -82,15 +85,20 @@ class Backtester:
                 if not reasons:
                     continue
 
-                # These depend on TIER rates and TREND_TEMPLATE_PEAK_FACTOR, but
-                # we call them anyway - the optimization inner loop will be in optimizer.py
                 win_rate, avg_ret = self.analyzer.validate_strategy(df, target_idx)
                 last = df.iloc[target_idx]
                 is_elite = self.analyzer.is_trend_template(df, target_idx)
                 is_above_200 = last['Close'] > last['SMA200']
                 tier1 = self.analyzer.config.get('TIER1_WIN_RATE', 60)
                 tier2 = self.analyzer.config.get('TIER2_WIN_RATE', 50)
-                if not ((is_elite and win_rate >= tier1) or (is_above_200 and win_rate >= tier2)):
+
+                # 시장 필터: 하락장에서 Power Combo 아닌 Tier1 종목 제외
+                has_divergence = "RSI 반전 신호(상승 가능성)" in reasons
+                has_taj_mahal = "바닥권 반등 신호(BB 하단)" in reasons
+                power_combo = has_divergence and has_taj_mahal
+                market_ok = market_uptrend or not market_filter or power_combo
+
+                if not ((is_elite and win_rate >= tier1 and market_ok) or (is_above_200 and win_rate >= tier2)):
                     continue
 
                 buy_price = float(last['Close'])
@@ -143,9 +151,13 @@ class Backtester:
         target_date = ks11.index[-(days_ago + 1)]
         current_date = ks11.index[-1]
 
-        print(f"Target Date (Buy): {target_date.date()}")
-        print(f"Current Date (Sell): {current_date.date()}")
-
+        # 목표일 기준 시장 상태 판단
+        kospi_uptrend = self.analyzer._is_market_in_uptrend(ks11, target_idx=len(ks11[ks11.index <= target_date]) - 1)
+        try:
+            sp500 = fdr.DataReader('US500', start=(target_date - datetime.timedelta(days=300)).strftime('%Y-%m-%d'), end=target_date.strftime('%Y-%m-%d'))
+            us_uptrend = self.analyzer._is_market_in_uptrend(sp500)
+        except Exception:
+            us_uptrend = True
         market_cache_key = str(target_date.date())
         if market_cache_key in self.us_market_cache:
             us_market = self.us_market_cache[market_cache_key]
@@ -167,12 +179,12 @@ class Backtester:
         sample_size = self.analyzer.config.get('BACKTEST_SAMPLE_SIZE', 200)
         stocks = fdr.StockListing('KOSPI')[:sample_size]
         kospi_universe = [(row['Code'], row['Name']) for _, row in stocks.iterrows()]
-        results = self._backtest_universe(kospi_universe, target_date, 'KOSPI')
+        results = self._backtest_universe(kospi_universe, target_date, 'KOSPI', market_uptrend=kospi_uptrend)
 
         if self.analyzer.config.get('US_RECOMMENDATION_ENABLED', True):
             us_candidates = self._load_us_candidates()
             if us_candidates:
-                results.extend(self._backtest_universe(us_candidates, target_date, 'US', benchmark_symbol='IXIC'))
+                results.extend(self._backtest_universe(us_candidates, target_date, 'US', benchmark_symbol='IXIC', market_uptrend=us_uptrend))
 
         df_results = pd.DataFrame(results)
         df_results['US_SP500_Positive'] = us_market.get('S&P 500', {}).get('positive', False)
