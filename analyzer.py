@@ -1154,12 +1154,12 @@ class StockAnalyzer:
         return False
 
     def detect_volume_spike(self, df, idx=-1):
-        """거래량 급증 감지 (평균 대비 2배 이상)"""
+        """거래량 급증 감지 (평균 대비 2.5배 이상 - 기존 2배에서 강화)"""
         df_target = df.iloc[:idx+1] if idx != -1 else df
         if len(df_target) < 2: return False
         
         last = df_target.iloc[-1]
-        if last['Volume'] > last['VOL_AVG'] * 2:
+        if last['Volume'] > last['VOL_AVG'] * 2.5:
             return True
         return False
 
