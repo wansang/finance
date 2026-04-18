@@ -1253,7 +1253,7 @@ class StockAnalyzer:
         
         return c1 and c2 and c3 and c4 and c5
 
-    def validate_strategy(self, df, current_idx):
+    def validate_strategy(self, df, current_idx, config_override=None):
         """특정 종목의 과거 6개월 승률 검증 (미니 백테스트)
         
         손익 구조:
@@ -1262,14 +1262,15 @@ class StockAnalyzer:
         - 트레일링 스톱: 고점 대비 3.5% 하락 시 청산
         - 타임컷: VALIDATE_MAX_HOLD_DAYS 경과 시 청산
         """
-        lookback = self.config.get('VALIDATE_LOOKBACK_DAYS', 120)
-        start_idx = max(self.config.get('VALIDATE_MIN_HISTORY', 200), current_idx - lookback)
-        max_hold = self.config.get('VALIDATE_MAX_HOLD_DAYS', 20)
-        trailing_stop = self.config.get('TRAILING_STOP_PCT', 0.035)
-        fallback_stop = abs(self.config.get('VALIDATE_STOP_LOSS_PCT', -0.05))
-        fallback_target = self.config.get('PROFIT_TARGET_PCT', 0.08)
-        atr_stop_mult = self.config.get('ATR_STOP_MULTIPLIER', 2.0)
-        atr_target_mult = self.config.get('ATR_TARGET_MULTIPLIER', 3.0)
+        cfg = {**self.config, **config_override} if config_override else self.config
+        lookback = cfg.get('VALIDATE_LOOKBACK_DAYS', 120)
+        start_idx = max(cfg.get('VALIDATE_MIN_HISTORY', 200), current_idx - lookback)
+        max_hold = cfg.get('VALIDATE_MAX_HOLD_DAYS', 20)
+        trailing_stop = cfg.get('TRAILING_STOP_PCT', 0.035)
+        fallback_stop = abs(cfg.get('VALIDATE_STOP_LOSS_PCT', -0.05))
+        fallback_target = cfg.get('PROFIT_TARGET_PCT', 0.08)
+        atr_stop_mult = cfg.get('ATR_STOP_MULTIPLIER', 2.0)
+        atr_target_mult = cfg.get('ATR_TARGET_MULTIPLIER', 3.0)
 
         trades = []
         for i in range(start_idx, current_idx):
@@ -1602,6 +1603,17 @@ class StockAnalyzer:
         us_market_uptrend = self._is_market_in_uptrend(sp500_index) if sp500_index is not None else True
 
         print(f"Starting US candidate analysis for {len(candidates)} stocks...")
+        # US 전용 파라미터 오버라이드 (거래세 없음, 더 넓은 ATR 스톱, 낮은 진입 기준)
+        us_cfg_override = {
+            'VALIDATE_STOP_LOSS_PCT': self.config.get('US_VALIDATE_STOP_LOSS_PCT', -0.07),
+            'PROFIT_TARGET_PCT': self.config.get('US_PROFIT_TARGET_PCT', 0.10),
+            'ATR_STOP_MULTIPLIER': self.config.get('US_ATR_STOP_MULTIPLIER', 2.5),
+            'ATR_TARGET_MULTIPLIER': self.config.get('US_ATR_TARGET_MULTIPLIER', 4.0),
+            'TRAILING_STOP_PCT': self.config.get('US_TRAILING_STOP_PCT', 0.05),
+            'VALIDATE_MAX_HOLD_DAYS': self.config.get('US_VALIDATE_MAX_HOLD_DAYS', 30),
+            'TRANSACTION_COST_BUY_PCT': self.config.get('US_TRANSACTION_COST_BUY_PCT', 0.0001),
+            'TRANSACTION_COST_SELL_PCT': self.config.get('US_TRANSACTION_COST_SELL_PCT', 0.0005),
+        }
         for code, market in candidates:
             try:
                 df = fdr.DataReader(code, start=start)
@@ -1622,7 +1634,7 @@ class StockAnalyzer:
                     continue
 
                 last = df.iloc[target_idx]
-                win_rate, avg_ret = self.validate_strategy(df, target_idx)
+                win_rate, avg_ret = self.validate_strategy(df, target_idx, config_override=us_cfg_override)
                 is_elite = self.is_trend_template(df, target_idx)
                 is_above_200 = last['Close'] > last['SMA200']
                 rs_score = last['RS_LINE'] if 'RS_LINE' in last else 0
@@ -1654,7 +1666,7 @@ class StockAnalyzer:
                     rs_score >= min_rs
                 )
                 market_ok = us_market_uptrend or not market_filter or power_combo
-                is_tier1 = is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality and market_ok
+                is_tier1 = is_elite and win_rate >= self.config.get('US_TIER1_WIN_RATE', 45) and tier1_quality and market_ok
                 if power_combo:
                     position_size = 1.5
                 elif is_tier1:
@@ -1665,7 +1677,7 @@ class StockAnalyzer:
                 stock_data['position_size'] = position_size
                 if is_tier1:
                     results[1].append(stock_data)
-                elif is_above_200 and win_rate >= self.config.get('TIER2_WIN_RATE', 50):
+                elif is_above_200 and win_rate >= self.config.get('US_TIER2_WIN_RATE', 40):
                     results[2].append(stock_data)
                 elif win_rate >= 40:
                     results[3].append(stock_data)

@@ -10,7 +10,7 @@ class Backtester:
         self.data_cache = {}
         self.us_market_cache = {}
 
-    def _simulate_trade(self, df, target_idx, reasons, max_hold_days=None):
+    def _simulate_trade(self, df, target_idx, reasons, max_hold_days=None, config_override=None):
         """
         단일 거래 시뮬레이션
         - 매수: 신호 다음날 시가 (현실적 진입 — 당일 종가 매수 비현실적 문제 해결)
@@ -19,16 +19,17 @@ class Backtester:
         - 트레일링 스톱: 고점 대비 3.5%
         - 거래비용: 매수 0.015% + 매도 0.5% (코스피 실비: 수수료+세금)
         """
+        cfg = {**self.analyzer.config, **config_override} if config_override else self.analyzer.config
         if max_hold_days is None:
-            max_hold_days = self.analyzer.config.get('VALIDATE_MAX_HOLD_DAYS', 20)
+            max_hold_days = cfg.get('VALIDATE_MAX_HOLD_DAYS', 20)
 
-        trailing_stop = self.analyzer.config.get('TRAILING_STOP_PCT', 0.035)
-        fallback_stop = abs(self.analyzer.config.get('VALIDATE_STOP_LOSS_PCT', -0.05))
-        fallback_target = self.analyzer.config.get('PROFIT_TARGET_PCT', 0.08)
-        atr_stop_mult = self.analyzer.config.get('ATR_STOP_MULTIPLIER', 2.0)
-        atr_target_mult = self.analyzer.config.get('ATR_TARGET_MULTIPLIER', 3.0)
-        tx_buy = self.analyzer.config.get('TRANSACTION_COST_BUY_PCT', 0.00015)
-        tx_sell = self.analyzer.config.get('TRANSACTION_COST_SELL_PCT', 0.005)
+        trailing_stop = cfg.get('TRAILING_STOP_PCT', 0.035)
+        fallback_stop = abs(cfg.get('VALIDATE_STOP_LOSS_PCT', -0.05))
+        fallback_target = cfg.get('PROFIT_TARGET_PCT', 0.08)
+        atr_stop_mult = cfg.get('ATR_STOP_MULTIPLIER', 2.0)
+        atr_target_mult = cfg.get('ATR_TARGET_MULTIPLIER', 3.0)
+        tx_buy = cfg.get('TRANSACTION_COST_BUY_PCT', 0.00015)
+        tx_sell = cfg.get('TRANSACTION_COST_SELL_PCT', 0.005)
 
         # 다음날 시가 진입
         buy_idx = target_idx + 1
@@ -106,7 +107,20 @@ class Backtester:
             print(f"⚠️ {market_name} 하락장 감지: Power Combo(RSI다이버전스+타지마할) 종목만 Tier1 허용")
         print(f"Analyzing {total} {market_name} stocks for signals on {target_date.date()}...")
 
-        max_hold = self.analyzer.config.get('VALIDATE_MAX_HOLD_DAYS', 20)
+        # 시장별 파라미터 오버라이드 (US: 더 넓은 ATR 손절, 낮은 거래세, 긴 보유기간)
+        cfg_override = None
+        if market_name == 'US':
+            cfg_override = {
+                'VALIDATE_STOP_LOSS_PCT': self.analyzer.config.get('US_VALIDATE_STOP_LOSS_PCT', -0.07),
+                'PROFIT_TARGET_PCT': self.analyzer.config.get('US_PROFIT_TARGET_PCT', 0.10),
+                'ATR_STOP_MULTIPLIER': self.analyzer.config.get('US_ATR_STOP_MULTIPLIER', 2.5),
+                'ATR_TARGET_MULTIPLIER': self.analyzer.config.get('US_ATR_TARGET_MULTIPLIER', 4.0),
+                'TRAILING_STOP_PCT': self.analyzer.config.get('US_TRAILING_STOP_PCT', 0.05),
+                'VALIDATE_MAX_HOLD_DAYS': self.analyzer.config.get('US_VALIDATE_MAX_HOLD_DAYS', 30),
+                'TRANSACTION_COST_BUY_PCT': self.analyzer.config.get('US_TRANSACTION_COST_BUY_PCT', 0.0001),
+                'TRANSACTION_COST_SELL_PCT': self.analyzer.config.get('US_TRANSACTION_COST_SELL_PCT', 0.0005),
+            }
+        max_hold = cfg_override.get('VALIDATE_MAX_HOLD_DAYS', 20) if cfg_override else self.analyzer.config.get('VALIDATE_MAX_HOLD_DAYS', 20)
 
         for item in universe:
             if isinstance(item, tuple):
@@ -164,12 +178,12 @@ class Backtester:
                 if not reasons:
                     continue
 
-                win_rate, avg_ret = self.analyzer.validate_strategy(df, target_idx)
+                win_rate, avg_ret = self.analyzer.validate_strategy(df, target_idx, config_override=cfg_override)
                 last = df.iloc[target_idx]
                 is_elite = self.analyzer.is_trend_template(df, target_idx)
                 is_above_200 = last['Close'] > last['SMA200']
-                tier1 = self.analyzer.config.get('TIER1_WIN_RATE', 60)
-                tier2 = self.analyzer.config.get('TIER2_WIN_RATE', 50)
+                tier1 = self.analyzer.config.get('US_TIER1_WIN_RATE', 45) if market_name == 'US' else self.analyzer.config.get('TIER1_WIN_RATE', 60)
+                tier2 = self.analyzer.config.get('US_TIER2_WIN_RATE', 40) if market_name == 'US' else self.analyzer.config.get('TIER2_WIN_RATE', 50)
 
                 has_divergence = "RSI 반전 신호(상승 가능성)" in reasons
                 has_taj_mahal = "바닥권 반등 신호(BB 하단)" in reasons
@@ -188,7 +202,7 @@ class Backtester:
                 else:
                     position_size = 0.5
 
-                ret, exit_reason, buy_price, sell_price = self._simulate_trade(df, target_idx, reasons, max_hold)
+                ret, exit_reason, buy_price, sell_price = self._simulate_trade(df, target_idx, reasons, max_hold, config_override=cfg_override)
                 sell_date = df.index[min(target_idx + 1 + max_hold, len(df) - 1)]
 
                 results.append({
