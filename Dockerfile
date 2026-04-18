@@ -21,4 +21,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # 봇 실행
-CMD ["python", "bot.py"]
+CMD ["python3", "bot.py"]

@@ -5,7 +5,22 @@ import sys
 from zoneinfo import ZoneInfo
 import holidays
 
+# 봇 실행을 위한 import
+try:
+    from bot import StockBot
+    BOT_AVAILABLE = True
+except ImportError:
+    BOT_AVAILABLE = False
+
 def main():
+    # 봇 모드로 실행 (환경변수로 구분)
+    if os.environ.get("RUN_BOT") == "true" and BOT_AVAILABLE:
+        print("Starting Telegram Bot...")
+        bot = StockBot()
+        bot.run()
+        return
+
+    # 기존 분석 로직
     now_kst = datetime.datetime.now(ZoneInfo("Asia/Seoul"))
     kr_holidays = holidays.KR()
     is_manual = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
