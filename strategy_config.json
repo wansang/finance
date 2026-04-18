@@ -31,6 +31,9 @@
     ],
     "INTRADAY_MAX_RETRIES": 1,
     "PRICE_CHANGE_BASIS": "open",
+    "TIER1_MIN_SIGNALS": 2,
+    "TIER1_MIN_RS": 0.0,
+    "MIN_AVG_VOLUME": 50000,
     "US_RECOMMENDATION_ENABLED": true,
     "US_DOW_TICKERS": [
         "AAPL",

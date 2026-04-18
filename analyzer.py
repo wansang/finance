@@ -1257,6 +1257,7 @@ class StockAnalyzer:
                 is_elite = self.is_trend_template(df, target_idx)
                 is_above_200 = last['Close'] > last['SMA200']
                 rs_score = last['RS_LINE'] if 'RS_LINE' in last else 0
+                avg_vol = float(df['Volume'].tail(20).mean()) if 'Volume' in df.columns else 0
                 
                 safe_name = html.escape(name)
                 safe_reasons = html.escape(", ".join(reasons))
@@ -1270,11 +1271,21 @@ class StockAnalyzer:
                     'avg_ret': avg_ret,
                     'rs_score': rs_score,
                     'last': float(last['Close']),
-                    'prev_close': prev_close
+                    'prev_close': prev_close,
+                    'avg_vol': avg_vol
                 }
 
                 # Tier Classification
-                if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60):
+                # Tier 1 고품질 필터: 신호 2개 이상 + 양수 RS + 최소 거래량
+                min_signals = self.config.get('TIER1_MIN_SIGNALS', 2)
+                min_rs = self.config.get('TIER1_MIN_RS', 0.0)
+                min_vol = self.config.get('MIN_AVG_VOLUME', 50000)
+                tier1_quality = (
+                    len(reasons) >= min_signals and
+                    rs_score >= min_rs and
+                    (avg_vol >= min_vol or min_vol <= 0)
+                )
+                if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality:
                     results[1].append(stock_data)
                 elif is_above_200 and win_rate >= self.config.get('TIER2_WIN_RATE', 50):
                     results[2].append(stock_data)
@@ -1308,6 +1319,7 @@ class StockAnalyzer:
                 is_elite = self.is_trend_template(df, target_idx)
                 is_above_200 = last['Close'] > last['SMA200']
                 rs_score = last['RS_LINE'] if 'RS_LINE' in last else 0
+                avg_vol = float(df['Volume'].tail(20).mean()) if 'Volume' in df.columns else 0
                 safe_name = html.escape(name)
                 safe_reasons = html.escape(", ".join(reasons))
                 prev_close = float(df.iloc[target_idx - 1]['Close']) if target_idx > 0 else float(last['Close'])
@@ -1319,10 +1331,19 @@ class StockAnalyzer:
                     'avg_ret': avg_ret,
                     'rs_score': rs_score,
                     'last': float(last['Close']),
-                    'prev_close': prev_close
+                    'prev_close': prev_close,
+                    'avg_vol': avg_vol
                 }
 
-                if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60):
+                min_signals = self.config.get('TIER1_MIN_SIGNALS', 2)
+                min_rs = self.config.get('TIER1_MIN_RS', 0.0)
+                min_vol = self.config.get('MIN_AVG_VOLUME', 50000)
+                tier1_quality = (
+                    len(reasons) >= min_signals and
+                    rs_score >= min_rs and
+                    (avg_vol >= min_vol or min_vol <= 0)
+                )
+                if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality:
                     results[1].append(stock_data)
                 elif is_above_200 and win_rate >= self.config.get('TIER2_WIN_RATE', 50):
                     results[2].append(stock_data)
@@ -1427,6 +1448,7 @@ class StockAnalyzer:
                 safe_reasons = html.escape(", ".join(reasons))
                 prev_close = float(df.iloc[target_idx - 1]['Close']) if target_idx > 0 else float(last['Close'])
 
+                avg_vol = float(df['Volume'].tail(20).mean()) if 'Volume' in df.columns else 0
                 stock_data = {
                     'name': html.escape(code),
                     'code': code,
@@ -1436,10 +1458,17 @@ class StockAnalyzer:
                     'avg_ret': avg_ret,
                     'rs_score': rs_score,
                     'last': float(last['Close']),
-                    'prev_close': prev_close
+                    'prev_close': prev_close,
+                    'avg_vol': avg_vol
                 }
 
-                if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60):
+                min_signals = self.config.get('TIER1_MIN_SIGNALS', 2)
+                min_rs = self.config.get('TIER1_MIN_RS', 0.0)
+                tier1_quality = (
+                    len(reasons) >= min_signals and
+                    rs_score >= min_rs
+                )
+                if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality:
                     results[1].append(stock_data)
                 elif is_above_200 and win_rate >= self.config.get('TIER2_WIN_RATE', 50):
                     results[2].append(stock_data)
