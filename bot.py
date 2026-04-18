@@ -22,10 +22,15 @@ class StockBot:
         await context.bot.send_message(
             chat_id=update.effective_chat.id, 
             text="안녕하세요! 주식 분석 봇입니다.\n\n"
-                 "<b>[명령어 안내]</b>\n"
-                 "/buy [코드] [가격] - 종목 추가\n"
-                 "/sell [코드] - 종목 삭제\n"
-                 "/list - 현재 포트폴리오 확인\n"
+                 "<b>[보유주 관리]</b>\n"
+                 "/buy [코드] [가격] - 보유주 추가\n"
+                 "/sell [코드] - 보유주 삭제\n"
+                 "/list - 보유주 목록 확인\n\n"
+                 "<b>[관심주 관리]</b>\n"
+                 "/watch [코드] - 관심주 추가\n"
+                 "/unwatch [코드] - 관심주 삭제\n"
+                 "/watchlist - 관심주 목록 확인\n\n"
+                 "<b>[분석]</b>\n"
                  "/analyze - 지금 즉시 코스피 분석 실행",
             parse_mode='HTML'
         )
@@ -89,6 +94,68 @@ class StockBot:
         self.analyzer.run() # 기존 run 메소드가 텔레그램으로 전송함
         await update.message.reply_text("✅ 분석이 완료되어 리포트가 전송되었습니다.")
 
+    async def watch(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        try:
+            if len(context.args) < 1:
+                await update.message.reply_text("사용법: /watch [종목코드]\n예: /watch 005930")
+                return
+
+            code = context.args[0]
+            
+            # watchlist.json 업데이트
+            watchlist = self.analyzer.load_watchlist()
+            if code in watchlist:
+                await update.message.reply_text(f"⚠️ {code} 종목은 이미 관심주 목록에 있습니다.")
+                return
+            
+            watchlist[code] = {
+                "name": code,
+                "add_date": datetime.datetime.now().strftime('%Y-%m-%d'),
+                "source": "manual"
+            }
+            self.analyzer.save_watchlist(watchlist)
+            
+            await update.message.reply_text(f"⭐ {code} 종목이 관심주 목록에 추가되었습니다.")
+        except Exception as e:
+            await update.message.reply_text(f"❌ 오류 발생: {e}")
+
+    async def unwatch(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        try:
+            if len(context.args) < 1:
+                await update.message.reply_text("사용법: /unwatch [종목코드]")
+                return
+
+            code = context.args[0]
+            watchlist = self.analyzer.load_watchlist()
+            
+            if code in watchlist:
+                del watchlist[code]
+                self.analyzer.save_watchlist(watchlist)
+                await update.message.reply_text(f"🗑 {code} 종목이 관심주 목록에서 삭제되었습니다.")
+            else:
+                await update.message.reply_text(f"❌ {code} 종목을 관심주 목록에서 찾을 수 없습니다.")
+        except Exception as e:
+            await update.message.reply_text(f"❌ 오류 발생: {e}")
+
+    async def list_watchlist(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        try:
+            watchlist = self.analyzer.load_watchlist()
+            if not watchlist:
+                await update.message.reply_text("현재 관심주 목록이 비어있습니다.")
+                return
+
+            text = "<b>[관심주 목록]</b>\n\n"
+            for code, info in watchlist.items():
+                source = info.get('source', '알 수 없음')
+                add_date = info.get('add_date', '알 수 없음')
+                text += f"• {info.get('name', code)}({code})\n"
+                text += f"  - 추가일: {add_date}\n"
+                text += f"  - 출처: {source}\n\n"
+            
+            await context.bot.send_message(chat_id=update.effective_chat.id, text=text, parse_mode='HTML')
+        except Exception as e:
+            await update.message.reply_text(f"❌ 오류 발생: {e}")
+
     def run(self):
         if not self.token:
             print("TELEGRAM_TOKEN이 설정되지 않았습니다.")
@@ -100,6 +167,9 @@ class StockBot:
         application.add_handler(CommandHandler('buy', self.buy))
         application.add_handler(CommandHandler('sell', self.sell))
         application.add_handler(CommandHandler('list', self.list_holdings))
+        application.add_handler(CommandHandler('watch', self.watch))
+        application.add_handler(CommandHandler('unwatch', self.unwatch))
+        application.add_handler(CommandHandler('watchlist', self.list_watchlist))
         application.add_handler(CommandHandler('analyze', self.analyze_now))
         
         print("Bot is running... Press Ctrl+C to stop.")
