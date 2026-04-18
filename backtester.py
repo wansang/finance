@@ -12,53 +12,78 @@ class Backtester:
 
     def _simulate_trade(self, df, target_idx, reasons, max_hold_days=None):
         """
-        단일 거래 시뮬레이션: 하드 손절 + 트레일링 스톱 + 목표가 + 타임컷
-        매수가에서 max_hold_days 이내 청산. None이면 데이터 끝까지.
+        단일 거래 시뮬레이션
+        - 매수: 신호 다음날 시가 (현실적 진입 — 당일 종가 매수 비현실적 문제 해결)
+        - 손절: ATR × 2배 (ATR 없으면 고정 -5%)
+        - 목표가: ATR × 3배 (ATR 없으면 +8%, PowerCombo +12%)
+        - 트레일링 스톱: 고점 대비 3.5%
+        - 거래비용: 매수 0.015% + 매도 0.5% (코스피 실비: 수수료+세금)
         """
         if max_hold_days is None:
             max_hold_days = self.analyzer.config.get('VALIDATE_MAX_HOLD_DAYS', 20)
 
         trailing_stop = self.analyzer.config.get('TRAILING_STOP_PCT', 0.035)
-        hard_stop = abs(self.analyzer.config.get('VALIDATE_STOP_LOSS_PCT', -0.05))
-        profit_target = self.analyzer.config.get('PROFIT_TARGET_PCT', 0.08)
+        fallback_stop = abs(self.analyzer.config.get('VALIDATE_STOP_LOSS_PCT', -0.05))
+        fallback_target = self.analyzer.config.get('PROFIT_TARGET_PCT', 0.08)
+        atr_stop_mult = self.analyzer.config.get('ATR_STOP_MULTIPLIER', 2.0)
+        atr_target_mult = self.analyzer.config.get('ATR_TARGET_MULTIPLIER', 3.0)
+        tx_buy = self.analyzer.config.get('TRANSACTION_COST_BUY_PCT', 0.00015)
+        tx_sell = self.analyzer.config.get('TRANSACTION_COST_SELL_PCT', 0.005)
 
-        has_premium = any(s in reasons for s in [
-            "RSI 반전 신호(상승 가능성)", "바닥권 반등 신호(BB 하단)"
-        ])
-        effective_target = profit_target * 1.5 if has_premium else profit_target
+        # 다음날 시가 진입
+        buy_idx = target_idx + 1
+        if buy_idx >= len(df):
+            return 0.0, "NoData", 0.0, 0.0
 
-        buy_price = float(df.iloc[target_idx]['Close'])
-        max_p = buy_price
-        sell_price = buy_price
+        open_col = 'Open' if 'Open' in df.columns else 'Close'
+        raw_buy = float(df.iloc[buy_idx][open_col])
+        if raw_buy <= 0:
+            raw_buy = float(df.iloc[buy_idx]['Close'])
+        buy_price = raw_buy * (1 + tx_buy)  # 매수 비용 반영
+
+        # ATR 기반 손절/목표가 (없으면 고정값 폴백)
+        atr_val = None
+        if 'ATR' in df.columns:
+            v = df.iloc[target_idx]['ATR']
+            if pd.notna(v) and float(v) > 0:
+                atr_val = float(v)
+
+        has_premium = any(s in reasons for s in ["RSI 반전 신호(상승 가능성)", "바닥권 반등 신호(BB 하단)"])
+        if atr_val:
+            hard_stop_pct = atr_stop_mult * atr_val / raw_buy
+            profit_target_pct = atr_target_mult * (1.5 if has_premium else 1.0) * atr_val / raw_buy
+            stop_label = f"ATR×{atr_stop_mult:.0f}"
+        else:
+            hard_stop_pct = fallback_stop
+            profit_target_pct = fallback_target * (1.5 if has_premium else 1.0)
+            stop_label = "Fixed"
+
+        max_p = raw_buy
+        end_idx = min(buy_idx + max_hold_days + 1, len(df))
+        sell_raw = float(df.iloc[end_idx - 1]['Close'])
         exit_reason = "TimeOut"
-        end_idx = min(target_idx + max_hold_days + 1, len(df))
 
-        for j in range(target_idx + 1, end_idx):
+        for j in range(buy_idx, end_idx):
             curr_p = float(df.iloc[j]['Close'])
             if curr_p > max_p:
                 max_p = curr_p
-
-            pct = (curr_p - buy_price) / buy_price
-
-            # 하드 손절
-            if pct <= -hard_stop:
-                sell_price = curr_p
-                exit_reason = f"HardStop(-{hard_stop*100:.0f}%)"
+            pct = (curr_p - raw_buy) / raw_buy
+            if pct <= -hard_stop_pct:
+                sell_raw = curr_p
+                exit_reason = f"HardStop({stop_label},-{hard_stop_pct*100:.1f}%)"
                 break
-            # 목표가
-            if pct >= effective_target:
-                sell_price = curr_p
-                exit_reason = f"Target(+{effective_target*100:.0f}%)"
+            if pct >= profit_target_pct:
+                sell_raw = curr_p
+                exit_reason = f"Target({stop_label},+{profit_target_pct*100:.1f}%)"
                 break
-            # 트레일링 스톱 (고점 대비)
-            if max_p > buy_price and (max_p - curr_p) / max_p >= trailing_stop:
-                sell_price = curr_p
+            if max_p > raw_buy and (max_p - curr_p) / max_p >= trailing_stop:
+                sell_raw = curr_p
                 exit_reason = f"TrailingStop({trailing_stop*100:.0f}%)"
                 break
-        else:
-            sell_price = float(df.iloc[end_idx - 1]['Close'])
 
-        return (sell_price - buy_price) / buy_price * 100, exit_reason, buy_price, sell_price
+        sell_price_net = sell_raw * (1 - tx_sell)  # 매도 비용 반영
+        ret = (sell_price_net - buy_price) / buy_price * 100
+        return ret, exit_reason, buy_price, sell_raw
 
     def _load_us_candidates(self):
         dow_candidates = self.analyzer.config.get('US_DOW_TICKERS', [])
@@ -131,8 +156,8 @@ class Backtester:
                     target_idx = df.index.get_loc(target_date)
                     actual_buy_date = target_date
 
-                # 매도 구간 데이터가 충분한지 확인
-                if target_idx + max_hold >= len(df):
+                # 매도 구간 데이터가 충분한지 확인 (다음날 시가 진입 + max_hold일)
+                if target_idx + 1 + max_hold >= len(df):
                     continue
 
                 reasons = self.analyzer.check_signals(df, target_idx)
@@ -154,8 +179,17 @@ class Backtester:
                 if not ((is_elite and win_rate >= tier1 and market_ok) or (is_above_200 and win_rate >= tier2)):
                     continue
 
+                # 포지션 사이징: PowerCombo 1.5배, Tier1 1.0배, Tier2 0.5배
+                is_tier1 = is_elite and win_rate >= tier1 and market_ok
+                if power_combo:
+                    position_size = 1.5
+                elif is_tier1:
+                    position_size = 1.0
+                else:
+                    position_size = 0.5
+
                 ret, exit_reason, buy_price, sell_price = self._simulate_trade(df, target_idx, reasons, max_hold)
-                sell_date = df.index[min(target_idx + max_hold, len(df) - 1)]
+                sell_date = df.index[min(target_idx + 1 + max_hold, len(df) - 1)]
 
                 results.append({
                     'Market': market_name,
@@ -171,6 +205,7 @@ class Backtester:
                     'WinRate_Hist': win_rate,
                     'PowerCombo': power_combo,
                     'MarketUptrend': market_uptrend,
+                    'PositionSize': position_size,
                 })
 
                 count += 1
@@ -311,12 +346,19 @@ class Backtester:
         best = df_results.loc[df_results['Return(%)'].idxmax()]
         worst = df_results.loc[df_results['Return(%)'].idxmin()]
 
+        # 포지션 사이징 가중 수익률 (PowerCombo 1.5배, Tier1 1.0배, Tier2 0.5배)
+        if 'PositionSize' in df_results.columns:
+            total_weight = df_results['PositionSize'].sum()
+            weighted_ret = (df_results['Return(%)'] * df_results['PositionSize']).sum() / total_weight if total_weight > 0 else avg_ret
+        else:
+            weighted_ret = avg_ret
+
         print(f"\n{'='*60}")
         print(f"  [{title} 종합 결과]")
         print(f"{'='*60}")
         print(f"  총 거래 수:   {total}개  (통계 신뢰도: {'높음 ✅' if total >= 80 else '보통 ⚠️' if total >= 30 else '낮음 ❌'})")
         print(f"  승률:         {win_rate:.1f}%  ({wins}승 {total-wins}패)")
-        print(f"  평균 수익률:  {avg_ret:+.2f}%")
+        print(f"  평균 수익률:  {avg_ret:+.2f}%  (가중평균: {weighted_ret:+.2f}%)")
         print(f"  최고 수익:    {best['Return(%)']:+.2f}%  ({best['Name']})")
         print(f"  최저 수익:    {worst['Return(%)']:+.2f}%  ({worst['Name']})")
         print(f"{'─'*60}")

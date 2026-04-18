@@ -1017,6 +1017,11 @@ class StockAnalyzer:
         # Volume Average
         df['VOL_AVG'] = df['Volume'].rolling(window=self.config.get('VOL_AVG_WINDOW', 20)).mean()
 
+        # ATR (Average True Range) - 종목별 변동성 기반 손절/목표가 계산용
+        atr_length = self.config.get('ATR_LENGTH', 14)
+        atr = ta.atr(df['High'], df['Low'], df['Close'], length=atr_length)
+        df['ATR'] = atr if atr is not None else np.nan
+
         return df
 
     def detect_divergence(self, df, idx=-1):
@@ -1260,45 +1265,56 @@ class StockAnalyzer:
         lookback = self.config.get('VALIDATE_LOOKBACK_DAYS', 120)
         start_idx = max(self.config.get('VALIDATE_MIN_HISTORY', 200), current_idx - lookback)
         max_hold = self.config.get('VALIDATE_MAX_HOLD_DAYS', 20)
-        stop_loss_pct = self.config.get('VALIDATE_STOP_LOSS_PCT', -0.05)  # 하드 손절 -5%
-        trailing_stop = self.config.get('TRAILING_STOP_PCT', 0.035)       # 트레일링 3.5%
-        profit_target = self.config.get('PROFIT_TARGET_PCT', 0.08)        # 목표가 +8%
-        
+        trailing_stop = self.config.get('TRAILING_STOP_PCT', 0.035)
+        fallback_stop = abs(self.config.get('VALIDATE_STOP_LOSS_PCT', -0.05))
+        fallback_target = self.config.get('PROFIT_TARGET_PCT', 0.08)
+        atr_stop_mult = self.config.get('ATR_STOP_MULTIPLIER', 2.0)
+        atr_target_mult = self.config.get('ATR_TARGET_MULTIPLIER', 3.0)
+
         trades = []
         for i in range(start_idx, current_idx):
             reasons = self.check_signals(df, i)
             if reasons and self.is_trend_template(df, i):
-                buy_price = df.iloc[i]['Close']
+                # 다음날 시가 매수 (현실적 진입 - 당일 종가 매수 비현실적 문제 해결)
+                buy_idx = i + 1
+                if buy_idx >= current_idx:
+                    continue
+                open_col = 'Open' if 'Open' in df.columns else 'Close'
+                buy_price = float(df.iloc[buy_idx][open_col])
+                if buy_price <= 0:
+                    buy_price = float(df.iloc[i]['Close'])
+
+                # ATR 기반 손절/목표가 (없으면 고정값 폴백)
+                atr_val = None
+                if 'ATR' in df.columns:
+                    v = df.iloc[i]['ATR']
+                    if pd.notna(v) and v > 0:
+                        atr_val = float(v)
+                has_premium = any(s in reasons for s in ["RSI 반전 신호(상승 가능성)", "바닥권 반등 신호(BB 하단)"])
+                if atr_val:
+                    hard_stop_pct = atr_stop_mult * atr_val / buy_price
+                    effective_target = atr_target_mult * (1.5 if has_premium else 1.0) * atr_val / buy_price
+                else:
+                    hard_stop_pct = fallback_stop
+                    effective_target = fallback_target * (1.5 if has_premium else 1.0)
+
                 max_p = buy_price
-                result = stop_loss_pct  # 기본값: 하드 손절
-                for j in range(i + 1, min(i + max_hold + 1, current_idx + 1)):
-                    curr_p = df.iloc[j]['Close']
+                result = -hard_stop_pct
+                for j in range(buy_idx, min(buy_idx + max_hold + 1, current_idx + 1)):
+                    curr_p = float(df.iloc[j]['Close'])
                     if curr_p > max_p:
                         max_p = curr_p
-                    
                     pct_from_buy = (curr_p - buy_price) / buy_price
-                    
-                    # 하드 손절: 매수가 기준 손절폭 이하 즉시 청산
-                    if pct_from_buy <= stop_loss_pct:
-                        result = stop_loss_pct
+                    if pct_from_buy <= -hard_stop_pct:
+                        result = -hard_stop_pct
                         break
-                    
-                    # 수익 목표 달성: +8% 도달 시 청산 (RSI 다이버전스+타지마할 조합은 더 높은 목표)
-                    has_premium = any(
-                        s in reasons for s in
-                        ["RSI 반전 신호(상승 가능성)", "바닥권 반등 신호(BB 하단)"]
-                    )
-                    effective_target = profit_target * 1.5 if has_premium else profit_target
                     if pct_from_buy >= effective_target:
                         result = effective_target
                         break
-                    
-                    # 트레일링 스톱: 고점 대비 3.5% 하락 시 청산
                     if max_p > buy_price and (max_p - curr_p) / max_p >= trailing_stop:
                         result = pct_from_buy
                         break
-                    
-                    if j == i + max_hold:  # 타임컷
+                    if j == buy_idx + max_hold:
                         result = pct_from_buy
                 trades.append(result)
         
@@ -1402,9 +1418,18 @@ class StockAnalyzer:
                 
                 # 시장 필터: 하락장에서는 power_combo만 Tier1 허용, 나머지는 Tier2로 강등
                 market_ok = kospi_uptrend or not market_filter or power_combo
-                
-                stock_data['power_combo'] = power_combo  # 정렬 우선순위용
-                if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality and market_ok:
+
+                is_tier1 = is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality and market_ok
+                # 포지션 사이징: PowerCombo 1.5배, Tier1 1.0배, Tier2/3 0.5배
+                if power_combo:
+                    position_size = 1.5
+                elif is_tier1:
+                    position_size = 1.0
+                else:
+                    position_size = 0.5
+                stock_data['power_combo'] = power_combo
+                stock_data['position_size'] = position_size
+                if is_tier1:
                     results[1].append(stock_data)
                 elif is_above_200 and win_rate >= self.config.get('TIER2_WIN_RATE', 50):
                     results[2].append(stock_data)
@@ -1466,9 +1491,17 @@ class StockAnalyzer:
                     rs_score >= min_rs and
                     (avg_vol >= min_vol or min_vol <= 0)
                 )
-                stock_data['power_combo'] = power_combo
                 market_ok = kospi_uptrend or not market_filter or power_combo
-                if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality and market_ok:
+                is_tier1 = is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality and market_ok
+                if power_combo:
+                    position_size = 1.5
+                elif is_tier1:
+                    position_size = 1.0
+                else:
+                    position_size = 0.5
+                stock_data['power_combo'] = power_combo
+                stock_data['position_size'] = position_size
+                if is_tier1:
                     results[1].append(stock_data)
                 elif is_above_200 and win_rate >= self.config.get('TIER2_WIN_RATE', 50):
                     results[2].append(stock_data)
@@ -1606,9 +1639,17 @@ class StockAnalyzer:
                     len(reasons) >= effective_min_signals and
                     rs_score >= min_rs
                 )
-                stock_data['power_combo'] = power_combo
                 market_ok = us_market_uptrend or not market_filter or power_combo
-                if is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality and market_ok:
+                is_tier1 = is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality and market_ok
+                if power_combo:
+                    position_size = 1.5
+                elif is_tier1:
+                    position_size = 1.0
+                else:
+                    position_size = 0.5
+                stock_data['power_combo'] = power_combo
+                stock_data['position_size'] = position_size
+                if is_tier1:
                     results[1].append(stock_data)
                 elif is_above_200 and win_rate >= self.config.get('TIER2_WIN_RATE', 50):
                     results[2].append(stock_data)
