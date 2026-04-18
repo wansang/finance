@@ -477,10 +477,12 @@ class StockAnalyzer:
         if isinstance(target_date, datetime.datetime):
             target_date = target_date.date()
 
+        target_timestamp = pd.Timestamp(target_date)
+
         indices = {
-            'S&P 500': 'US500',
-            'Nasdaq': 'IXIC',
-            'Dow': 'DJI'
+            'S&P 500': '^GSPC',
+            'Nasdaq': '^IXIC',
+            'Dow': '^DJI'
         }
         condition = {}
         overall_positive = True
@@ -491,8 +493,8 @@ class StockAnalyzer:
                 df = fdr.DataReader(symbol, start=start, end=end)
                 if df.empty:
                     raise ValueError('No data')
-                if target_date not in df.index:
-                    df = df[df.index <= target_date]
+                if target_timestamp not in df.index:
+                    df = df[df.index <= target_timestamp]
                     if df.empty:
                         raise ValueError('No trading day before target')
                 last = df.iloc[-1]
