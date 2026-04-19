@@ -50,13 +50,14 @@ class Backtester:
             if pd.notna(v) and float(v) > 0:
                 atr_val = float(v)
 
+        max_hard_stop = cfg.get('MAX_HARD_STOP_PCT', 0.07)
         has_premium = any(s in reasons for s in ["RSI 반전 신호(상승 가능성)", "바닥권 반등 신호(BB 하단)"])
         if atr_val:
-            hard_stop_pct = atr_stop_mult * atr_val / raw_buy
+            hard_stop_pct = min(atr_stop_mult * atr_val / raw_buy, max_hard_stop)
             profit_target_pct = atr_target_mult * (1.5 if has_premium else 1.0) * atr_val / raw_buy
             stop_label = f"ATR×{atr_stop_mult:.0f}"
         else:
-            hard_stop_pct = fallback_stop
+            hard_stop_pct = min(fallback_stop, max_hard_stop)
             profit_target_pct = fallback_target * (1.5 if has_premium else 1.0)
             stop_label = "Fixed"
 
@@ -191,7 +192,7 @@ class Backtester:
                 power_combo = has_divergence and has_taj_mahal
                 market_ok = market_uptrend or not market_filter or power_combo
 
-                if not ((is_elite and win_rate >= tier1 and market_ok) or (is_above_200 and win_rate >= tier2)):
+                if not ((is_elite and win_rate >= tier1 and market_ok) or (is_above_200 and win_rate >= tier2 and market_ok)):
                     continue
 
                 # 포지션 사이징: PowerCombo 1.5배, Tier1 1.0배, Tier2 0.5배

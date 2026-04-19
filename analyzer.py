@@ -1292,12 +1292,13 @@ class StockAnalyzer:
                     v = df.iloc[i]['ATR']
                     if pd.notna(v) and v > 0:
                         atr_val = float(v)
+                max_hard_stop = cfg.get('MAX_HARD_STOP_PCT', 0.07)
                 has_premium = any(s in reasons for s in ["RSI 반전 신호(상승 가능성)", "바닥권 반등 신호(BB 하단)"])
                 if atr_val:
-                    hard_stop_pct = atr_stop_mult * atr_val / buy_price
+                    hard_stop_pct = min(atr_stop_mult * atr_val / buy_price, max_hard_stop)
                     effective_target = atr_target_mult * (1.5 if has_premium else 1.0) * atr_val / buy_price
                 else:
-                    hard_stop_pct = fallback_stop
+                    hard_stop_pct = min(fallback_stop, max_hard_stop)
                     effective_target = fallback_target * (1.5 if has_premium else 1.0)
 
                 max_p = buy_price
