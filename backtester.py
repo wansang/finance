@@ -206,6 +206,12 @@ class Backtester:
                 if market_name == 'US' and not power_combo:
                     continue
 
+                # Stage 8: KOSPI - 강한 기술적 신호 최소 1개 필수 (약한 신호 단독 차단)
+                STRONG_TECH_SIGNALS = ["RSI 반전 신호(상승 가능성)", "바닥권 반등 신호(BB 하단)", "과매도 반등 신호", "거래량 급증"]
+                has_strong_tech = any(s in reasons for s in STRONG_TECH_SIGNALS)
+                if market_name != 'US' and not has_strong_tech:
+                    continue
+
                 if not ((is_elite and win_rate >= tier1 and market_ok) or (is_above_200 and win_rate >= tier2 and market_ok)):
                     continue
 
