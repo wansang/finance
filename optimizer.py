@@ -144,19 +144,79 @@ class StrategyOptimizer:
     # ------------------------------------------------------------------
     # 2. 실제 수익률 계산
     # ------------------------------------------------------------------
-    def fetch_actual_performance(self, recs, trailing_stop_pct):
+    def _is_us_stock(self, code):
+        """US 주식 여부 판별 (숫자가 아닌 코드 = US 티커)"""
+        return bool(code) and not str(code).isdigit()
+
+    def _load_recommendations_by_tier(self, tier='지금 매수', days_back=30):
+        """특정 등급(tier) 추천 종목 로드 공용 메서드"""
+        if not os.path.exists(RECOMMENDATIONS_FILE):
+            return []
+        cutoff = datetime.datetime.now() - datetime.timedelta(days=days_back)
+        recs = []
+        try:
+            raw = pd.read_csv(RECOMMENDATIONS_FILE, header=None, dtype=str, encoding='utf-8-sig')
+            if str(raw.iloc[0, 0]).strip().lower() == 'date':
+                raw = raw.iloc[1:].reset_index(drop=True)
+            for _, row in raw.iterrows():
+                try:
+                    rec_date = datetime.datetime.strptime(str(row.iloc[0]).strip(), '%Y-%m-%d')
+                    if rec_date < cutoff:
+                        continue
+                    if str(row.iloc[1]).strip() != tier:
+                        continue
+                    name = str(row.iloc[2]).strip()
+                    code = str(row.iloc[3]).strip()
+                    stored_win_rate = None
+                    try:
+                        stored_win_rate = float(str(row.iloc[5]).strip().replace('%', ''))
+                    except (ValueError, IndexError):
+                        pass
+                    buy_price = None
+                    if len(row) > 7:
+                        try:
+                            bp = float(str(row.iloc[7]).strip())
+                            if bp > 0:
+                                buy_price = bp
+                        except (ValueError, TypeError):
+                            pass
+                    recs.append({
+                        'date': rec_date, 'name': name, 'code': code,
+                        'stored_win_rate': stored_win_rate, 'buy_price': buy_price,
+                    })
+                except Exception:
+                    continue
+        except Exception:
+            return []
+        return recs
+
+    def _load_tier2_recommendations(self, days_back=30):
+        """2등급(관심 종목) 추천 이력 로드"""
+        return self._load_recommendations_by_tier(tier='관심 종목', days_back=days_back)
+
+    def fetch_actual_performance(self, recs, trailing_stop_pct, max_hold_override=None, use_us_params=False):
         """
         각 추천 종목을 다음날 시가에 매수, ATR 기반 손절/목표가 + 트레일링 스톱 + 거래비용 반영.
         backtester.py의 _simulate_trade 로직과 동일하게 통일.
         """
         results = []
-        tx_buy = self.base_config.get('TRANSACTION_COST_BUY_PCT', 0.00015)
-        tx_sell = self.base_config.get('TRANSACTION_COST_SELL_PCT', 0.005)
-        atr_stop_mult = self.base_config.get('ATR_STOP_MULTIPLIER', 2.0)
-        atr_target_mult = self.base_config.get('ATR_TARGET_MULTIPLIER', 3.0)
-        fallback_stop = abs(self.base_config.get('VALIDATE_STOP_LOSS_PCT', -0.05))
-        fallback_target = self.base_config.get('PROFIT_TARGET_PCT', 0.08)
-        max_hold = self.base_config.get('VALIDATE_MAX_HOLD_DAYS', 20)
+        if use_us_params:
+            tx_buy = self.base_config.get('US_TRANSACTION_COST_BUY_PCT', 0.0001)
+            tx_sell = self.base_config.get('US_TRANSACTION_COST_SELL_PCT', 0.0005)
+            atr_stop_mult = self.base_config.get('US_ATR_STOP_MULTIPLIER', 2.5)
+            atr_target_mult = self.base_config.get('US_ATR_TARGET_MULTIPLIER', 4.0)
+            fallback_stop = abs(self.base_config.get('US_VALIDATE_STOP_LOSS_PCT', -0.07))
+            fallback_target = self.base_config.get('US_PROFIT_TARGET_PCT', 0.10)
+            default_max_hold = self.base_config.get('US_VALIDATE_MAX_HOLD_DAYS', 30)
+        else:
+            tx_buy = self.base_config.get('TRANSACTION_COST_BUY_PCT', 0.00015)
+            tx_sell = self.base_config.get('TRANSACTION_COST_SELL_PCT', 0.005)
+            atr_stop_mult = self.base_config.get('ATR_STOP_MULTIPLIER', 2.0)
+            atr_target_mult = self.base_config.get('ATR_TARGET_MULTIPLIER', 3.0)
+            fallback_stop = abs(self.base_config.get('VALIDATE_STOP_LOSS_PCT', -0.05))
+            fallback_target = self.base_config.get('PROFIT_TARGET_PCT', 0.08)
+            default_max_hold = self.base_config.get('VALIDATE_MAX_HOLD_DAYS', 20)
+        max_hold = max_hold_override if max_hold_override is not None else default_max_hold
 
         for rec in recs:
             code = rec['code']
@@ -251,10 +311,12 @@ class StrategyOptimizer:
     def analyze_signal_performance(self, recs, results):
         """
         각 매수 신호가 실제로 얼마나 효과적이었는지 분석
-        recommendations.csv의 Reasons 필드와 실제 수익률을 매칭
+        (code, buy_date) 쌍으로 정확히 매칭하여 중복/오염 방지
         """
+        # 매번 신호 통계를 새로 계산 - 누적 오염 방지 (30일 롤링)
         signal_perf = self.load_signal_performance()
-        
+        signal_perf['signals'] = {}  # 신호 통계 초기화 (failure_patterns 등은 유지)
+
         # CSV에서 추천 종목의 신호 정보 가져오기
         try:
             raw = pd.read_csv(RECOMMENDATIONS_FILE, header=None, dtype=str, encoding='utf-8-sig')
@@ -262,43 +324,51 @@ class StrategyOptimizer:
                 raw = raw.iloc[1:].reset_index(drop=True)
         except Exception:
             return signal_perf
-        
-        # results를 code로 인덱싱
-        result_map = {r['code']: r for r in results}
-        
+
+        # (code, buy_date_str) 복합키로 인덱싱 - 같은 종목 여러 날짜 추천 혼선 방지
+        result_map = {}
+        for r in results:
+            key = (r['code'], str(r['buy_date']))
+            result_map[key] = r
+
         for _, row in raw.iterrows():
             try:
+                date_str = str(row.iloc[0]).strip()
+                tier = str(row.iloc[1]).strip()
                 code = str(row.iloc[3]).strip()
                 reasons_str = str(row.iloc[4]).strip()
-                
-                if code not in result_map:
+
+                if tier != '지금 매수':
                     continue
-                
-                actual = result_map[code]
-                signals = [s.strip() for s in reasons_str.split(',')]
-                
+
+                key = (code, date_str)
+                if key not in result_map:
+                    continue
+
+                actual = result_map[key]
+                # 괄호 안 쉼표를 보호하며 분리: "신호A(설명, 추가), 신호B" → ['신호A(설명, 추가)', '신호B']
+                import re as _re
+                signals_raw = _re.split(r',\s*(?![^()]*\))', reasons_str)
+                signals = [s.strip() for s in signals_raw if s.strip()]
+
                 for signal in signals:
+                    if not signal:
+                        continue
                     if signal not in signal_perf['signals']:
                         signal_perf['signals'][signal] = {
-                            'total_count': 0,
-                            'win_count': 0,
-                            'total_return': 0.0,
-                            'avg_return': 0.0,
-                            'win_rate': 0.0
+                            'total_count': 0, 'win_count': 0,
+                            'total_return': 0.0, 'avg_return': 0.0, 'win_rate': 0.0
                         }
-                    
                     perf = signal_perf['signals'][signal]
                     perf['total_count'] += 1
                     perf['total_return'] += actual['return_pct']
-                    
                     if actual['return_pct'] > 0:
                         perf['win_count'] += 1
-                    
                     perf['avg_return'] = perf['total_return'] / perf['total_count']
-                    perf['win_rate'] = (perf['win_count'] / perf['total_count'] * 100) if perf['total_count'] > 0 else 0
+                    perf['win_rate'] = (perf['win_count'] / perf['total_count'] * 100)
             except Exception:
                 continue
-        
+
         self.save_signal_performance(signal_perf)
         return signal_perf
 
@@ -372,51 +442,185 @@ class StrategyOptimizer:
     # ------------------------------------------------------------------
     # 6. 추가 파라미터 최적화
     # ------------------------------------------------------------------
-    def optimize_additional_parameters(self, recs, optimize_started):
+    def optimize_additional_parameters(self, recs, results, optimize_started):
         """
-        TIER2_WIN_RATE, VALIDATE_MAX_HOLD_DAYS, TREND_TEMPLATE_PEAK_FACTOR 최적화
+        TIER2_WIN_RATE, VALIDATE_MAX_HOLD_DAYS, TREND_TEMPLATE_PEAK_FACTOR 실제 최적화
         """
-        print("\n[Optimizer] 추가 파라미터 최적화 시작...")
-        
+        print("\n[추가 파라미터 최적화]")
+
         best_params = {
             'TIER2_WIN_RATE': self.base_config.get('TIER2_WIN_RATE', 50),
             'VALIDATE_MAX_HOLD_DAYS': self.base_config.get('VALIDATE_MAX_HOLD_DAYS', 20),
-            'TREND_TEMPLATE_PEAK_FACTOR': self.base_config.get('TREND_TEMPLATE_PEAK_FACTOR', 0.75)
+            'TREND_TEMPLATE_PEAK_FACTOR': self.base_config.get('TREND_TEMPLATE_PEAK_FACTOR', 0.85)
         }
-        
-        # 샘플 수가 충분한 경우에만 최적화 (통계적 신뢰도)
-        if len(recs) < 10:
-            print("  샘플 수 부족 (< 10), 추가 파라미터 최적화 생략")
-            return best_params
-        
-        # TIER2_WIN_RATE 최적화 (간략화 버전)
-        print("  TIER2_WIN_RATE 최적화...")
-        tier2_candidates = [45, 50, 55]
-        current_tier2 = self.base_config.get('TIER2_WIN_RATE', 50)
-        
-        for tier2 in tier2_candidates:
-            if time.time() - optimize_started >= self.time_limit_seconds:
-                break
-            marker = ' <-- 현재' if tier2 == current_tier2 else ''
-            print(f"    {tier2}%{marker}")
-        
-        # 실제로는 백테스트가 필요하지만, 시간 제약상 현재값 유지
-        print(f"  -> 현재 TIER2_WIN_RATE({current_tier2}%) 유지")
-        
-        # VALIDATE_MAX_HOLD_DAYS 최적화
-        print("  VALIDATE_MAX_HOLD_DAYS 최적화...")
-        hold_candidates = [15, 20, 25, 30]
-        current_hold = self.base_config.get('VALIDATE_MAX_HOLD_DAYS', 20)
-        
-        for hold in hold_candidates:
-            if time.time() - optimize_started >= self.time_limit_seconds:
-                break
-            marker = ' <-- 현재' if hold == current_hold else ''
-            print(f"    {hold}일{marker}")
-        
-        print(f"  -> 현재 VALIDATE_MAX_HOLD_DAYS({current_hold}일) 유지")
-        
+
+        current_stop = self.base_config.get('TRAILING_STOP_PCT', 0.035)
+        returns = [r['return_pct'] for r in results] if results else []
+        win_rate_actual = (len([r for r in returns if r > 0]) / len(returns) * 100) if returns else 0
+
+        # ── A. VALIDATE_MAX_HOLD_DAYS 실제 최적화 ──────────────────────
+        if len(recs) >= 5 and time.time() - optimize_started < self.time_limit_seconds:
+            print("  [보유 기간 최적화]")
+            current_hold = self.base_config.get('VALIDATE_MAX_HOLD_DAYS', 20)
+            best_hold = current_hold
+            best_hold_score = -9999
+            for hold_days in [10, 15, 20, 25, 30]:
+                if time.time() - optimize_started >= self.time_limit_seconds:
+                    break
+                test_res = self.fetch_actual_performance(recs, current_stop, max_hold_override=hold_days)
+                if not test_res:
+                    continue
+                t_rets = [r['return_pct'] for r in test_res]
+                t_avg = sum(t_rets) / len(t_rets)
+                t_wr = len([r for r in t_rets if r > 0]) / len(t_rets) * 100
+                t_score = t_avg + max(t_wr - 45, 0) * 0.4
+                marker = ' <-- 현재' if hold_days == current_hold else ''
+                print(f"    {hold_days}일: 평균 {t_avg:+.2f}%, 승률 {t_wr:.1f}%, 점수 {t_score:.2f}{marker}")
+                if t_score > best_hold_score:
+                    best_hold_score = t_score
+                    best_hold = hold_days
+            if best_hold != current_hold:
+                print(f"    ✓ VALIDATE_MAX_HOLD_DAYS: {current_hold}일 → {best_hold}일")
+                best_params['VALIDATE_MAX_HOLD_DAYS'] = best_hold
+            else:
+                print(f"    → 현재 {current_hold}일 유지")
+
+        # ── B. TIER2_WIN_RATE 실제 최적화 (Tier2 추천 종목 활용) ────────
+        if len(recs) >= 10 and time.time() - optimize_started < self.time_limit_seconds:
+            print("  [TIER2 승률 임계값 최적화]")
+            tier2_recs = self._load_tier2_recommendations(days_back=30)
+            if len(tier2_recs) >= 5:
+                tier2_results = self.fetch_actual_performance(tier2_recs, current_stop)
+                recs_with_perf2 = [r for r in tier2_results if r.get('stored_win_rate') is not None]
+                if len(recs_with_perf2) >= 3:
+                    current_tier2 = self.base_config.get('TIER2_WIN_RATE', 50)
+                    best_tier2 = current_tier2
+                    best_tier2_score = -9999
+                    for threshold in [35, 40, 45, 50, 55, 60]:
+                        if time.time() - optimize_started >= self.time_limit_seconds:
+                            break
+                        selected = [r for r in recs_with_perf2 if r['stored_win_rate'] >= threshold]
+                        if len(selected) < 2:
+                            continue
+                        sel_rets = [r['return_pct'] for r in selected]
+                        sel_avg = sum(sel_rets) / len(sel_rets)
+                        sel_wr = len([r for r in sel_rets if r > 0]) / len(sel_rets) * 100
+                        sel_score = sel_avg + max(sel_wr - 45, 0) * 0.4
+                        marker = ' <-- 현재' if threshold == current_tier2 else ''
+                        print(f"    >= {threshold}%: {len(selected)}개, 평균 {sel_avg:+.2f}%, 승률 {sel_wr:.1f}%, 점수 {sel_score:.2f}{marker}")
+                        if sel_score > best_tier2_score:
+                            best_tier2_score = sel_score
+                            best_tier2 = threshold
+                    if best_tier2 != current_tier2:
+                        print(f"    ✓ TIER2_WIN_RATE: {current_tier2}% → {best_tier2}%")
+                        best_params['TIER2_WIN_RATE'] = best_tier2
+                    else:
+                        print(f"    → 현재 {current_tier2}% 유지")
+                else:
+                    print(f"    Tier2 승률 데이터 부족 ({len(recs_with_perf2)}개 < 3), 생략")
+            else:
+                print(f"    Tier2 추천 종목 부족 ({len(tier2_recs)}개 < 5), 생략")
+
+        # ── C. TREND_TEMPLATE_PEAK_FACTOR 방향 기반 휴리스틱 조정 ───────
+        print("  [추세 템플릿 피크 팩터 조정]")
+        current_peak = self.base_config.get('TREND_TEMPLATE_PEAK_FACTOR', 0.85)
+        if win_rate_actual >= 65:
+            new_peak = min(round(current_peak + 0.02, 3), 0.95)
+            print(f"    승률 {win_rate_actual:.1f}% 높음 → 상향 조정: {current_peak} → {new_peak}")
+            best_params['TREND_TEMPLATE_PEAK_FACTOR'] = new_peak
+        elif win_rate_actual < 50 and len(returns) >= 5:
+            new_peak = max(round(current_peak - 0.02, 3), 0.70)
+            print(f"    승률 {win_rate_actual:.1f}% 낮음 → 하향 조정: {current_peak} → {new_peak}")
+            best_params['TREND_TEMPLATE_PEAK_FACTOR'] = new_peak
+        else:
+            print(f"    승률 {win_rate_actual:.1f}% 정상 → 현재값 유지 ({current_peak})")
+
         return best_params
+
+    # ------------------------------------------------------------------
+    # 6-B. US 주식 전용 파라미터 최적화
+    # ------------------------------------------------------------------
+    def optimize_us_parameters(self, optimize_started):
+        """미국 주식 추천 종목 실적 기반 US 전용 파라미터 최적화"""
+        print("\n[미국 주식 파라미터 최적화]")
+
+        all_recs = self.load_tier1_recommendations(days_back=30)
+        us_recs = [r for r in all_recs if self._is_us_stock(r['code'])]
+
+        if len(us_recs) < 3:
+            print(f"  US 추천 종목 부족 ({len(us_recs)}개 < 3), 생략")
+            return {}
+
+        print(f"  {len(us_recs)}개 US 종목 발견")
+        current_us_stop = self.base_config.get('US_TRAILING_STOP_PCT', 0.05)
+
+        # 현재 US 파라미터 기준 성과
+        us_current = self.fetch_actual_performance(us_recs, current_us_stop, use_us_params=True)
+        if not us_current:
+            print("  US 성과 데이터 없음")
+            return {}
+
+        us_rets = [r['return_pct'] for r in us_current]
+        us_avg = sum(us_rets) / len(us_rets)
+        us_wr = len([r for r in us_rets if r > 0]) / len(us_rets) * 100
+        best_us_score = us_avg + max(us_wr - 45, 0) * 0.4
+        best_us_stop = current_us_stop
+        print(f"  현재 US_TRAILING_STOP {current_us_stop*100:.1f}%: 평균 {us_avg:+.2f}%, 승률 {us_wr:.1f}%, 점수 {best_us_score:.2f}")
+
+        for stop_pct in [0.035, 0.04, 0.05, 0.06, 0.07, 0.08]:
+            if abs(stop_pct - current_us_stop) < 0.001:
+                continue
+            if time.time() - optimize_started >= self.time_limit_seconds:
+                print("  시간 제한 도달, US 탐색 중단")
+                break
+            test_res = self.fetch_actual_performance(us_recs, stop_pct, use_us_params=True)
+            if not test_res:
+                continue
+            t_rets = [r['return_pct'] for r in test_res]
+            t_avg = sum(t_rets) / len(t_rets)
+            t_wr = len([r for r in t_rets if r > 0]) / len(t_rets) * 100
+            t_score = t_avg + max(t_wr - 45, 0) * 0.4
+            print(f"  US_TRAILING_STOP {stop_pct*100:.1f}%: 평균 {t_avg:+.2f}%, 승률 {t_wr:.1f}%, 점수 {t_score:.2f}")
+            if t_score > best_us_score:
+                best_us_score = t_score
+                best_us_stop = stop_pct
+
+        result_params = {}
+        if best_us_stop != current_us_stop:
+            print(f"  ✓ 최적 US_TRAILING_STOP_PCT: {current_us_stop*100:.1f}% → {best_us_stop*100:.1f}%")
+            result_params['US_TRAILING_STOP_PCT'] = best_us_stop
+        else:
+            print(f"  → 현재 US_TRAILING_STOP_PCT({current_us_stop*100:.1f}%) 유지")
+
+        # US TIER1_WIN_RATE 최적화
+        recs_with_perf_us = [r for r in us_current if r.get('stored_win_rate') is not None]
+        if len(recs_with_perf_us) >= 3:
+            current_us_tier1 = self.base_config.get('US_TIER1_WIN_RATE', 50)
+            best_us_tier1 = current_us_tier1
+            best_us_tier1_score = -9999
+            print(f"  [US TIER1_WIN_RATE 최적화]")
+            for threshold in [35, 40, 45, 50, 55, 60]:
+                if time.time() - optimize_started >= self.time_limit_seconds:
+                    break
+                selected = [r for r in recs_with_perf_us if r['stored_win_rate'] >= threshold]
+                if len(selected) < 2:
+                    continue
+                sel_rets = [r['return_pct'] for r in selected]
+                sel_avg = sum(sel_rets) / len(sel_rets)
+                sel_wr = len([r for r in sel_rets if r > 0]) / len(sel_rets) * 100
+                sel_score = sel_avg + max(sel_wr - 45, 0) * 0.4
+                marker = ' <-- 현재' if threshold == current_us_tier1 else ''
+                print(f"    >= {threshold}%: {len(selected)}개, 평균 {sel_avg:+.2f}%, 승률 {sel_wr:.1f}%, 점수 {sel_score:.2f}{marker}")
+                if sel_score > best_us_tier1_score:
+                    best_us_tier1_score = sel_score
+                    best_us_tier1 = threshold
+            if best_us_tier1 != current_us_tier1:
+                print(f"    ✓ US_TIER1_WIN_RATE: {current_us_tier1}% → {best_us_tier1}%")
+                result_params['US_TIER1_WIN_RATE'] = best_us_tier1
+            else:
+                print(f"    → 현재 US_TIER1_WIN_RATE({current_us_tier1}%) 유지")
+
+        return result_params
 
     # ------------------------------------------------------------------
     # 7. 점진적 학습 (Gradual Learning)
@@ -428,19 +632,25 @@ class StrategyOptimizer:
         """
         gradual_config = copy.deepcopy(old_config)
         
-        numeric_params = ['TRAILING_STOP_PCT', 'TREND_TEMPLATE_PEAK_FACTOR']
-        
+        numeric_params = [
+            'TRAILING_STOP_PCT', 'TREND_TEMPLATE_PEAK_FACTOR',
+            'US_TRAILING_STOP_PCT',
+        ]
+
         for param in numeric_params:
             if param in new_config and param in old_config:
                 old_val = old_config[param]
                 new_val = new_config[param]
-                
+
                 # 점진적 업데이트: 새값의 learning_rate만 반영
                 gradual_val = old_val * (1 - learning_rate) + new_val * learning_rate
                 gradual_config[param] = round(gradual_val, 4)
-        
+
         # 정수형 파라미터는 반올림
-        int_params = ['TIER1_WIN_RATE', 'TIER2_WIN_RATE', 'VALIDATE_MAX_HOLD_DAYS']
+        int_params = [
+            'TIER1_WIN_RATE', 'TIER2_WIN_RATE', 'VALIDATE_MAX_HOLD_DAYS',
+            'US_TIER1_WIN_RATE', 'US_TIER2_WIN_RATE', 'US_VALIDATE_MAX_HOLD_DAYS',
+        ]
         for param in int_params:
             if param in new_config and param in old_config:
                 old_val = old_config[param]
@@ -614,18 +824,28 @@ class StrategyOptimizer:
             print("\n[TIER1 승률 임계값 최적화]")
             print("  사전 승률 데이터 부족, 분석 생략")
 
-        # ── 6. 추가 파라미터 최적화 ──────────────────────────────────────
-        additional_params = self.optimize_additional_parameters(recs, optimize_started)
+        # ── 6. 추가 파라미터 최적화 (실제 구현) ─────────────────────────
+        additional_params = self.optimize_additional_parameters(recs, current_results, optimize_started)
+
+        # ── 6-B. US 주식 파라미터 최적화 ────────────────────────────────
+        us_params = self.optimize_us_parameters(optimize_started)
 
         # ── 7. 점진적 학습 적용 ──────────────────────────────────────────
         proposed_config = copy.deepcopy(self.base_config)
         proposed_config['TRAILING_STOP_PCT'] = best_stop
         proposed_config['TIER1_WIN_RATE'] = best_tier1
         proposed_config.update(additional_params)
+        proposed_config.update(us_params)
 
-        # 급격한 변경 방지 - 30%만 반영
-        print("\n[점진적 학습 적용]")
-        gradual_config = self.apply_gradual_learning(self.base_config, proposed_config, learning_rate=0.3)
+        # 샘플 수 기반 동적 learning_rate (샘플 많을수록 더 적극적 반영)
+        if len(recs) >= 30:
+            learning_rate = 0.4
+        elif len(recs) >= 15:
+            learning_rate = 0.3
+        else:
+            learning_rate = 0.15
+        print(f"\n[점진적 학습 적용] (샘플 {len(recs)}개 → learning_rate={learning_rate})")
+        gradual_config = self.apply_gradual_learning(self.base_config, proposed_config, learning_rate=learning_rate)
         
         # 실제 변경사항 확인
         changes = compute_config_changes(self.base_config, gradual_config)
