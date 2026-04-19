@@ -1,5 +1,7 @@
-// 이 파일은 사용하지 않습니다.
-// 모든 워크플로 스케줄 로직은 dispatch_optimize_workflow.gs 하나로 통합되었습니다.
+const GITHUB_OWNER = 'wansang';
+const GITHUB_REPO = 'finance';
+const WORKFLOW_FILE = 'analyze.yml';
+const GITHUB_PAT = PropertiesService.getScriptProperties().getProperty('GITHUB_PAT');
 
 // 한국 공휴일 리스트 (YYYY-MM-DD)
 const HOLIDAYS = [
