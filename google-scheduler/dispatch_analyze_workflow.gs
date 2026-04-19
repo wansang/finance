@@ -3,50 +3,10 @@ const GITHUB_REPO = 'finance';
 const WORKFLOW_FILE = 'analyze.yml';
 const GITHUB_PAT = PropertiesService.getScriptProperties().getProperty('GITHUB_PAT');
 
-// 한국 공휴일 리스트 (YYYY-MM-DD)
-const HOLIDAYS = [
-  // 2025
-  '2025-01-01', // 신정
-  '2025-01-28', // 설날
-  '2025-01-29', // 설날
-  '2025-01-30', // 설날
-  '2025-03-01', // 삼일절
-  '2025-05-05', // 어린이날
-  '2025-05-06', // 대체공휴일
-  '2025-05-13', // 석가탄신일
-  '2025-06-06', // 현충일
-  '2025-08-15', // 광복절
-  '2025-10-03', // 개천절
-  '2025-10-05', // 추석
-  '2025-10-06', // 추석
-  '2025-10-07', // 추석
-  '2025-10-08', // 대체공휴일
-  '2025-10-09', // 한글날
-  '2025-12-25', // 크리스마스
-  // 2026
-  '2026-01-01', // 신정
-  '2026-02-17', // 설날
-  '2026-02-18', // 설날
-  '2026-02-19', // 설날
-  '2026-03-01', // 삼일절
-  '2026-05-05', // 어린이날
-  '2026-05-06', // 대체공휴일
-  '2026-05-24', // 석가탄신일
-  '2026-06-06', // 현충일
-  '2026-08-15', // 광복절
-  '2026-09-24', // 추석
-  '2026-09-25', // 추석
-  '2026-09-26', // 추석
-  '2026-10-03', // 개천절
-  '2026-10-09', // 한글날
-  '2026-12-25', // 크리스마스
-];
-
+// Google 대한민국 공휴일 캘린더로 동적 체크 (수동 업데이트 불필요)
 function isHoliday(date) {
-  const dateStr = date.getFullYear() + '-' +
-                  String(date.getMonth() + 1).padStart(2, '0') + '-' +
-                  String(date.getDate()).padStart(2, '0');
-  return HOLIDAYS.includes(dateStr);
+  const cal = CalendarApp.getCalendarById('ko.south_korea#holiday@group.v.calendar.google.com');
+  return cal.getEventsForDay(date).length > 0;
 }
 
 function dispatchAnalyzeWorkflow() {
