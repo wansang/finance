@@ -10,7 +10,7 @@ class Backtester:
         self.data_cache = {}
         self.us_market_cache = {}
 
-    def _simulate_trade(self, df, target_idx, reasons, max_hold_days=None, config_override=None):
+    def _simulate_trade(self, df, target_idx, reasons, max_hold_days=None, config_override=None, market='KOSPI'):
         """
         단일 거래 시뮬레이션
         - 매수: 신호 다음날 시가 (현실적 진입 — 당일 종가 매수 비현실적 문제 해결)
@@ -50,7 +50,10 @@ class Backtester:
             if pd.notna(v) and float(v) > 0:
                 atr_val = float(v)
 
-        max_hard_stop = cfg.get('MAX_HARD_STOP_PCT', 0.07)
+        if market == 'US':
+            max_hard_stop = cfg.get('US_MAX_HARD_STOP_PCT', 0.05)
+        else:
+            max_hard_stop = cfg.get('MAX_HARD_STOP_PCT', 0.07)
         has_premium = any(s in reasons for s in ["RSI 반전 신호(상승 가능성)", "바닥권 반등 신호(BB 하단)"])
         if atr_val:
             hard_stop_pct = min(atr_stop_mult * atr_val / raw_buy, max_hard_stop)
@@ -198,6 +201,10 @@ class Backtester:
                 power_combo = has_divergence and has_taj_mahal
                 market_ok = market_uptrend or not market_filter or power_combo
 
+                # US는 항상 PowerCombo 필수
+                if market_name == 'US' and not power_combo:
+                    continue
+
                 if not ((is_elite and win_rate >= tier1 and market_ok) or (is_above_200 and win_rate >= tier2 and market_ok)):
                     continue
 
@@ -210,7 +217,7 @@ class Backtester:
                 else:
                     position_size = 0.5
 
-                ret, exit_reason, buy_price, sell_price = self._simulate_trade(df, target_idx, reasons, max_hold, config_override=cfg_override)
+                ret, exit_reason, buy_price, sell_price = self._simulate_trade(df, target_idx, reasons, max_hold, config_override=cfg_override, market=market_name)
                 sell_date = df.index[min(target_idx + 1 + max_hold, len(df) - 1)]
 
                 results.append({
