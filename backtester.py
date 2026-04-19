@@ -180,12 +180,18 @@ class Backtester:
                 if not reasons:
                     continue
 
-                win_rate, avg_ret = self.analyzer.validate_strategy(df, target_idx, config_override=cfg_override)
+                # ATR 변동성 필터: ATR이 주가의 6% 초과 종목 스킵 (너무 불안정)
                 last = df.iloc[target_idx]
+                max_atr_ratio = self.analyzer.config.get('MAX_ATR_RATIO', 0.06)
+                if 'ATR' in df.columns and pd.notna(last['ATR']) and last['Close'] > 0:
+                    if last['ATR'] / last['Close'] > max_atr_ratio:
+                        continue
+
+                win_rate, avg_ret = self.analyzer.validate_strategy(df, target_idx, config_override=cfg_override)
                 is_elite = self.analyzer.is_trend_template(df, target_idx)
                 is_above_200 = last['Close'] > last['SMA200']
-                tier1 = self.analyzer.config.get('US_TIER1_WIN_RATE', 45) if market_name == 'US' else self.analyzer.config.get('TIER1_WIN_RATE', 60)
-                tier2 = self.analyzer.config.get('US_TIER2_WIN_RATE', 40) if market_name == 'US' else self.analyzer.config.get('TIER2_WIN_RATE', 50)
+                tier1 = self.analyzer.config.get('US_TIER1_WIN_RATE', 50) if market_name == 'US' else self.analyzer.config.get('TIER1_WIN_RATE', 60)
+                tier2 = self.analyzer.config.get('US_TIER2_WIN_RATE', 45) if market_name == 'US' else self.analyzer.config.get('TIER2_WIN_RATE', 50)
 
                 has_divergence = "RSI 반전 신호(상승 가능성)" in reasons
                 has_taj_mahal = "바닥권 반등 신호(BB 하단)" in reasons
