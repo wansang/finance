@@ -113,6 +113,18 @@
         "CRWD",
         "ASML"
     ],
+    "US_SECTOR_TICKERS": [
+        "LLY", "PFE", "ABBV", "TMO", "DHR", "ISRG", "GILD", "BMY", "ABT", "MDT",
+        "BAC", "WFC", "BLK", "MS", "C", "SCHW", "AIG", "PGR",
+        "TGT", "LOW", "SBUX", "F", "GM", "BKNG",
+        "XOM", "COP", "SLB", "EOG", "OXY", "PSX",
+        "LMT", "RTX", "GE", "DE", "UPS", "FDX", "NOC", "EMR",
+        "T", "CMCSA", "NFLX",
+        "PEP", "CL", "MDLZ", "GIS", "KHC",
+        "LIN", "APD", "ECL", "NEM", "FCX",
+        "ORCL", "INTU", "NOW", "SNOW", "PLTR", "UBER", "TTD", "ZS", "DDOG",
+        "AMT", "PLD", "EQIX", "SPG"
+    ],
     "KOSPI_ETF_TICKERS": [
         "069500",
         "091170",

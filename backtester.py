@@ -94,9 +94,10 @@ class Backtester:
     def _load_us_candidates(self):
         dow_candidates = self.analyzer.config.get('US_DOW_TICKERS', [])
         nasdaq_candidates = self.analyzer.config.get('US_NASDAQ_TICKERS', [])
+        sector_candidates = self.analyzer.config.get('US_SECTOR_TICKERS', [])
         seen = set()
         candidates = []
-        for code in dow_candidates + nasdaq_candidates:
+        for code in dow_candidates + nasdaq_candidates + sector_candidates:
             token = str(code).strip().upper()
             if token and token not in seen:
                 seen.add(token)
@@ -438,6 +439,18 @@ class Backtester:
             cols = ['PeriodDate', 'Name', 'Return(%)', 'ExitReason']
         top10 = df_results.sort_values('Return(%)', ascending=False).head(10)[cols]
         print(top10.to_string(index=False))
+
+        # HardStop 손절 종목 상세
+        hardstop_df = df_results[df_results['ExitReason'].str.startswith('HardStop')]
+        if len(hardstop_df) > 0:
+            print(f"\n  [⚠️ HardStop 손절 종목 상세 ({len(hardstop_df)}건)]")
+            hs_cols = ['Name', 'Return(%)', 'ExitReason']
+            if 'PeriodDate' in hardstop_df.columns:
+                hs_cols = ['PeriodDate', 'Name', 'Market', 'Return(%)', 'ExitReason', 'Reasons']
+            elif 'Market' in hardstop_df.columns:
+                hs_cols = ['Name', 'Market', 'Return(%)', 'ExitReason', 'Reasons']
+            print(hardstop_df.sort_values('Return(%)')[hs_cols].to_string(index=False))
+
         print(f"{'='*60}")
 
 
