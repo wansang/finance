@@ -24,6 +24,7 @@ class Backtester:
             max_hold_days = cfg.get('VALIDATE_MAX_HOLD_DAYS', 20)
 
         trailing_stop = cfg.get('TRAILING_STOP_PCT', 0.035)
+        trailing_activate = cfg.get('TRAILING_STOP_ACTIVATE_PCT', 0.04)
         fallback_stop = abs(cfg.get('VALIDATE_STOP_LOSS_PCT', -0.05))
         fallback_target = cfg.get('PROFIT_TARGET_PCT', 0.08)
         atr_stop_mult = cfg.get('ATR_STOP_MULTIPLIER', 2.0)
@@ -77,7 +78,7 @@ class Backtester:
                 sell_raw = curr_p
                 exit_reason = f"Target({stop_label},+{profit_target_pct*100:.1f}%)"
                 break
-            if max_p > raw_buy and (max_p - curr_p) / max_p >= trailing_stop:
+            if max_p >= raw_buy * (1 + trailing_activate) and (max_p - curr_p) / max_p >= trailing_stop:
                 sell_raw = curr_p
                 exit_reason = f"TrailingStop({trailing_stop*100:.0f}%)"
                 break

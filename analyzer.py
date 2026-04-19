@@ -1267,6 +1267,7 @@ class StockAnalyzer:
         start_idx = max(cfg.get('VALIDATE_MIN_HISTORY', 200), current_idx - lookback)
         max_hold = cfg.get('VALIDATE_MAX_HOLD_DAYS', 20)
         trailing_stop = cfg.get('TRAILING_STOP_PCT', 0.035)
+        trailing_activate = cfg.get('TRAILING_STOP_ACTIVATE_PCT', 0.04)
         fallback_stop = abs(cfg.get('VALIDATE_STOP_LOSS_PCT', -0.05))
         fallback_target = cfg.get('PROFIT_TARGET_PCT', 0.08)
         atr_stop_mult = cfg.get('ATR_STOP_MULTIPLIER', 2.0)
@@ -1312,7 +1313,7 @@ class StockAnalyzer:
                     if pct_from_buy >= effective_target:
                         result = effective_target
                         break
-                    if max_p > buy_price and (max_p - curr_p) / max_p >= trailing_stop:
+                    if max_p >= buy_price * (1 + trailing_activate) and (max_p - curr_p) / max_p >= trailing_stop:
                         result = pct_from_buy
                         break
                     if j == buy_idx + max_hold:
