@@ -9,7 +9,15 @@ function isHoliday(date) {
 
 function dispatchAnalyzeWorkflow() {
   const kst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const day = kst.getDay();
 
+  // 주말(토/일) 제외
+  if (day === 0 || day === 6) {
+    Logger.log('[SKIP] 주말: ' + kst.toLocaleString('ko-KR'));
+    return;
+  }
+
+  // 공휴일 제외
   if (isHoliday(kst)) {
     Logger.log('[SKIP] 공휴일: ' + kst.toLocaleDateString('ko-KR'));
     return;
