@@ -13,7 +13,7 @@ class MarketMonitor:
         self.analyzer = StockAnalyzer()
         
     def _format_monitor_line(self, name, price_text, change_text, high_text, volume_text, detail):
-        high_segment = f", 조회시간 기준 최고가 {high_text}" if high_text else ""
+        high_segment = f", 당일최고가 {high_text}" if high_text else ""
         vol_segment = f", 거래량 {volume_text}" if volume_text else ""
         return f"- {name}: 현재가 {price_text} {change_text}{high_segment}{vol_segment}. {detail}"
 

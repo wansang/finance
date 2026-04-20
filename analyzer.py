@@ -253,6 +253,42 @@ class StockAnalyzer:
                 return df
         raise ValueError(f'Yahoo intraday data not available for {code}')
 
+    def _fetch_yahoo_meta(self, code, timeout=8):
+        """Yahoo Finance API에서 당일 최고가/거래량 등 메타 정보를 가져옵니다. 결과는 인스턴스 캐시에 저장됩니다."""
+        if not hasattr(self, '_yahoo_meta_cache'):
+            self._yahoo_meta_cache = {}
+        if code in self._yahoo_meta_cache:
+            return self._yahoo_meta_cache[code]
+        symbol = self._normalize_yahoo_symbol(code)
+        candidates = [symbol]
+        if symbol.endswith('.KS'):
+            alt = symbol.replace('.KS', '.KQ')
+            if alt != symbol:
+                candidates.append(alt)
+        for sym in candidates:
+            url = (
+                f'https://query2.finance.yahoo.com/v8/finance/chart/{sym}?'
+                f'range=1d&interval=1m&includePrePost=false'
+            )
+            try:
+                response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=timeout)
+                response.raise_for_status()
+                payload = response.json()
+                chart = payload.get('chart', {})
+                if chart.get('error'):
+                    continue
+                result = chart.get('result')
+                if not result:
+                    continue
+                meta = result[0].get('meta', {})
+                if meta:
+                    self._yahoo_meta_cache[code] = meta
+                    return meta
+            except Exception:
+                continue
+        self._yahoo_meta_cache[code] = {}
+        return {}
+
     def _is_kr_stock_code(self, code):
         token = str(code).upper()
         return token.isdigit() or token.endswith(('.KS', '.KQ'))
@@ -415,14 +451,19 @@ class StockAnalyzer:
         return None
 
     def get_intraday_high(self, code):
-        """조회 시점 기준 최고가를 가져옵니다."""
+        """오늘 기준 당일 최고가를 가져옵니다."""
+        timeout = self.config.get('INTRADAY_TIMEOUT', 8)
+
+        # Yahoo meta에서 당일 최고가 조회 (regularMarketDayHigh = 장중 포함 당일 전체 최고가)
         try:
-            df = self._fetch_intraday(code, timeout=self.config.get('INTRADAY_TIMEOUT', 8))
-            if not df.empty and 'High' in df.columns:
-                return float(df['High'].max())
+            meta = self._fetch_yahoo_meta(code, timeout=timeout)
+            day_high = meta.get('regularMarketDayHigh')
+            if day_high:
+                return float(day_high)
         except Exception:
             pass
 
+        # 폴백: fdr 일별 데이터에서 오늘 최고가 조회
         try:
             today = datetime.datetime.now().date()
             df = fdr.DataReader(code, start=today.strftime('%Y-%m-%d'))
@@ -437,13 +478,18 @@ class StockAnalyzer:
 
     def get_intraday_volume(self, code):
         """오늘 기준 누적 거래량을 가져옵니다."""
+        timeout = self.config.get('INTRADAY_TIMEOUT', 8)
+
+        # Yahoo meta에서 당일 누적 거래량 조회 (regularMarketVolume = 당일 실시간 누적 거래량)
         try:
-            df = self._fetch_intraday(code, timeout=self.config.get('INTRADAY_TIMEOUT', 8))
-            if not df.empty and 'Volume' in df.columns:
-                return int(df['Volume'].sum())
+            meta = self._fetch_yahoo_meta(code, timeout=timeout)
+            volume = meta.get('regularMarketVolume')
+            if volume is not None:
+                return int(volume)
         except Exception:
             pass
 
+        # 폴백: fdr 일별 데이터에서 오늘 거래량 조회
         try:
             today = datetime.datetime.now().date()
             df = fdr.DataReader(code, start=today.strftime('%Y-%m-%d'))
@@ -1065,18 +1111,18 @@ class StockAnalyzer:
         4. 최근 RSI가 과매도권(40 이하)에서 발생한 경우만 유효
         """
         df_target = df.iloc[:idx+1] if idx != -1 else df
-        if len(df_target) < 40: return False
+        if len(df_target) < 50: return False
         
         closes = df_target['Close'].values
         rsi_vals = df_target['RSI'].values
         
         # NaN 제거 확인
-        if any(v != v for v in rsi_vals[-40:]):  # NaN check
+        if any(v != v for v in rsi_vals[-50:]):  # NaN check
             return False
         
-        # 최근 40일에서 로컬 저점 찾기 (최소 5봉 간격)
-        recent_closes = closes[-40:]
-        recent_rsi = rsi_vals[-40:]
+        # 최근 50일에서 로컬 저점 찾기 (최소 5봉 간격)
+        recent_closes = closes[-50:]
+        recent_rsi = rsi_vals[-50:]
         
         local_lows = []
         for i in range(2, len(recent_closes) - 2):
@@ -1103,8 +1149,8 @@ class StockAnalyzer:
         if p2_rsi > 45:
             return False
         
-        # 두 번째 저점이 최근 10봉 이내여야 함 (타이밍 유효성)
-        if p2_idx < len(recent_closes) - 10:
+        # 두 번째 저점이 최근 12봉 이내여야 함 (타이밍 유효성)
+        if p2_idx < len(recent_closes) - 12:
             return False
         
         return True
@@ -1161,7 +1207,7 @@ class StockAnalyzer:
         
         # 조건 3: RSI 과매도 후 반등
         rsi_recent = df_target['RSI'].iloc[-5:].values
-        rsi_was_oversold = any(r <= 38 for r in rsi_recent if r == r)
+        rsi_was_oversold = any(r <= 40 for r in rsi_recent if r == r)
         rsi_rising = last['RSI'] > df_target['RSI'].iloc[-2]
         if not (rsi_was_oversold and rsi_rising):
             return False
@@ -1174,6 +1220,46 @@ class StockAnalyzer:
         if last['Close'] <= last['Open']:
             return False
         
+        return True
+
+    def detect_macd_golden_cross(self, df, idx=-1):
+        """MACD 골든크로스 감지 (MACD 선이 시그널 선을 상향 돌파)
+        
+        조건:
+        1. 직전봉: MACD < 시그널 (데드크로스 상태)
+        2. 현재봉: MACD > 시그널 (골든크로스 발생)
+        3. MACD 히스토그램이 0선 근처에서 발생 (강한 추세 반전 필터)
+        4. RSI가 50 이하 (과매도 회복 구간에서만 유효)
+        """
+        df_target = df.iloc[:idx+1] if idx != -1 else df
+        if len(df_target) < 3:
+            return False
+
+        for col in ['MACD', 'MACDs', 'MACDh', 'RSI']:
+            if col not in df_target.columns:
+                return False
+
+        last = df_target.iloc[-1]
+        prev = df_target.iloc[-2]
+
+        for val in [last['MACD'], last['MACDs'], prev['MACD'], prev['MACDs'], last['RSI']]:
+            if val != val:  # NaN
+                return False
+
+        # 골든크로스: 직전 MACD < 시그널, 현재 MACD > 시그널
+        cross_up = (float(prev['MACD']) < float(prev['MACDs'])) and (float(last['MACD']) > float(last['MACDs']))
+        if not cross_up:
+            return False
+
+        # MACD 히스토그램이 -0.5% 이내 (너무 깊은 음수 구간에서의 크로스 제외)
+        hist_threshold = float(last['Close']) * 0.005
+        if float(last['MACDh']) < -hist_threshold:
+            return False
+
+        # RSI 50 이하에서만 유효 (과매도 회복 구간)
+        if float(last['RSI']) > 55:
+            return False
+
         return True
 
     def detect_bb_squeeze(self, df, idx=-1):
@@ -1241,7 +1327,11 @@ class StockAnalyzer:
         # 6. Stochastic RSI & MFI 과매도 반등
         if self.detect_stoch_mfi_rebound(df, idx):
             reasons.append("과매도 반등 신호")
-            
+
+        # 7. MACD 골든크로스 (추세 반전 확인)
+        if self.detect_macd_golden_cross(df, idx):
+            reasons.append("MACD 골든크로스")
+
         return reasons
 
     def check_trailing_stop(self, df, buy_date, threshold=0.03):
