@@ -383,6 +383,31 @@ class Backtester:
         else:
             weighted_ret = avg_ret
 
+        # MDD (최대낙폭) — 매수날짜 순 누적 수익 기준
+        sort_col = 'BuyDate' if 'BuyDate' in df_results.columns else 'PeriodDate' if 'PeriodDate' in df_results.columns else None
+        sorted_r = df_results.sort_values(sort_col) if sort_col else df_results
+        rets_seq = sorted_r['Return(%)'].tolist()
+        equity = 0.0; peak_eq = 0.0; mdd = 0.0
+        for r in rets_seq:
+            equity += r
+            if equity > peak_eq:
+                peak_eq = equity
+            dd = peak_eq - equity
+            if dd > mdd:
+                mdd = dd
+
+        # Sharpe 비율 (무위험수익률 0% 가정)
+        std_ret = df_results['Return(%)'].std()
+        sharpe = avg_ret / std_ret if std_ret > 0 else 0.0
+
+        # 최대 연속 손실 횟수
+        loss_flags = [1 if r <= 0 else 0 for r in rets_seq]
+        max_consec = curr_c = 0
+        for lf in loss_flags:
+            curr_c = curr_c + 1 if lf else 0
+            if curr_c > max_consec:
+                max_consec = curr_c
+
         print(f"\n{'='*60}")
         print(f"  [{title} 종합 결과]")
         print(f"{'='*60}")
@@ -391,6 +416,7 @@ class Backtester:
         print(f"  평균 수익률:  {avg_ret:+.2f}%  (가중평균: {weighted_ret:+.2f}%)")
         print(f"  최고 수익:    {best['Return(%)']:+.2f}%  ({best['Name']})")
         print(f"  최저 수익:    {worst['Return(%)']:+.2f}%  ({worst['Name']})")
+        print(f"  MDD (최대낙폭): -{mdd:.2f}%p  |  Sharpe: {sharpe:.2f}  |  최대연속손실: {max_consec}연속")
         print(f"{'─'*60}")
 
         # 시장별

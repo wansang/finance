@@ -1276,7 +1276,19 @@ class StockAnalyzer:
         trades = []
         for i in range(start_idx, current_idx):
             reasons = self.check_signals(df, i)
-            if reasons and self.is_trend_template(df, i):
+            if not reasons:
+                continue
+            # Tier1(Trend Template) 또는 Tier2(SMA200 위) 모두 집계 — 실제 진입 로직과 정합
+            last_row = df.iloc[i]
+            is_elite = self.is_trend_template(df, i)
+            is_above_200 = (
+                'SMA200' in df.columns
+                and pd.notna(last_row.get('SMA200'))
+                and float(last_row['Close']) > float(last_row['SMA200'])
+            )
+            if not (is_elite or is_above_200):
+                continue
+            if True:  # 조건 통과
                 # 다음날 시가 매수 (현실적 진입 - 당일 종가 매수 비현실적 문제 해결)
                 buy_idx = i + 1
                 if buy_idx >= current_idx:
@@ -1327,13 +1339,16 @@ class StockAnalyzer:
         return win_rate, avg_ret
 
     def _is_market_in_uptrend(self, index_df, target_idx=None):
-        """시장 지수가 SMA200 위에 있는지 확인 (상승장 판단)"""
+        """시장 지수가 SMA200 위이며 20일 모멘텀 양수인지 확인 (상승장 판단)"""
         try:
             df = index_df.iloc[:target_idx+1] if target_idx is not None else index_df
             if len(df) < 200:
                 return True  # 데이터 부족 시 필터 미적용
             sma200 = df['Close'].rolling(200).mean().iloc[-1]
-            return float(df['Close'].iloc[-1]) > float(sma200)
+            above_sma200 = float(df['Close'].iloc[-1]) > float(sma200)
+            # 20일 모멘텀: 현재가 > 20일 전 종가 (추세 방향 확인)
+            momentum_ok = float(df['Close'].iloc[-1]) > float(df['Close'].iloc[-21]) if len(df) >= 21 else True
+            return above_sma200 and momentum_ok
         except Exception:
             return True
 
