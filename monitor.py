@@ -12,9 +12,10 @@ class MarketMonitor:
     def __init__(self):
         self.analyzer = StockAnalyzer()
         
-    def _format_monitor_line(self, name, price_text, change_text, high_text, detail):
+    def _format_monitor_line(self, name, price_text, change_text, high_text, volume_text, detail):
         high_segment = f", 조회시간 기준 최고가 {high_text}" if high_text else ""
-        return f"- {name}: 현재가 {price_text} {change_text}{high_segment}. {detail}"
+        vol_segment = f", 거래량 {volume_text}" if volume_text else ""
+        return f"- {name}: 현재가 {price_text} {change_text}{high_segment}{vol_segment}. {detail}"
 
     def run(self):
         import sys
@@ -72,6 +73,8 @@ class MarketMonitor:
                 change_text = self.analyzer.format_price_change(current_price, prev_price, code)
                 high_price = self.analyzer.get_intraday_high(code)
                 high_text = self.analyzer.format_price(high_price, code) if high_price is not None else None
+                volume = self.analyzer.get_intraday_volume(code)
+                volume_text = self.analyzer.format_volume(volume, code)
 
                 if triggered:
                     status = "매도 권장"
@@ -90,6 +93,7 @@ class MarketMonitor:
                         price_text,
                         change_text,
                         high_text,
+                        volume_text,
                         f"수익률 {profit_pct:+.2f}%, 상태: {status}. 이유: {reason}"
                     )
                 )
@@ -115,6 +119,8 @@ class MarketMonitor:
                 change_text = self.analyzer.format_price_change(current_price, prev_price, code)
                 high_price = self.analyzer.get_intraday_high(code)
                 high_text = self.analyzer.format_price(high_price, code) if high_price is not None else None
+                volume = self.analyzer.get_intraday_volume(code)
+                volume_text = self.analyzer.format_volume(volume, code)
 
                 reasons = self.analyzer.check_signals(df, -1)
                 if reasons:
@@ -127,6 +133,7 @@ class MarketMonitor:
                         price_text,
                         change_text,
                         high_text,
+                        volume_text,
                         f"신호: {sig_text}"
                     )
                 )

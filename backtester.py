@@ -200,10 +200,11 @@ class Backtester:
                 has_divergence = "RSI 반전 신호(상승 가능성)" in reasons
                 has_taj_mahal = "바닥권 반등 신호(BB 하단)" in reasons
                 power_combo = has_divergence and has_taj_mahal
-                market_ok = market_uptrend or not market_filter or power_combo
+                has_either_signal = has_divergence or has_taj_mahal  # 하락장 완화 조건
+                market_ok = market_uptrend or not market_filter or has_either_signal
 
-                # US는 항상 PowerCombo 필수
-                if market_name == 'US' and not power_combo:
+                # US는 핵심 신호(RSI 다이버전스 또는 BB 하단) 중 하나 이상 필수
+                if market_name == 'US' and not has_either_signal:
                     continue
 
                 if not ((is_elite and win_rate >= tier1 and market_ok) or (is_above_200 and win_rate >= tier2 and market_ok)):
@@ -383,22 +384,25 @@ class Backtester:
         else:
             weighted_ret = avg_ret
 
-        # MDD (최대낙폭) — 매수날짜 순 누적 수익 기준
+        # MDD (최대낙폭) — 복리 자본곡선 기반 (단순 합산 → 과소평가 문제 수정)
         sort_col = 'BuyDate' if 'BuyDate' in df_results.columns else 'PeriodDate' if 'PeriodDate' in df_results.columns else None
         sorted_r = df_results.sort_values(sort_col) if sort_col else df_results
         rets_seq = sorted_r['Return(%)'].tolist()
-        equity = 0.0; peak_eq = 0.0; mdd = 0.0
+        equity = 1.0; peak_eq = 1.0; mdd = 0.0
         for r in rets_seq:
-            equity += r
+            equity *= (1 + r / 100)
             if equity > peak_eq:
                 peak_eq = equity
-            dd = peak_eq - equity
+            dd = (peak_eq - equity) / peak_eq * 100
             if dd > mdd:
                 mdd = dd
 
-        # Sharpe 비율 (무위험수익률 0% 가정)
+        # Sharpe 비율 (연율화 적용, 한국 무위험수익률 3.5% 반영)
         std_ret = df_results['Return(%)'].std()
-        sharpe = avg_ret / std_ret if std_ret > 0 else 0.0
+        avg_hold = self.analyzer.config.get('VALIDATE_MAX_HOLD_DAYS', 20)
+        annual_factor = (250 / max(avg_hold, 1)) ** 0.5
+        risk_free_per_trade = 3.5 / (250 / max(avg_hold, 1))
+        sharpe = ((avg_ret - risk_free_per_trade) / std_ret * annual_factor) if std_ret > 0 else 0.0
 
         # 최대 연속 손실 횟수
         loss_flags = [1 if r <= 0 else 0 for r in rets_seq]
@@ -416,7 +420,7 @@ class Backtester:
         print(f"  평균 수익률:  {avg_ret:+.2f}%  (가중평균: {weighted_ret:+.2f}%)")
         print(f"  최고 수익:    {best['Return(%)']:+.2f}%  ({best['Name']})")
         print(f"  최저 수익:    {worst['Return(%)']:+.2f}%  ({worst['Name']})")
-        print(f"  MDD (최대낙폭): -{mdd:.2f}%p  |  Sharpe: {sharpe:.2f}  |  최대연속손실: {max_consec}연속")
+        print(f"  MDD (최대낙폭): -{mdd:.2f}%  |  Sharpe(연율화): {sharpe:.2f}  |  최대연속손실: {max_consec}연속")
         print(f"{'─'*60}")
 
         # 시장별

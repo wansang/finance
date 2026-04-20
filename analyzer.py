@@ -435,6 +435,37 @@ class StockAnalyzer:
 
         return None
 
+    def get_intraday_volume(self, code):
+        """오늘 기준 누적 거래량을 가져옵니다."""
+        try:
+            df = self._fetch_intraday(code, timeout=self.config.get('INTRADAY_TIMEOUT', 8))
+            if not df.empty and 'Volume' in df.columns:
+                return int(df['Volume'].sum())
+        except Exception:
+            pass
+
+        try:
+            today = datetime.datetime.now().date()
+            df = fdr.DataReader(code, start=today.strftime('%Y-%m-%d'))
+            if not df.empty:
+                same_day = df[df.index.date == today]
+                if not same_day.empty and 'Volume' in same_day.columns:
+                    return int(same_day['Volume'].sum())
+        except Exception:
+            pass
+
+        return None
+
+    def format_volume(self, volume, code):
+        """거래량을 읽기 좋은 형식으로 변환합니다."""
+        if volume is None:
+            return None
+        if volume >= 100_000_000:
+            return f"{volume / 100_000_000:.1f}억주"
+        if volume >= 10_000:
+            return f"{volume / 10_000:.1f}만주"
+        return f"{volume:,}주"
+
     def fetch_price_history(self, code, start=None, end=None):
         """기존 일별 시세를 그대로 호출하는 헬퍼."""
         return fdr.DataReader(code, start=start, end=end)
@@ -1428,7 +1459,7 @@ class StockAnalyzer:
                 has_divergence = "RSI 반전 신호(상승 가능성)" in reasons
                 has_taj_mahal = "바닥권 반등 신호(BB 하단)" in reasons
                 power_combo = has_divergence and has_taj_mahal
-                
+                has_either_signal = has_divergence or has_taj_mahal  # 하락장 완화 조건
                 effective_min_signals = 1 if power_combo else min_signals
                 tier1_quality = (
                     len(reasons) >= effective_min_signals and
@@ -1436,8 +1467,8 @@ class StockAnalyzer:
                     (avg_vol >= min_vol or min_vol <= 0)
                 )
                 
-                # 시장 필터: 하락장에서는 power_combo만 Tier1 허용, 나머지는 Tier2로 강등
-                market_ok = kospi_uptrend or not market_filter or power_combo
+                # 시장 필터: 하락장에서는 RSI 다이버전스 또는 BB 하단 중 하나 이상 필요
+                market_ok = kospi_uptrend or not market_filter or has_either_signal
 
                 is_tier1 = is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality and market_ok
                 # 포지션 사이징: PowerCombo 1.5배, Tier1 1.0배, Tier2/3 0.5배
@@ -1506,13 +1537,14 @@ class StockAnalyzer:
                 has_divergence = "RSI 반전 신호(상승 가능성)" in reasons
                 has_taj_mahal = "바닥권 반등 신호(BB 하단)" in reasons
                 power_combo = has_divergence and has_taj_mahal
+                has_either_signal = has_divergence or has_taj_mahal  # 하락장 완화 조건
                 effective_min_signals = 1 if power_combo else min_signals
                 tier1_quality = (
                     len(reasons) >= effective_min_signals and
                     rs_score >= min_rs and
                     (avg_vol >= min_vol or min_vol <= 0)
                 )
-                market_ok = kospi_uptrend or not market_filter or power_combo
+                market_ok = kospi_uptrend or not market_filter or has_either_signal
                 is_tier1 = is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality and market_ok
                 if power_combo:
                     position_size = 1.5
