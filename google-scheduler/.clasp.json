@@ -1,0 +1,16 @@
+{
+  "scriptId": "1OvP_mxtAJK-wBj97inirjYERgtAIQrIzBPqP5LwqE0QpmqX1Ll2KvXN0",
+  "rootDir": "analyze",
+  "scriptExtensions": [
+    ".js",
+    ".gs"
+  ],
+  "htmlExtensions": [
+    ".html"
+  ],
+  "jsonExtensions": [
+    ".json"
+  ],
+  "filePushOrder": [],
+  "skipSubdirectories": false
+}
