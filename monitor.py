@@ -87,6 +87,13 @@ class MarketMonitor:
                     else:
                         reason = "현재는 손실 구간이나 매도 기준에는 미달하여 추가 관찰이 필요합니다."
 
+                high_52w = self.analyzer.get_52week_high(code)
+                near_high_label = ""
+                if high_52w and current_price >= high_52w * 0.98:
+                    if current_price >= high_52w:
+                        near_high_label = " 📈 52주 신고가 돌파!"
+                    else:
+                        near_high_label = " 📈 52주 신고가 근접"
                 holding_data.append(
                     self._format_monitor_line(
                         name,
@@ -94,7 +101,7 @@ class MarketMonitor:
                         change_text,
                         high_text,
                         volume_text,
-                        f"수익률 {profit_pct:+.2f}%, 상태: {status}. 이유: {reason}"
+                        f"수익률 {profit_pct:+.2f}%, 상태: {status}. 이유: {reason}{near_high_label}"
                     )
                 )
             except Exception:
@@ -127,6 +134,13 @@ class MarketMonitor:
                     sig_text = " / ".join(reasons)
                 else:
                     sig_text = "현재 매수 신호는 없습니다."
+                high_52w = self.analyzer.get_52week_high(code)
+                near_high_label = ""
+                if high_52w and current_price >= high_52w * 0.98:
+                    if current_price >= high_52w:
+                        near_high_label = " 📈 52주 신고가 돌파!"
+                    else:
+                        near_high_label = " 📈 52주 신고가 근접"
                 watch_data.append(
                     self._format_monitor_line(
                         name,
@@ -134,7 +148,7 @@ class MarketMonitor:
                         change_text,
                         high_text,
                         volume_text,
-                        f"신호: {sig_text}"
+                        f"신호: {sig_text}{near_high_label}"
                     )
                 )
             except Exception:

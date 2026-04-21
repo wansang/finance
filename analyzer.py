@@ -476,6 +476,17 @@ class StockAnalyzer:
 
         return None
 
+    def get_52week_high(self, code):
+        """Yahoo Finance 메타에서 52주 신고가를 가져옵니다. 캐시 재사용."""
+        try:
+            meta = self._fetch_yahoo_meta(code)
+            val = meta.get('fiftyTwoWeekHigh')
+            if val:
+                return float(val)
+        except Exception:
+            pass
+        return None
+
     def get_intraday_volume(self, code):
         """오늘 기준 누적 거래량을 가져옵니다."""
         timeout = self.config.get('INTRADAY_TIMEOUT', 8)
