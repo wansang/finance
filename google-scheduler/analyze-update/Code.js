@@ -3,19 +3,21 @@ const GITHUB_REPO = 'finance';
 const WORKFLOW_FILE = 'optimize.yml';
 
 function dispatchOptimizeWorkflow() {
-  const kst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-  const day = kst.getDay();
-  const hour = kst.getHours();
+  const now = new Date();
+  // GAS에서 안전한 KST 요일/시간 계산 (Utilities.formatDate 사용)
+  const kstDay = parseInt(Utilities.formatDate(now, 'Asia/Seoul', 'u')); // 1=월 ... 6=토, 7=일
+  const kstHour = parseInt(Utilities.formatDate(now, 'Asia/Seoul', 'H'));
+  const kstLabel = Utilities.formatDate(now, 'Asia/Seoul', 'yyyy-MM-dd HH:mm');
 
-  // 토요일(6)만 실행
-  if (day !== 6) {
-    Logger.log('[SKIP] 토요일 아님: ' + kst.toLocaleString('ko-KR'));
+  // 토요일(u=6)만 실행
+  if (kstDay !== 6) {
+    Logger.log('[SKIP] 토요일 아님: ' + kstLabel);
     return;
   }
 
   // 오전 10~11시 사이만 실행
-  if (hour < 10 || hour >= 11) {
-    Logger.log('[SKIP] 실행 시간 외 (' + hour + '시): ' + kst.toLocaleString('ko-KR'));
+  if (kstHour < 10 || kstHour >= 11) {
+    Logger.log('[SKIP] 실행 시간 외 (' + kstHour + '시): ' + kstLabel);
     return;
   }
 
@@ -42,9 +44,9 @@ function dispatchOptimizeWorkflow() {
     const code = response.getResponseCode();
     const body = response.getContentText();
     if (code === 204) {
-      Logger.log('[OK] Optimize 워크플로 트리거 성공: ' + kst.toLocaleString('ko-KR'));
+      Logger.log('[OK] Optimize 워크플로 트리거 성공: ' + kstLabel);
     } else {
-      Logger.log('[ERROR] 응답코드: ' + code + ' / ' + body);
+      Logger.log('[ERROR] ' + kstLabel + ' 응답코드: ' + code + ' / ' + body);
     }
   } catch (e) {
     Logger.log('[EXCEPTION] ' + e.message);

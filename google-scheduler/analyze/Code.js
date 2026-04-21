@@ -8,18 +8,21 @@ function isHoliday(date) {
 }
 
 function dispatchAnalyzeWorkflow() {
-  const kst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-  const day = kst.getDay();
+  const now = new Date();
+  // GAS에서 안전한 KST 요일/시간 계산 (Utilities.formatDate 사용)
+  const kstDay = parseInt(Utilities.formatDate(now, 'Asia/Seoul', 'u')); // 1=월 ... 6=토, 7=일
+  const kstDateObj = new Date(Utilities.formatDate(now, 'Asia/Seoul', 'yyyy/MM/dd'));
+  const kstLabel = Utilities.formatDate(now, 'Asia/Seoul', 'yyyy-MM-dd HH:mm');
 
   // 주말(토/일) 제외
-  if (day === 0 || day === 6) {
-    Logger.log('[SKIP] 주말: ' + kst.toLocaleString('ko-KR'));
+  if (kstDay === 6 || kstDay === 7) {
+    Logger.log('[SKIP] 주말: ' + kstLabel);
     return;
   }
 
   // 공휴일 제외
-  if (isHoliday(kst)) {
-    Logger.log('[SKIP] 공휴일: ' + kst.toLocaleDateString('ko-KR'));
+  if (isHoliday(kstDateObj)) {
+    Logger.log('[SKIP] 공휴일: ' + kstLabel);
     return;
   }
 
@@ -46,9 +49,9 @@ function dispatchAnalyzeWorkflow() {
     const code = response.getResponseCode();
     const body = response.getContentText();
     if (code === 204) {
-      Logger.log('[OK] Analyze 워크플로 트리거 성공: ' + kst.toLocaleString('ko-KR'));
+      Logger.log('[OK] Analyze 워크플로 트리거 성공: ' + kstLabel);
     } else {
-      Logger.log('[ERROR] 응답코드: ' + code + ' / ' + body);
+      Logger.log('[ERROR] ' + kstLabel + ' 응답코드: ' + code + ' / ' + body);
     }
   } catch (e) {
     Logger.log('[EXCEPTION] ' + e.message);
