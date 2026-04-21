@@ -12,10 +12,11 @@ class MarketMonitor:
     def __init__(self):
         self.analyzer = StockAnalyzer()
         
-    def _format_monitor_line(self, name, price_text, change_text, high_text, volume_text, detail):
+    def _format_monitor_line(self, name, price_text, change_text, high_text, volume_text, detail, high_52w_text=None):
         high_segment = f", 당일최고가 {high_text}" if high_text else ""
+        high_52w_segment = f", 52주신고가 {high_52w_text}" if high_52w_text else ""
         vol_segment = f", 거래량 {volume_text}" if volume_text else ""
-        return f"- {name}: 현재가 {price_text} {change_text}{high_segment}{vol_segment}. {detail}"
+        return f"- {name}: 현재가 {price_text} {change_text}{high_segment}{high_52w_segment}{vol_segment}. {detail}"
 
     def run(self):
         import sys
@@ -88,6 +89,7 @@ class MarketMonitor:
                         reason = "현재는 손실 구간이나 매도 기준에는 미달하여 추가 관찰이 필요합니다."
 
                 high_52w = self.analyzer.get_52week_high(code)
+                high_52w_text = self.analyzer.format_price(high_52w, code) if high_52w is not None else None
                 near_high_label = ""
                 if high_52w and current_price >= high_52w * 0.98:
                     if current_price >= high_52w:
@@ -101,7 +103,8 @@ class MarketMonitor:
                         change_text,
                         high_text,
                         volume_text,
-                        f"수익률 {profit_pct:+.2f}%, 상태: {status}. 이유: {reason}{near_high_label}"
+                        f"수익률 {profit_pct:+.2f}%, 상태: {status}. 이유: {reason}{near_high_label}",
+                        high_52w_text=high_52w_text
                     )
                 )
             except Exception:
@@ -135,6 +138,7 @@ class MarketMonitor:
                 else:
                     sig_text = "현재 매수 신호는 없습니다."
                 high_52w = self.analyzer.get_52week_high(code)
+                high_52w_text = self.analyzer.format_price(high_52w, code) if high_52w is not None else None
                 near_high_label = ""
                 if high_52w and current_price >= high_52w * 0.98:
                     if current_price >= high_52w:
@@ -148,7 +152,8 @@ class MarketMonitor:
                         change_text,
                         high_text,
                         volume_text,
-                        f"신호: {sig_text}{near_high_label}"
+                        f"신호: {sig_text}{near_high_label}",
+                        high_52w_text=high_52w_text
                     )
                 )
             except Exception:
