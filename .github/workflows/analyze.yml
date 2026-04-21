@@ -34,6 +34,6 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: "Automated update of analysis results [skip ci]"
-          file_pattern: 'holdings.json recommendations.csv'
+          file_pattern: 'holdings.json recommendations.csv watchlist.json'
           branch: main
           push_options: '--force'
