@@ -495,7 +495,7 @@ class StockAnalyzer:
         try:
             meta = self._fetch_yahoo_meta(code, timeout=timeout)
             volume = meta.get('regularMarketVolume')
-            if volume is not None:
+            if volume is not None and int(volume) > 0:
                 return int(volume)
         except Exception:
             pass
@@ -507,7 +507,9 @@ class StockAnalyzer:
             if not df.empty:
                 same_day = df[df.index.date == today]
                 if not same_day.empty and 'Volume' in same_day.columns:
-                    return int(same_day['Volume'].sum())
+                    vol = int(same_day['Volume'].sum())
+                    if vol > 0:
+                        return vol
         except Exception:
             pass
 
