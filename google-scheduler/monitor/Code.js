@@ -2,38 +2,16 @@ const GITHUB_OWNER = 'wansang';
 const GITHUB_REPO = 'finance';
 const WORKFLOW_FILE = 'monitor.yml';
 
-// Google 대한민국 공휴일 캘린더로 동적 체크 (수동 업데이트 불필요)
-function isHoliday(date) {
-  try {
-    const cal = CalendarApp.getCalendarById('ko.south_korea#holiday@group.v.calendar.google.com');
-    if (!cal) {
-      Logger.log('[WARN] 공휴일 캘린더를 찾을 수 없습니다. 공휴일 체크를 건너뜁니다.');
-      return false;
-    }
-    return cal.getEventsForDay(date).length > 0;
-  } catch (e) {
-    Logger.log('[WARN] 공휴일 체크 중 오류: ' + e.message + '. 공휴일 체크를 건너뜁니다.');
-    return false;
-  }
-}
-
 function dispatchMonitorWorkflow() {
   const now = new Date();
   // GAS에서 안전한 KST 요일/시간 계산 (Utilities.formatDate 사용)
   const kstDay = parseInt(Utilities.formatDate(now, 'Asia/Seoul', 'u')); // 1=월 ... 6=토, 7=일
   const kstHour = parseInt(Utilities.formatDate(now, 'Asia/Seoul', 'H'));
-  const kstDateObj = new Date(Utilities.formatDate(now, 'Asia/Seoul', 'yyyy/MM/dd'));
   const kstLabel = Utilities.formatDate(now, 'Asia/Seoul', 'yyyy-MM-dd HH:mm');
 
-  // 평일(월-금)만 실행
+  // 평일(월-금)만 실행 (공휴일은 Python monitor.py에서 holidays 패키지로 처리)
   if (kstDay === 6 || kstDay === 7) {
     Logger.log('[SKIP] 주말: ' + kstLabel);
-    return;
-  }
-
-  // 공휴일 제외
-  if (isHoliday(kstDateObj)) {
-    Logger.log('[SKIP] 공휴일: ' + kstLabel);
     return;
   }
 
