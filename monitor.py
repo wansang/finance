@@ -110,14 +110,19 @@ class MarketMonitor:
             except Exception:
                 holding_data.append(f"- {code}: 분석 오류")
 
-        # 3. 관심 종목 데이터 수집
+        # 3. 관심 종목 데이터 수집 (일반 관심종목 / AI 추천 관심종목 분리)
         watch_data = []
+        ai_watch_data = []
         for code, info in watchlist.items():
             try:
                 name = info.get('name', code)
-                df = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=100)).strftime('%Y-%m-%d'))
+                is_ai_recommended = info.get('source') == 'auto_recommendation'
+
+                # AI 추천 종목은 승률/수익률 계산을 위해 더 많은 데이터 필요
+                fetch_days = 400 if is_ai_recommended else 100
+                df = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=fetch_days)).strftime('%Y-%m-%d'))
                 df = self.analyzer.get_indicators(df)
-                
+
                 latest_price = self.analyzer.get_latest_price(code)
                 if latest_price:
                     current_price = latest_price['last']
@@ -145,30 +150,56 @@ class MarketMonitor:
                         near_high_label = " 📈 52주 신고가 돌파!"
                     else:
                         near_high_label = " 📈 52주 신고가 근접"
-                watch_data.append(
-                    self._format_monitor_line(
-                        name,
-                        price_text,
-                        change_text,
-                        high_text,
-                        volume_text,
-                        f"신호: {sig_text}{near_high_label}",
-                        high_52w_text=high_52w_text
+
+                if is_ai_recommended:
+                    # Tier 1 지표 추가 계산 (승률 / 평균수익률)
+                    win_rate, avg_ret = self.analyzer.validate_strategy(df, len(df) - 1)
+                    add_date = info.get('add_date', '')
+                    detail = (
+                        f"신호: {sig_text}, 승률: {win_rate:.1f}%, "
+                        f"평균수익률: {avg_ret:+.2f}%, 추가일: {add_date}{near_high_label}"
                     )
-                )
+                    ai_watch_data.append(
+                        self._format_monitor_line(
+                            name,
+                            price_text,
+                            change_text,
+                            high_text,
+                            volume_text,
+                            detail,
+                            high_52w_text=high_52w_text
+                        )
+                    )
+                else:
+                    watch_data.append(
+                        self._format_monitor_line(
+                            name,
+                            price_text,
+                            change_text,
+                            high_text,
+                            volume_text,
+                            f"신호: {sig_text}{near_high_label}",
+                            high_52w_text=high_52w_text
+                        )
+                    )
             except Exception:
-                watch_data.append(f"- {code}: 분석 오류")
+                if info.get('source') == 'auto_recommendation':
+                    ai_watch_data.append(f"- {code}: 분석 오류")
+                else:
+                    watch_data.append(f"- {code}: 분석 오류")
 
         # 4. AI 리포트 생성
         market_section = sentiment_msg.strip()
         holding_section = "\n\n".join(holding_data) if holding_data else "없음"
         watch_section = "\n\n".join(watch_data) if watch_data else "없음"
+        ai_watch_section = "\n\n".join(ai_watch_data) if ai_watch_data else "없음"
 
         final_report = self.analyzer.ask_ai_report(
             market_data=market_section,
             holding_data=holding_section,
             watch_data=watch_section,
-            report_mode="monitor"
+            report_mode="monitor",
+            ai_watch_data=ai_watch_section
         )
         
         final_report = "🕒 <b>[실시간 모니터링 알림]</b>\n\n" + final_report.strip()

@@ -477,12 +477,21 @@ class StockAnalyzer:
         return None
 
     def get_52week_high(self, code):
-        """Yahoo Finance 메타에서 52주 신고가를 가져옵니다. 캐시 재사용."""
+        """Yahoo Finance 메타에서 52주 신고가를 가져옵니다. 캐시 재사용.
+        장중에 신고가를 돌파한 경우 Yahoo는 종가 확정 전까지 업데이트하지 않으므로,
+        현재가·당일최고가와 비교해 가장 큰 값을 반환합니다."""
         try:
             meta = self._fetch_yahoo_meta(code)
-            val = meta.get('fiftyTwoWeekHigh')
-            if val:
-                return float(val)
+            candidates = []
+            for key in ('fiftyTwoWeekHigh', 'regularMarketPrice', 'regularMarketDayHigh'):
+                val = meta.get(key)
+                if val:
+                    try:
+                        candidates.append(float(val))
+                    except (TypeError, ValueError):
+                        pass
+            if candidates:
+                return max(candidates)
         except Exception:
             pass
         return None
@@ -850,7 +859,7 @@ class StockAnalyzer:
         except Exception as e:
             return f"⚠️ 시장 분석 오류: {e}", False
 
-    def build_local_report(self, market_data, holding_data, watch_data, report_mode="monitor"):
+    def build_local_report(self, market_data, holding_data, watch_data, report_mode="monitor", ai_watch_data=None):
         """AI 미사용 시에도 읽기 쉬운 로컬 요약 리포트를 생성"""
         header = "🤖 자동 기술적 분석 리포트 (로컬 요약)"
         if report_mode == "monitor":
@@ -865,6 +874,8 @@ class StockAnalyzer:
             sections.extend(["[보유 종목]", holding_data.strip()])
         if watch_data:
             sections.extend([f"[{watch_label}]", watch_data.strip()])
+        if report_mode == "monitor" and ai_watch_data and ai_watch_data.strip() != "없음":
+            sections.extend(["[AI 추천 관심종목]", ai_watch_data.strip()])
 
         return "\n\n".join(sections).strip()
 
@@ -925,12 +936,13 @@ class StockAnalyzer:
                 return text.strip()
         return None
 
-    def ask_ai_report(self, market_data, holding_data, watch_data, report_mode="monitor"):
+    def ask_ai_report(self, market_data, holding_data, watch_data, report_mode="monitor", ai_watch_data=None):
         """Gemini AI를 사용하여 주식 전문가 스타일의 한글 리포트 생성"""
         if not self.model:
-            return self.build_local_report(market_data, holding_data, watch_data, report_mode)
+            return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data)
 
         if report_mode == "monitor":
+            ai_watch_section_text = ai_watch_data if ai_watch_data else "없음"
             prompt = f"""
 주식 투자 전문가로서 아래 데이터를 바탕으로 30분 단위 실시간 모니터링 리포트를 작성해줘.
 
@@ -938,11 +950,12 @@ class StockAnalyzer:
 1. 시장 상황: {market_data}
 2. 보유 종목 상태: {holding_data}
 3. 관심 종목 상태: {watch_data}
+4. AI 추천 관심종목 상태: {ai_watch_section_text}
 
 [작성 가이드라인]
 - **어투**: 신뢰감 있고 친숙한 한국어 존댓말로 작성해줘.
 - **언어 제약**: 영어 표현과 전문 용어를 쓰지 말고, 쉬운 한국어로 풀어 설명해줘.
-- **중요**: 보유 종목과 관심 종목 정보를 명확히 구분해서 작성해줘. 각 섹션은 분리되어 있어야 하며, 제목을 지나치게 생략하지 말고 구분이 쉽게 유지되도록 해줘.
+- **중요**: 보유 종목, 관심 종목, AI 추천 관심종목 정보를 명확히 구분해서 작성해줘. 각 섹션은 분리되어 있어야 하며, 제목을 지나치게 생략하지 말고 구분이 쉽게 유지되도록 해줘.
 - **핵심 요구**: 각 종목에 대한 설명에 반드시 입력된 `현재가`, `등락가`, `등락율`, `당일최고가`, `52주신고가`, `거래량` 수치를 포함해줘. `당일최고가`는 오늘 장중 기록한 최고가이고, `52주신고가`는 최근 1년간의 최고가야. 이 두 가지를 혼동하지 말고 각각 명확히 구분해서 표시해줘. 전달된 숫자를 변경하지 말고, 가능한 한 그대로 반영해서 작성해줘. 데이터가 없으면 생략해도 되지만, 있으면 반드시 넣어줘.
 - **신고가 해석**: 데이터에 '52주 신고가 돌파' 또는 '52주 신고가 근접' 표시가 있는 종목은 반드시 이를 언급하고, 신고가 돌파/근접이 갖는 의미(추가 상승 모멘텀 가능성, 또는 차익실현 압력 등)를 한 문장으로 설명해줘.
 - **추가 요구**: 시장에서 특정 업종/그룹(예: 반도체, 전기차/테슬라, 방산, 2차전지/배터리, 유가/원자재)이 함께 움직이고 있다면 그 배경을 함께 설명해줘.
@@ -950,6 +963,7 @@ class StockAnalyzer:
   1. 현재 시장의 분위기를 한 문단으로 정리해줘.
   2. [보유 종목] 섹션을 만들어서, 각 종목에 대해 왜 매도/보유 판단을 했는지 설명해줘.
   3. [관심 종목] 섹션을 만들어서, 각 종목에 대해 왜 기다려야 하는지 또는 주의할 점을 설명해줘.
+  4. [AI 추천 관심종목] 섹션을 만들어서, AI가 선별한 1티어 종목들의 현재 상태를 설명해줘. 승률과 평균수익률 데이터를 반드시 언급하고, 현재 매수 신호 여부와 주의할 점을 설명해줘.
 - **표현 금지**: '트레일링 스톱', '깃발형 패턴', '에너지 응축', '변동성 수렴' 등의 전문 용어를 쓰지 말고, '고점 대비 하락 기준', '급등 후 숨고르기', '거래가 조용해진 구간' 같은 쉬운 설명으로 바꿔줘.
 - **문장 구성**: 각 설명은 새 문단으로 구분하고, 항목 사이에는 빈 줄을 넣어줘.
 - **가장 중요한 것**: 왜 그런 판단을 했는지 이유를 분명하게 설명해줘.
@@ -989,7 +1003,7 @@ class StockAnalyzer:
                     normalized = self._normalize_ai_response(response)
                     if normalized:
                         return normalized
-                    return self.build_local_report(market_data, holding_data, watch_data, report_mode)
+                    return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data)
                 elif self.genai_library == 'generativeai' and self.model is not None:
                     if not hasattr(self.model, 'generate_content') and hasattr(genai, 'GenerativeModel'):
                         self.model = genai.GenerativeModel(self.model_name)
@@ -1004,14 +1018,14 @@ class StockAnalyzer:
                     normalized = self._normalize_ai_response(response)
                     if normalized:
                         return normalized
-                    return self.build_local_report(market_data, holding_data, watch_data, report_mode)
+                    return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data)
                 elif hasattr(genai, 'generate_text'):
                     model_name = self.model_name or 'gemini-2.1'
                     response = genai.generate_text(model=model_name, prompt=prompt)
                     normalized = self._normalize_ai_response(response)
                     if normalized:
                         return normalized
-                    return self.build_local_report(market_data, holding_data, watch_data, report_mode)
+                    return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data)
                 else:
                     raise RuntimeError('지원되지 않는 AI 모델 인터페이스입니다.')
             except Exception as e:
@@ -1022,7 +1036,7 @@ class StockAnalyzer:
                     time.sleep(wait_sec)
                     continue
                 print(f"AI 호출 중 오류 발생: {e}")
-                return self.build_local_report(market_data, holding_data, watch_data, report_mode)
+                return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data)
 
     def get_indicators(self, df, kospi_index=None):
         """기술적 지표 계산 (SMA, RSI, MACD, BB, StochRSI, MFI)"""
