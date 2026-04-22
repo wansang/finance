@@ -3,8 +3,17 @@ const GITHUB_REPO = 'finance';
 const WORKFLOW_FILE = 'analyze.yml';
 
 function isHoliday(date) {
-  const cal = CalendarApp.getCalendarById('ko.south_korea#holiday@group.v.calendar.google.com');
-  return cal.getEventsForDay(date).length > 0;
+  try {
+    const cal = CalendarApp.getCalendarById('ko.south_korea#holiday@group.v.calendar.google.com');
+    if (!cal) {
+      Logger.log('[WARN] 공휴일 캘린더를 찾을 수 없습니다. 공휴일 체크를 건너뜁니다.');
+      return false;
+    }
+    return cal.getEventsForDay(date).length > 0;
+  } catch (e) {
+    Logger.log('[WARN] 공휴일 체크 중 오류: ' + e.message + '. 공휴일 체크를 건너뜁니다.');
+    return false;
+  }
 }
 
 function dispatchAnalyzeWorkflow() {
