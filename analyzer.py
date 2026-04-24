@@ -1174,8 +1174,8 @@ class StockAnalyzer:
         if p2_rsi <= p1_rsi:
             return False
         
-        # RSI가 과매도권(40 이하)에서 발생해야 유효 (강화: 45→40, 백테스트 RSI<30~35 고성능 근거)
-        if p2_rsi > 40:
+        # RSI가 과매도권(45 이하)에서 발생해야 유효
+        if p2_rsi > 45:
             return False
         
         # 두 번째 저점이 최근 12봉 이내여야 함 (타이밍 유효성)
@@ -1234,9 +1234,9 @@ class StockAnalyzer:
         if not (touched_lower and above_lower_now):
             return False
         
-        # 조건 3: RSI 과매도 후 반등 (강화: 35 이하로 기준 상향 — 백테스트 결과 RSI<30에서 90.9% 승률)
+        # 조건 3: RSI 과매도 후 반등 (기준 40 이하 — 코스피 평균 RSI 범위 고려)
         rsi_recent = df_target['RSI'].iloc[-5:].values
-        rsi_was_oversold = any(r <= 35 for r in rsi_recent if r == r)
+        rsi_was_oversold = any(r <= 40 for r in rsi_recent if r == r)
         rsi_rising = last['RSI'] > df_target['RSI'].iloc[-2]
         if not (rsi_was_oversold and rsi_rising):
             return False
@@ -1386,10 +1386,6 @@ class StockAnalyzer:
         # 7. MACD 골든크로스 (추세 반전 확인)
         if self.detect_macd_golden_cross(df, idx):
             reasons.append("MACD 골든크로스")
-
-        # 8. 52주 신고가 돌파 (백테스트 결과 79.2% 승률, 평균 +18.87%)
-        if self.detect_52week_high_breakout(df, idx):
-            reasons.append("52주 신고가 돌파(모멘텀)")
 
         return reasons
 

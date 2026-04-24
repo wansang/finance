@@ -86,12 +86,11 @@ def update_log(before_stats, after_stats):
         "timestamp": datetime.datetime.now().isoformat(),
         "type": "A전문가_알고리즘_개선",
         "changes": [
-            "is_taj_mahal_signal: RSI 과매도 기준 40→35 강화",
-            "is_taj_mahal_signal: 거래량 필터 0.8배→1.2배 강화",
-            "detect_divergence: RSI 과매도 기준 45→40 강화",
-            "detect_volume_spike: 기준 2.5배→2.0배 완화 (신호 민감도 조정)",
-            "detect_52week_high_breakout: 신규 신호 추가 (52주신고가95%+거래량1.5배+양봉)",
-            "check_signals: 신호 8번 52주신고가 돌파 추가",
+            "is_taj_mahal_signal: 거래량 필터 0.8배→1.2배 유지 (가짜 반등 방지)",
+            "detect_volume_spike: 기준 2.5배→2.0배 유지 (민감도 조정)",
+            "is_taj_mahal_signal: RSI 기준 35→40 롤백 (성과 악화)",
+            "detect_divergence: RSI 기준 40→45 롤백 (성과 악화)",
+            "detect_52week_high_breakout: 신호 제거 (KOSPI 고점 추격 HardStop 연속)",
         ],
         "before": {k: str(v) for k, v in before_stats.items()},
         "after": {k: str(v) for k, v in after_stats.items()},
@@ -122,16 +121,17 @@ def main():
     }
 
     print("\n" + "="*60)
-    print("  📊 B전문가 검증 시작: A전문가 개선 알고리즘 백테스트")
-    print("  개선 내용:")
-    print("    1. 타지마할 신호 RSI 기준: 40 → 35")
-    print("    2. 타지마할 신호 거래량 필터: 0.8배 → 1.2배")
-    print("    3. RSI 다이버전스 과매도 기준: 45 → 40")
-    print("    4. 거래량 급증 기준: 2.5배 → 2.0배 (민감도 조정)")
-    print("    5. 52주 신고가 돌파 신호 추가 (신규)")
+    print("  📊 B전문가 검증 2차: 선택적 개선 적용 알고리즘 백테스트")
+    print("  유지된 개선:")
+    print("    1. 타지마할 거래량 필터: 0.8배 → 1.2배 (가짜 반등 방지)")
+    print("    2. 거래량 급증 기준: 2.5배 → 2.0배 (민감도 조정)")
+    print("  롤백된 변경 (성과 악화):")
+    print("    X RSI 기준 강화 (40→35) 롤백 → 40 유지")
+    print("    X 다이버전스 RSI 기준 (45→40) 롤백 → 45 유지")
+    print("    X 52주 신고가 신호 제거 (KOSPI 고점 추격 손절 연속)")
     print("="*60)
 
-    df_after = run_backtest("A전문가 개선후 — BB+RSI강화+52주신고가")
+    df_after = run_backtest("선택적 개선 — 거래량필터 강화만 유지")
     after_stats = calc_stats_from_df(df_after)
 
     # ─── 비교 리포트 저장 ───────────────────────────────────────────────────
@@ -140,11 +140,11 @@ def main():
             f.write("# 전략별 백테스트 결과\n\n")
 
     save_section(
-        "【B전문가 검증】 A전문가 개선 후 — BB+RSI강화+52주신고가 신호 추가",
+        "【B전문가 2차 검증】 선택적 개선 — 거래량필터 강화만 유지",
         after_stats,
         notes=(
-            "개선 내용: ① 타지마할 RSI≤40→35 ② 거래량필터 0.8배→1.2배 "
-            "③ 다이버전스 RSI≤45→40 ④ 거래량급증 2.5배→2.0배 ⑤ 52주신고가 신호 신규 추가"
+            "유지: ① 타지마할 거래량 1.2배 ② 거래량급증 2.0배 / "
+            "롤백: RSI≤35→40, 다이버전스RSI≤40→45, 52주신고가신호 제거"
         )
     )
 
@@ -166,7 +166,7 @@ def main():
     print("\n  📦 Git 커밋 중...")
     after_summary = f"승률:{after_stats.get('승률','?')} 평균:{after_stats.get('평균수익률','?')} MDD:{after_stats.get('MDD','?')} Sharpe:{after_stats.get('Sharpe(연율화)','?')}"
     os.system(f'cd {BASE_DIR} && git add analyzer.py backtest_results.md algorithm_update_log.json run_comparison.py && '
-              f'git commit -m "feat: A전문가 알고리즘 개선 + B전문가 백테스트 검증 [{after_summary}]" && '
+              f'git commit -m "fix: 선택적 개선 유지 — 거래량필터1.2배 유지, RSI기준/52주신호 롤백 [{after_summary}]" && '
               f'git push origin main')
     print("  ✅ Git 커밋 완료")
     print("\n✅ B전문가 검증 사이클 완료")
