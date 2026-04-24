@@ -3,6 +3,29 @@ import pandas as pd
 import datetime
 from analyzer import StockAnalyzer
 import time
+import signal
+
+# fdr.DataReader hang 방지용 타임아웃 래퍼
+class _FdrTimeout(Exception):
+    pass
+
+def _fdr_timeout_handler(signum, frame):
+    raise _FdrTimeout("fdr timeout")
+
+def _fdr_read(code, start=None, end=None, timeout_sec=30):
+    signal.signal(signal.SIGALRM, _fdr_timeout_handler)
+    signal.alarm(timeout_sec)
+    try:
+        if end:
+            return fdr.DataReader(code, start=start, end=end)
+        elif start:
+            return fdr.DataReader(code, start=start)
+        else:
+            return fdr.DataReader(code)
+    except _FdrTimeout:
+        return None
+    finally:
+        signal.alarm(0)
 
 class Backtester:
     def __init__(self):
@@ -145,7 +168,9 @@ class Backtester:
                 else:
                     history_window_days = max(550, self.analyzer.config.get('VALIDATE_MIN_HISTORY', 252) * 2 + 60)
                     start_date = (target_date - datetime.timedelta(days=history_window_days)).strftime('%Y-%m-%d')
-                    df = fdr.DataReader(code, start=start_date)
+                    df = _fdr_read(code, start=start_date)
+                    if df is None or df.empty:
+                        continue
                     min_history = max(50, self.analyzer.config.get('SMA200', 200))
                     if len(df) < min_history:
                         continue
@@ -156,7 +181,7 @@ class Backtester:
                             if bench_key in self.data_cache:
                                 benchmark = self.data_cache[bench_key]
                             else:
-                                benchmark = fdr.DataReader(benchmark_symbol, start=start_date)
+                                benchmark = _fdr_read(benchmark_symbol, start=start_date)
                                 self.data_cache[bench_key] = benchmark
                         except Exception:
                             benchmark = None
@@ -255,7 +280,9 @@ class Backtester:
         if ks11_key in self.data_cache:
             ks11 = self.data_cache[ks11_key]
         else:
-            ks11 = fdr.DataReader('KS11')
+            ks11 = _fdr_read('KS11')
+            if ks11 is None or ks11.empty:
+                raise RuntimeError("KS11 데이터 로드 실패")
             self.data_cache[ks11_key] = ks11
         target_date = ks11.index[-(days_ago + 1)]
 
@@ -264,8 +291,8 @@ class Backtester:
 
         kospi_uptrend = self.analyzer._is_market_in_uptrend(ks11, target_idx=len(ks11[ks11.index <= target_date]) - 1)
         try:
-            sp500 = fdr.DataReader('US500', start=(target_date - datetime.timedelta(days=300)).strftime('%Y-%m-%d'), end=target_date.strftime('%Y-%m-%d'))
-            us_uptrend = self.analyzer._is_market_in_uptrend(sp500)
+            sp500 = _fdr_read('US500', start=(target_date - datetime.timedelta(days=300)).strftime('%Y-%m-%d'), end=target_date.strftime('%Y-%m-%d'))
+            us_uptrend = self.analyzer._is_market_in_uptrend(sp500) if sp500 is not None and not sp500.empty else True
         except Exception:
             us_uptrend = True
 
@@ -304,7 +331,9 @@ class Backtester:
         print(f"  워크포워드 백테스트: {periods}개 구간 × {interval_weeks}주 간격")
         print(f"{'='*60}")
 
-        ks11 = fdr.DataReader('KS11', start=(datetime.datetime.now() - datetime.timedelta(days=900)).strftime('%Y-%m-%d'))
+        ks11 = _fdr_read('KS11', start=(datetime.datetime.now() - datetime.timedelta(days=900)).strftime('%Y-%m-%d'))
+        if ks11 is None or ks11.empty:
+            raise RuntimeError("KS11 데이터 로드 실패")
         max_hold = self.analyzer.config.get('VALIDATE_MAX_HOLD_DAYS', 20)
         sample_size = self.analyzer.config.get('BACKTEST_SAMPLE_SIZE', 200)
 
@@ -335,8 +364,8 @@ class Backtester:
             print(f"  코스피 시장 상태: {market_label}")
 
             try:
-                sp500 = fdr.DataReader('US500', start=(target_date - datetime.timedelta(days=300)).strftime('%Y-%m-%d'))
-                us_uptrend = self.analyzer._is_market_in_uptrend(sp500)
+                sp500 = _fdr_read('US500', start=(target_date - datetime.timedelta(days=300)).strftime('%Y-%m-%d'))
+                us_uptrend = self.analyzer._is_market_in_uptrend(sp500) if sp500 is not None and not sp500.empty else True
             except Exception:
                 us_uptrend = True
 
