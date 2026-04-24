@@ -1241,8 +1241,8 @@ class StockAnalyzer:
         if not (rsi_was_oversold and rsi_rising):
             return False
         
-        # 조건 4: 거래량 평균 이상 (강화: 1.2배 이상 — 52주신고가 전략의 거래량 필터 적용)
-        if last['Volume'] < last['VOL_AVG'] * 1.2:
+        # 조건 4: 거래량 평균 이상
+        if last['Volume'] < last['VOL_AVG'] * 0.8:
             return False
         
         # 조건 5: 양봉
@@ -1305,12 +1305,12 @@ class StockAnalyzer:
         return False
 
     def detect_volume_spike(self, df, idx=-1):
-        """거래량 급증 감지 (평균 대비 2.0배 이상 — 52주신고가 전략 거래량 필터와 정합)"""
+        """거래량 급증 감지 (평균 대비 2.5배 이상)"""
         df_target = df.iloc[:idx+1] if idx != -1 else df
         if len(df_target) < 2: return False
         
         last = df_target.iloc[-1]
-        if last['Volume'] > last['VOL_AVG'] * 2.0:
+        if last['Volume'] > last['VOL_AVG'] * 2.5:
             return True
         return False
 
