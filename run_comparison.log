@@ -1,0 +1,228 @@
+/Users/wansangryu/finance/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/wansangryu/finance/.venv/lib/python3.9/site-packages/google/auth/__init__.py:54: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+/Users/wansangryu/finance/.venv/lib/python3.9/site-packages/google/oauth2/__init__.py:40: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+
+============================================================
+  📊 B전문가 검증 2차: 선택적 개선 적용 알고리즘 백테스트
+  유지된 개선:
+    1. 타지마할 거래량 필터: 0.8배 → 1.2배 (가짜 반등 방지)
+    2. 거래량 급증 기준: 2.5배 → 2.0배 (민감도 조정)
+  롤백된 변경 (성과 악화):
+    X RSI 기준 강화 (40→35) 롤백 → 40 유지
+    X 다이버전스 RSI 기준 (45→40) 롤백 → 45 유지
+    X 52주 신고가 신호 제거 (KOSPI 고점 추격 손절 연속)
+============================================================
+
+============================================================
+  B전문가 검증 백테스트: 선택적 개선 — 거래량필터 강화만 유지
+============================================================
+AI 초기화 성공: library=genai, source=env, model=gemini-flash-latest
+
+============================================================
+  워크포워드 백테스트: 8개 구간 × 6주 간격
+============================================================
+
+[Period 1/8 (2025-01-02)]
+  코스피 시장 상태: 하락장
+⚠️ KOSPI 하락장 감지: Power Combo(RSI다이버전스+타지마할) 종목만 Tier1 허용
+Analyzing 200 KOSPI stocks for signals on 2025-01-02...
+Analyzing 109 US stocks for signals on 2025-01-02...
+  → 신호: 3개, 승률: 67%, 평균수익: +3.75%
+
+[Period 2/8 (2025-03-10)]
+  코스피 시장 상태: 하락장
+⚠️ KOSPI 하락장 감지: Power Combo(RSI다이버전스+타지마할) 종목만 Tier1 허용
+Analyzing 200 KOSPI stocks for signals on 2025-03-10...
+Analyzing 109 US stocks for signals on 2025-03-10...
+  → 신호 없음
+
+[Period 3/8 (2025-05-12)]
+  코스피 시장 상태: 상승장
+Analyzing 200 KOSPI stocks for signals on 2025-05-12...
+Analyzing 109 US stocks for signals on 2025-05-12...
+  → 신호: 19개, 승률: 79%, 평균수익: +5.76%
+
+[Period 4/8 (2025-07-11)]
+  코스피 시장 상태: 상승장
+Analyzing 200 KOSPI stocks for signals on 2025-07-11...
+Analyzing 109 US stocks for signals on 2025-07-11...
+  → 신호: 22개, 승률: 36%, 평균수익: -1.39%
+
+[Period 5/8 (2025-09-10)]
+  코스피 시장 상태: 상승장
+Analyzing 200 KOSPI stocks for signals on 2025-09-10...
+Analyzing 109 US stocks for signals on 2025-09-10...
+  → 신호: 44개, 승률: 32%, 평균수익: -1.54%
+
+[Period 6/8 (2025-11-14)]
+  코스피 시장 상태: 상승장
+Analyzing 200 KOSPI stocks for signals on 2025-11-14...
+Analyzing 109 US stocks for signals on 2025-11-14...
+  → 신호: 36개, 승률: 36%, 평균수익: -3.75%
+
+[Period 7/8 (2026-01-16)]
+  코스피 시장 상태: 상승장
+Analyzing 200 KOSPI stocks for signals on 2026-01-16...
+Analyzing 109 US stocks for signals on 2026-01-16...
+  → 신호: 39개, 승률: 64%, 평균수익: +4.72%
+
+[Period 8/8 (2026-03-23)]
+  코스피 시장 상태: 하락장
+⚠️ KOSPI 하락장 감지: Power Combo(RSI다이버전스+타지마할) 종목만 Tier1 허용
+Analyzing 200 KOSPI stocks for signals on 2026-03-23...
+Analyzing 109 US stocks for signals on 2026-03-23...
+  → 신호: 2개, 승률: 50%, 평균수익: +0.90%
+
+============================================================
+  [선택적 개선 — 거래량필터 강화만 유지 종합 결과]
+============================================================
+  총 거래 수:   165개  (통계 신뢰도: 높음 ✅)
+  승률:         47.3%  (78승 87패)
+  평균 수익률:  +0.44%  (가중평균: +0.32%)
+  최고 수익:    +27.66%  (에스엘)
+  최저 수익:    -12.07%  (효성중공업)
+  MDD (최대낙폭): -92.64%  |  Sharpe(연율화): 0.07  |  최대연속손실: 10연속
+────────────────────────────────────────────────────────────
+
+  [시장별]
+    KOSPI : 159건  승률  46.5%  평균 +0.34%
+    US    :   6건  승률  66.7%  평균 +3.28%
+
+  [시장 상태별]
+    상승장: 161건  승률  47.2%  평균 +0.44%
+    하락장:   4건  승률  50.0%  평균 +0.46%
+
+  [청산 사유별]
+    HardStop            :  58건  승률   0.0%  평균 -8.35%
+    Target              :  34건  승률 100.0%  평균 +13.46%
+    TimeOut             :  20건  승률  55.0%  평균 +1.06%
+    TrailingStop        :  53건  승률  62.3%  평균 +1.49%
+
+  [기간별 성과]
+    2025-01-02 ↓   3건  승률  66.7%  평균 +3.75%
+    2025-05-12 ↑  19건  승률  78.9%  평균 +5.76%
+    2025-07-11 ↑  22건  승률  36.4%  평균 -1.39%
+    2025-09-10 ↑  44건  승률  31.8%  평균 -1.54%
+    2025-11-14 ↑  36건  승률  36.1%  평균 -3.75%
+    2026-01-16 ↑  39건  승률  64.1%  평균 +4.72%
+    2026-03-23 ↓   2건  승률  50.0%  평균 +0.90%
+
+  [상위 10개 거래]
+PeriodDate      Name  Return(%)           ExitReason
+2026-01-16       에스엘  27.656099 Target(ATR×2,+15.2%)
+2026-01-16    포스코퓨처엠  25.867279 Target(ATR×2,+23.4%)
+2025-07-11    HD건설기계  23.670017 Target(ATR×2,+14.2%)
+2025-05-12      삼양식품  22.029513 Target(ATR×2,+11.7%)
+2025-05-12 미래에셋증권2우B  19.378020  Target(ATR×2,+6.5%)
+2026-01-16     한미반도체  18.931169 Target(ATR×2,+17.0%)
+2026-01-16      다우기술  18.224997 Target(ATR×2,+11.7%)
+2025-09-10        농심  17.267434  Target(ATR×2,+8.0%)
+2026-01-16  현대지에프홀딩스  15.168607 Target(ATR×2,+15.3%)
+2026-01-16   영원무역홀딩스  15.082084 Target(ATR×2,+13.9%)
+
+  [⚠️ HardStop 손절 종목 상세 (58건)]
+PeriodDate           Name Market  Return(%)            ExitReason                                                             Reasons
+2025-11-14          효성중공업  KOSPI -12.070108 HardStop(ATR×2,-7.0%)                                        거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2025-11-14         SK하이닉스  KOSPI -11.850807 HardStop(ATR×2,-7.0%)                                       거래가 조용해지며 다음 변동성을 준비하는 구간입니다.
+2025-11-14             한화  KOSPI -11.789898 HardStop(ATR×2,-7.0%)                                        거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2026-01-16 LIG디펜스앤에어로스페이스  KOSPI -11.619807 HardStop(ATR×2,-7.0%)                                            최근 급등 뒤 숨고르기 구간에 진입했습니다.
+2025-11-14           LG화학  KOSPI -11.595585 HardStop(ATR×2,-7.0%)                                        거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2025-11-14      한화에어로스페이스  KOSPI -10.411884 HardStop(ATR×2,-7.0%)                                       거래가 조용해지며 다음 변동성을 준비하는 구간입니다.
+2025-09-10           일진전기  KOSPI -10.314575 HardStop(ATR×2,-7.0%) 거래가 조용해져 다음 움직임을 준비하는 모습입니다., 거래가 조용해지며 다음 변동성을 준비하는 구간입니다., 거래량 급증
+2025-11-14       HD현대일렉트릭  KOSPI -10.200369 HardStop(ATR×2,-7.0%)              거래가 조용해져 다음 움직임을 준비하는 모습입니다., 최근 급등 뒤 숨고르기 구간에 진입했습니다.
+2026-01-16          포스코DX  KOSPI  -9.995407 HardStop(ATR×2,-7.0%)                                                              거래량 급증
+2025-07-11            F&F  KOSPI  -9.923978 HardStop(ATR×2,-6.9%)              거래가 조용해져 다음 움직임을 준비하는 모습입니다., 최근 급등 뒤 숨고르기 구간에 진입했습니다.
+2026-01-16          LG이노텍  KOSPI  -9.797861 HardStop(ATR×2,-7.0%)                                       거래가 조용해지며 다음 변동성을 준비하는 구간입니다.
+2026-01-16     HD현대에너지솔루션  KOSPI  -9.785934 HardStop(ATR×2,-7.0%)                                        거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2026-01-16       HD한국조선해양  KOSPI  -9.732749 HardStop(ATR×2,-7.0%)                                            최근 급등 뒤 숨고르기 구간에 진입했습니다.
+2025-07-11          SK스퀘어  KOSPI  -9.719139 HardStop(ATR×2,-7.0%)                                                              거래량 급증
+2025-11-14           한국카본  KOSPI  -9.646403 HardStop(ATR×2,-7.0%)                                                              거래량 급증
+2025-11-14          한화시스템  KOSPI  -9.626640 HardStop(ATR×2,-7.0%)                                            최근 급등 뒤 숨고르기 구간에 진입했습니다.
+2025-11-14           대신증권  KOSPI  -9.403624 HardStop(ATR×2,-7.0%)                                       거래가 조용해지며 다음 변동성을 준비하는 구간입니다.
+2026-03-23         한국앤컴퍼니  KOSPI  -9.276911 HardStop(ATR×2,-7.0%)                     RSI 반전 신호(상승 가능성), 거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2025-07-11          한전KPS  KOSPI  -9.265925 HardStop(ATR×2,-7.0%)                                        거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2025-11-14        HD현대중공업  KOSPI  -9.173180 HardStop(ATR×2,-7.0%)                                                              거래량 급증
+2025-09-10         현대글로비스  KOSPI  -9.105852 HardStop(ATR×2,-6.4%)                                            최근 급등 뒤 숨고르기 구간에 진입했습니다.
+2025-11-14         두산로보틱스  KOSPI  -8.984427 HardStop(ATR×2,-7.0%)                                            최근 급등 뒤 숨고르기 구간에 진입했습니다.
+2025-09-10           한화엔진  KOSPI  -8.977121 HardStop(ATR×2,-7.0%)                                            최근 급등 뒤 숨고르기 구간에 진입했습니다.
+2025-11-14        SK이노베이션  KOSPI  -8.939062 HardStop(ATR×2,-7.0%)                                        거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2025-09-10          삼성중공업  KOSPI  -8.622737 HardStop(ATR×2,-6.7%)                                        거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2025-07-11          코오롱인더  KOSPI  -8.581280 HardStop(ATR×2,-7.0%)                                        거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2025-09-10         미래에셋증권  KOSPI  -8.544345 HardStop(ATR×2,-7.0%)                                                              거래량 급증
+2025-11-14           다우기술  KOSPI  -8.529705 HardStop(ATR×2,-7.0%)                                        거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2025-11-14        두산에너빌리티  KOSPI  -8.177284 HardStop(ATR×2,-7.0%)                                            최근 급등 뒤 숨고르기 구간에 진입했습니다.
+2025-11-14          삼성SDI  KOSPI  -8.108021 HardStop(ATR×2,-7.0%)                                        거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2025-11-14          삼성중공업  KOSPI  -7.995004 HardStop(ATR×2,-7.0%)                                        거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2025-09-10           현대건설  KOSPI  -7.976304 HardStop(ATR×2,-7.0%)         거래가 조용해져 다음 움직임을 준비하는 모습입니다., 거래가 조용해지며 다음 변동성을 준비하는 구간입니다.
+2025-09-10    LS ELECTRIC  KOSPI  -7.901650 HardStop(ATR×2,-7.0%)                                        거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2025-09-10           신영증권  KOSPI  -7.879403 HardStop(ATR×2,-7.0%)                                                              거래량 급증
+2025-07-11        SK이노베이션  KOSPI  -7.858886 HardStop(ATR×2,-7.0%)                                            최근 급등 뒤 숨고르기 구간에 진입했습니다.
+2025-07-11          두산퓨얼셀  KOSPI  -7.814666 HardStop(ATR×2,-7.0%)                                        거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2025-09-10           대신증권  KOSPI  -7.769043 HardStop(ATR×2,-6.7%)                                                              거래량 급증
+2026-01-16      미래에셋증권2우B  KOSPI  -7.754411 HardStop(ATR×2,-7.0%)                                        거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2025-05-12           SK가스  KOSPI  -7.746217 HardStop(ATR×2,-7.0%)                                                              거래량 급증
+2025-11-14           삼양식품  KOSPI  -7.732190 HardStop(ATR×2,-7.0%)                                            최근 급등 뒤 숨고르기 구간에 진입했습니다.
+2026-01-16        두산에너빌리티  KOSPI  -7.694258 HardStop(ATR×2,-7.0%)                                                              거래량 급증
+2025-11-14           키움증권  KOSPI  -7.681944 HardStop(ATR×2,-7.0%)         거래가 조용해져 다음 움직임을 준비하는 모습입니다., 거래가 조용해지며 다음 변동성을 준비하는 구간입니다.
+2026-01-16             한화  KOSPI  -7.678492 HardStop(ATR×2,-7.0%)                                                              거래량 급증
+2025-11-14      HD현대마린솔루션  KOSPI  -7.670462 HardStop(ATR×2,-7.0%)                                                              거래량 급증
+2025-05-12           신영증권  KOSPI  -7.634038 HardStop(ATR×2,-6.9%)                                                              거래량 급증
+2025-09-10        DN오토모티브  KOSPI  -7.433998 HardStop(ATR×2,-6.9%)              거래가 조용해져 다음 움직임을 준비하는 모습입니다., 최근 급등 뒤 숨고르기 구간에 진입했습니다.
+2026-01-16        삼성에스디에스  KOSPI  -7.103338 HardStop(ATR×2,-5.9%)                                                              거래량 급증
+2025-09-10          삼성E&A  KOSPI  -6.938916 HardStop(ATR×2,-6.0%)                                       거래가 조용해지며 다음 변동성을 준비하는 구간입니다.
+2025-09-10             동서  KOSPI  -6.910392 HardStop(ATR×2,-5.0%)         거래가 조용해져 다음 움직임을 준비하는 모습입니다., 거래가 조용해지며 다음 변동성을 준비하는 구간입니다.
+2025-09-10            하이브  KOSPI  -6.861385 HardStop(ATR×2,-6.1%)         거래가 조용해져 다음 움직임을 준비하는 모습입니다., 거래가 조용해지며 다음 변동성을 준비하는 구간입니다.
+2025-09-10        메리츠금융지주  KOSPI  -6.620223 HardStop(ATR×2,-4.9%)                                        거래가 조용해져 다음 움직임을 준비하는 모습입니다.
+2025-09-10          현대모비스  KOSPI  -6.128501 HardStop(ATR×2,-5.6%)                                            최근 급등 뒤 숨고르기 구간에 진입했습니다.
+2025-07-11             KT  KOSPI  -6.022747 HardStop(ATR×2,-5.0%)                                            최근 급등 뒤 숨고르기 구간에 진입했습니다.
+2025-09-10             KT  KOSPI  -5.566899 HardStop(ATR×2,-4.5%)                                                              거래량 급증
+2025-09-10           NVDA     US  -5.282816 HardStop(ATR×2,-5.0%)                                                    바닥권 반등 신호(BB 하단)
+2025-09-10             기아  KOSPI  -4.742334 HardStop(ATR×2,-4.0%)                                       거래가 조용해지며 다음 변동성을 준비하는 구간입니다.
+2025-09-10           기업은행  KOSPI  -4.009130 HardStop(ATR×2,-3.5%)                                                              거래량 급증
+2025-09-10         맥쿼리인프라  KOSPI  -2.144420 HardStop(ATR×2,-1.6%)                                                           과매도 반등 신호
+============================================================
+
+============================================================
+  📊 B전문가 검증 결과 비교
+============================================================
+  지표                   이전(베이스라인)                 이후(A전문가 개선)              
+  ----------------------------------------------------------------------
+  총거래수                 191                       165                      
+  승률                   54.5% (104승 87패)          47.3% (78승 87패)          
+  평균수익률                +1.51%                    +0.44%                   
+  MDD                  -80.53%                   -92.88%                  
+  Sharpe(연율화)          0.47                      0.07                     
+  신뢰도                  높음 ✅                      높음 ✅                     
+
+✅ algorithm_update_log.json 업데이트 완료
+
+  📦 Git 커밋 중...
+[main 6be5ec1] fix: 선택적 개선 유지 — 거래량필터1.2배 유지, RSI기준/52주신호 롤백 [승률:47.3% (78승 87패) 평균:+0.44% MDD:-92.88% Sharpe:0.07]
+ Committer: wansang ryu <wansangryu@wansangui-MacBookPro.local>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly. Run the
+following command and follow the instructions in your editor to edit
+your configuration file:
+
+    git config --global --edit
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+ 4 files changed, 67 insertions(+), 26 deletions(-)
+To https://github.com/wansang/finance.git
+ ! [rejected]        main -> main (fetch first)
+error: failed to push some refs to 'https://github.com/wansang/finance.git'
+hint: Updates were rejected because the remote contains work that you do not
+hint: have locally. This is usually caused by another repository pushing to
+hint: the same ref. If you want to integrate the remote changes, use
+hint: 'git pull' before pushing again.
+hint: See the 'Note about fast-forwards' in 'git push --help' for details.
+  ✅ Git 커밋 완료
+
+✅ B전문가 검증 사이클 완료

@@ -1,0 +1,56 @@
+[wait_commit] PID 40289 완료 대기 중...
+[wait_commit] 프로세스 종료 확인. 3초 후 결과 처리...
+[wait_commit] backtest_results.md: 342줄
+[wait_commit] 마지막 30줄:
+| 신뢰도 | 낮음 ❌ |
+
+**비고**: 절대모멘텀(수익률>무위험) + 상대모멘텀(상위1종목) → 20일 청산
+
+---
+## 📊 전략 종합 비교표
+**생성일시**: 2026-04-22 21:14
+
+| 전략 | 총거래수 | 승률 | 평균수익률 | MDD | Sharpe | 신뢰도 |
+|------|----------|------|------------|-----|--------|--------|
+| 4. BB+RSI 복합 (현재시스템) | 191 | 54.5% (104승 87패) | +1.51% | -80.53% | 0.47 | 높음 ✅ |
+| 2a. SMA50×200 (보유20일) | 4 | 50.0% (2승 2패) | +1.14% | -13.01% | 0.23 | 낮음 ❌ |
+| 2b. SMA20×60 (보유20일) | 10 | 80.0% (8승 2패) | +13.36% | -17.15% | 2.94 | 낮음 ❌ |
+| 2c. SMA10×30 (보유10일) | 16 | 62.5% (10승 6패) | +8.06% | -5.92% | 2.98 | 낮음 ❌ |
+| 5a. 52주신고가 95%+거래량1.5배 | 24 | 79.2% (19승 5패) | +18.87% | -17.42% | 2.68 | 낮음 ❌ |
+| 5b. 52주신고가 100%돌파+거래량2배 | 0 | N/A | N/A | N/A | ? | ? |
+| 1a. 모멘텀6개월 상위20% | 0 | N/A | N/A | N/A | ? | ? |
+| 1b. 모멘텀12개월 상위10% | 0 | N/A | N/A | N/A | ? | ? |
+| 1c. 모멘텀3개월 상위20% | 117 | 59.0% (69승 48패) | +6.00% | -88.79% | 1.24 | 높음 ✅ |
+| 6a. 거래량2배+20일고점돌파 | 45 | 31.1% (14승 31패) | -3.77% | -94.55% | -1.16 | 보통 ⚠️ |
+| 6b. 거래량1.5배+10일고점돌파 | 83 | 34.9% (29승 54패) | -1.99% | -96.15% | -0.70 | 높음 ✅ |
+| 3a. RSI<30 반등 (청산60) | 11 | 90.9% (10승 1패) | +7.44% | -1.13% | 4.06 | 낮음 ❌ |
+| 3b. RSI<25 반등 (청산70) | 3 | 100.0% (3승 0패) | +3.01% | -0.00% | 4.37 | 낮음 ❌ |
+| 9a. StochRSI<20 반등 | 280 | 62.5% (175승 105패) | +2.99% | -93.33% | 1.59 | 높음 ✅ |
+| 9b. StochRSI<10 반등 | 101 | 60.4% (61승 40패) | +2.09% | -74.49% | 1.12 | 높음 ✅ |
+| 8a. 터틀20일 채널 | 166 | 42.2% (70승 96패) | +3.02% | -97.91% | 0.53 | 높음 ✅ |
+| 8b. 터틀55일 채널 | 77 | 39.0% (30승 47패) | -0.34% | -88.60% | -0.14 | 보통 ⚠️ |
+| 10. MFI 강세다이버전스 | 2 | 100.0% (2승 0패) | +11.09% | -0.00% | 3.39 | 낮음 ❌ |
+| 7a. 듀얼모멘텀12개월 | 0 | N/A | N/A | N/A | ? | ? |
+| 7b. 듀얼모멘텀6개월 | 2 | 0.0% (0승 2패) | -15.41% | -28.94% | -5.57 | 낮음 ❌ |
+[main 273fb3b] feat: 전략별 백테스트 결과 기록 (20개 파라미터 조합)
+ Committer: wansang ryu <wansangryu@wansangui-MacBookPro.local>
+Your name and email address were configured automatically based
+on your username and hostname. Please check that they are accurate.
+You can suppress this message by setting them explicitly. Run the
+following command and follow the instructions in your editor to edit
+your configuration file:
+
+    git config --global --edit
+
+After doing this, you may fix the identity used for this commit with:
+
+    git commit --amend --reset-author
+
+ 2 files changed, 110 insertions(+)
+
+
+
+To https://github.com/wansang/finance.git
+   e354231..273fb3b  main -> main
+
+[wait_commit] 완료! git push 성공
