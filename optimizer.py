@@ -94,7 +94,7 @@ class StrategyOptimizer:
         recs = []
 
         try:
-            raw = pd.read_csv(RECOMMENDATIONS_FILE, header=None, dtype=str, encoding='utf-8-sig')
+            raw = pd.read_csv(RECOMMENDATIONS_FILE, header=None, names=range(8), dtype=str, encoding='utf-8-sig')
             # 첫 행이 헤더이면 제거
             if str(raw.iloc[0, 0]).strip().lower() == 'date':
                 raw = raw.iloc[1:].reset_index(drop=True)
@@ -155,7 +155,7 @@ class StrategyOptimizer:
         cutoff = datetime.datetime.now() - datetime.timedelta(days=days_back)
         recs = []
         try:
-            raw = pd.read_csv(RECOMMENDATIONS_FILE, header=None, dtype=str, encoding='utf-8-sig')
+            raw = pd.read_csv(RECOMMENDATIONS_FILE, header=None, names=range(8), dtype=str, encoding='utf-8-sig')
             if str(raw.iloc[0, 0]).strip().lower() == 'date':
                 raw = raw.iloc[1:].reset_index(drop=True)
             for _, row in raw.iterrows():
@@ -319,7 +319,7 @@ class StrategyOptimizer:
 
         # CSV에서 추천 종목의 신호 정보 가져오기
         try:
-            raw = pd.read_csv(RECOMMENDATIONS_FILE, header=None, dtype=str, encoding='utf-8-sig')
+            raw = pd.read_csv(RECOMMENDATIONS_FILE, header=None, names=range(8), dtype=str, encoding='utf-8-sig')
             if str(raw.iloc[0, 0]).strip().lower() == 'date':
                 raw = raw.iloc[1:].reset_index(drop=True)
         except Exception:
