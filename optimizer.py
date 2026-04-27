@@ -944,9 +944,9 @@ class StrategyOptimizer:
         - Expert B: 경량 백테스트로 Before/After 성과를 객관적으로 비교 검증
         - 성과 향상 시 채택, 미향상 시 자동 rollback
         """
-        sample_size = self.base_config.get('EXPERT_AB_SAMPLE_SIZE', 50)
-        periods = self.base_config.get('EXPERT_AB_PERIODS', 4)
-        min_required = 1200
+        sample_size = self.base_config.get('EXPERT_AB_SAMPLE_SIZE', 200)
+        periods = self.base_config.get('EXPERT_AB_PERIODS', 8)
+        min_required = 7200  # Before + After 풀 백테스트 각 ~1시간 × 2
         remaining = self.time_limit_seconds - (time.time() - optimize_started)
         if remaining < min_required:
             print(f"[Expert A/B] 잔여 시간 {remaining:.0f}초 < 필요 {min_required}초. 생략합니다.")
