@@ -16,6 +16,7 @@ import copy
 import datetime
 import json
 import os
+import shutil
 import time
 
 import FinanceDataReader as fdr
@@ -668,7 +669,267 @@ class StrategyOptimizer:
         return gradual_config
 
     # ------------------------------------------------------------------
-    # 8. 메인 최적화 루틴
+    # 8. Expert A/B 자동 개선 사이클
+    # ------------------------------------------------------------------
+
+    ANALYZER_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'analyzer.py')
+    ANALYZER_BACKUP = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'analyzer.py.bak')
+
+    def _read_analyzer(self):
+        with open(self.ANALYZER_FILE, 'r', encoding='utf-8') as f:
+            return f.read()
+
+    def _write_analyzer(self, code):
+        with open(self.ANALYZER_FILE, 'w', encoding='utf-8') as f:
+            f.write(code)
+
+    def _backup_analyzer(self):
+        shutil.copy(self.ANALYZER_FILE, self.ANALYZER_BACKUP)
+
+    def _restore_analyzer(self):
+        if os.path.exists(self.ANALYZER_BACKUP):
+            shutil.copy(self.ANALYZER_BACKUP, self.ANALYZER_FILE)
+            print("  [rollback] analyzer.py 원복 완료")
+
+    # --- 패치 정의 (사전 검증된 안전한 코드 변경) ---
+
+    def _patch_volume_spike_bullish(self, code):
+        """거래량 급증 신호에 양봉 확인 조건 추가 (패닉 매도 거래량 제외)"""
+        old = """    def detect_volume_spike(self, df, idx=-1):
+        \"\"\"거래량 급증 감지 (평균 대비 2.5배 이상)\"\"\"
+        df_target = df.iloc[:idx+1] if idx != -1 else df
+        if len(df_target) < 2: return False
+        
+        last = df_target.iloc[-1]
+        if last['Volume'] > last['VOL_AVG'] * 2.5:
+            return True
+        return False"""
+        new = """    def detect_volume_spike(self, df, idx=-1):
+        \"\"\"거래량 급증 감지 (평균 대비 2.5배 이상 + 양봉 확인)
+        
+        양봉 확인 조건 추가: 패닉 매도 거래량(음봉) 제외, 매수세 우위 확인
+        \"\"\"
+        df_target = df.iloc[:idx+1] if idx != -1 else df
+        if len(df_target) < 2: return False
+        
+        last = df_target.iloc[-1]
+        if last['Volume'] > last['VOL_AVG'] * 2.5:
+            # 양봉 확인 (Close > Open) - 매수세가 매도세보다 강한 경우만
+            if 'Open' in df_target.columns and last['Open'] == last['Open'] and float(last['Open']) > 0:
+                return float(last['Close']) > float(last['Open'])
+            return True
+        return False"""
+        if old in code:
+            return code.replace(old, new), True
+        return code, False
+
+    def _patch_taj_mahal_rsi_35(self, code):
+        """BB 하단 반등 RSI 과매도 기준 강화 (40→35)"""
+        old = "        rsi_was_oversold = any(r <= 40 for r in rsi_recent if r == r)"
+        new = "        rsi_was_oversold = any(r <= 35 for r in rsi_recent if r == r)"
+        if old in code:
+            return code.replace(old, new), True
+        return code, False
+
+    def _patch_stoch_mfi_volume(self, code):
+        """과매도 반등 신호에 거래량 확인 추가 (VOL_AVG 1.2배)"""
+        old = """        # StochRSI K가 D를 골든크로스하고 20 이하(과매도)에서 반등할 때
+        if prev['STOCH_K'] < prev['STOCH_D'] and last['STOCH_K'] > last['STOCH_D']:
+            if last['STOCH_K'] < 30 or last['MFI'] < 30:
+                return True
+        return False"""
+        new = """        # StochRSI K가 D를 골든크로스하고 20 이하(과매도)에서 반등할 때
+        if prev['STOCH_K'] < prev['STOCH_D'] and last['STOCH_K'] > last['STOCH_D']:
+            if last['STOCH_K'] < 30 or last['MFI'] < 30:
+                # 거래량 확인 (가짜 반등 필터)
+                if 'VOL_AVG' in df_target.columns and last['VOL_AVG'] == last['VOL_AVG']:
+                    return float(last['Volume']) >= float(last['VOL_AVG']) * 1.2
+                return True
+        return False"""
+        if old in code:
+            return code.replace(old, new), True
+        return code, False
+
+    # --- 빠른 백테스트 ---
+
+    def run_quick_backtest_stats(self, sample_size=50, periods=4):
+        """경량 백테스트 (소규모 샘플로 빠른 전/후 비교용)"""
+        from backtester import Backtester
+        try:
+            bt = Backtester()
+            bt.analyzer.config['BACKTEST_SAMPLE_SIZE'] = sample_size
+            df = bt.run_walkforward_backtest(periods=periods, interval_weeks=6)
+            if df is None or df.empty:
+                return None
+            total = len(df)
+            if total == 0:
+                return None
+            wins = int((df['Return(%)'] > 0).sum())
+            win_rate = wins / total * 100
+            avg_ret = float(df['Return(%)'].mean())
+            std_ret = float(df['Return(%)'].std()) if total > 1 else 0.0
+            annual_factor = (250 / 20) ** 0.5
+            risk_free = 3.5 / (250 / 20)
+            sharpe = ((avg_ret - risk_free) / std_ret * annual_factor) if std_ret > 0 else 0.0
+            equity = 1.0
+            peak_eq = 1.0
+            mdd = 0.0
+            for r in df['Return(%)'].tolist():
+                equity *= (1 + r / 100)
+                if equity > peak_eq:
+                    peak_eq = equity
+                dd = (peak_eq - equity) / peak_eq * 100
+                if dd > mdd:
+                    mdd = dd
+            return {
+                'total': total, 'wins': wins, 'win_rate': win_rate,
+                'avg_ret': avg_ret, 'sharpe': sharpe, 'mdd': mdd,
+            }
+        except Exception as e:
+            print(f"  [Expert B] 백테스트 오류: {e}")
+            return None
+
+    @staticmethod
+    def _score_backtest(stats):
+        """통합 점수: 승률 40% + 평균수익률 × 10 - MDD 패널티"""
+        if not stats:
+            return -9999.0
+        return stats['win_rate'] * 0.4 + stats['avg_ret'] * 10 - stats['mdd'] * 0.1
+
+    def _log_expert_ab_result(self, patches_applied, before, after, kept):
+        """Expert A/B 결과를 algorithm_update_log.json에 기록"""
+        log_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'algorithm_update_log.json')
+        entry = {
+            'timestamp': datetime.datetime.now().isoformat(),
+            'type': 'ExpertAB_자동개선',
+            'patches_applied': patches_applied,
+            'kept': kept,
+            'before': {k: round(v, 4) if isinstance(v, float) else v for k, v in before.items()},
+            'after': {k: round(v, 4) if isinstance(v, float) else v for k, v in after.items()},
+        }
+        existing = []
+        if os.path.exists(log_file):
+            try:
+                with open(log_file, 'r', encoding='utf-8') as f:
+                    existing = json.load(f)
+                if not isinstance(existing, list):
+                    existing = [existing]
+            except Exception:
+                existing = []
+        existing.append(entry)
+        with open(log_file, 'w', encoding='utf-8') as f:
+            json.dump(existing, f, ensure_ascii=False, indent=2)
+
+    def expert_ab_cycle(self, signal_perf, optimize_started):
+        """
+        Expert A → B 자동 개선 사이클
+        1. 신호 성과 기반 약세 신호 자동 식별
+        2. 사전 정의 패치를 analyzer.py에 적용
+        3. Before/After 경량 백테스트 비교
+        4. 성과 향상 시 유지, 미향상 시 rollback
+        """
+        sample_size = self.base_config.get('EXPERT_AB_SAMPLE_SIZE', 50)
+        periods = self.base_config.get('EXPERT_AB_PERIODS', 4)
+        # 최소 잔여 시간: (백테스트 2회) × 예상 소요 시간을 넉넉히 600초 × 2 = 1200초
+        min_required = 1200
+        remaining = self.time_limit_seconds - (time.time() - optimize_started)
+        if remaining < min_required:
+            print(f"[Expert A/B] 잔여 시간 {remaining:.0f}초 < 필요 {min_required}초. 생략합니다.")
+            return
+
+        print("\n" + "=" * 72)
+        print("  [Expert A] 알고리즘 자동 개선 사이클 시작")
+        print("=" * 72)
+
+        signals = signal_perf.get('signals', {})
+        weak_threshold = self.base_config.get('WEAK_SIGNAL_WIN_RATE_THRESHOLD', 45)
+        weak_signals = {
+            k: v for k, v in signals.items()
+            if v.get('total_count', 0) >= 3 and v.get('win_rate', 100) < weak_threshold
+        }
+
+        if not weak_signals:
+            print(f"[Expert A] 승률 {weak_threshold}% 미만 약세 신호(3회 이상) 없음 — 코드 수정 불필요")
+            return
+
+        print(f"[Expert A] 약세 신호 발견 (기준: 승률 < {weak_threshold}%):")
+        for sig, data in weak_signals.items():
+            print(f"  ✗ {sig}: 승률 {data['win_rate']:.1f}%, 평균 {data.get('avg_return', 0):+.2f}%")
+
+        # 적용할 패치 결정
+        code = self._read_analyzer()
+        patched_code = code
+        patches_applied = []
+
+        if '거래량 급증' in weak_signals:
+            patched_code, applied = self._patch_volume_spike_bullish(patched_code)
+            if applied:
+                patches_applied.append('거래량급증_양봉필터: Close > Open 조건 추가 (패닉 매도 제외)')
+
+        if '바닥권 반등 신호(BB 하단)' in weak_signals:
+            patched_code, applied = self._patch_taj_mahal_rsi_35(patched_code)
+            if applied:
+                patches_applied.append('BB하단반등_RSI강화: 과매도 기준 40 → 35')
+
+        if '과매도 반등 신호' in weak_signals:
+            patched_code, applied = self._patch_stoch_mfi_volume(patched_code)
+            if applied:
+                patches_applied.append('과매도반등_거래량확인: VOL_AVG 1.2배 이상 조건 추가')
+
+        if not patches_applied:
+            print("[Expert A] 매칭되는 패치 없음 — 수동 검토 필요")
+            return
+
+        print(f"\n[Expert A] 적용 예정 패치 {len(patches_applied)}건:")
+        for p in patches_applied:
+            print(f"  ✎ {p}")
+
+        # Before 백테스트
+        print(f"\n[Expert B] Before 백테스트 (KOSPI {sample_size}종목 × {periods}구간) 실행 중...")
+        before_stats = self.run_quick_backtest_stats(sample_size=sample_size, periods=periods)
+        if not before_stats:
+            print("[Expert B] Before 백테스트 실패 — 사이클 중단")
+            return
+        print(
+            f"  Before: 총 {before_stats['total']}건 | 승률 {before_stats['win_rate']:.1f}% "
+            f"| 평균 {before_stats['avg_ret']:+.2f}% | Sharpe {before_stats['sharpe']:.2f} "
+            f"| MDD -{before_stats['mdd']:.1f}%"
+        )
+
+        # 패치 적용
+        self._backup_analyzer()
+        self._write_analyzer(patched_code)
+        print(f"\n[Expert A] 패치 적용 완료. After 백테스트 실행 중...")
+
+        # After 백테스트
+        after_stats = self.run_quick_backtest_stats(sample_size=sample_size, periods=periods)
+        if not after_stats:
+            print("[Expert B] After 백테스트 실패 — rollback")
+            self._restore_analyzer()
+            return
+        print(
+            f"  After:  총 {after_stats['total']}건 | 승률 {after_stats['win_rate']:.1f}% "
+            f"| 평균 {after_stats['avg_ret']:+.2f}% | Sharpe {after_stats['sharpe']:.2f} "
+            f"| MDD -{after_stats['mdd']:.1f}%"
+        )
+
+        # 비교 및 결정
+        before_score = self._score_backtest(before_stats)
+        after_score = self._score_backtest(after_stats)
+        print(f"\n[Expert B] 종합 점수: Before {before_score:.2f}  →  After {after_score:.2f}")
+
+        if after_score > before_score:
+            print("  ✅ 성과 향상 확인 — 개선안 채택")
+            self._log_expert_ab_result(patches_applied, before_stats, after_stats, kept=True)
+        else:
+            print("  ❌ 성과 미향상 또는 동일 — 원복")
+            self._restore_analyzer()
+            self._log_expert_ab_result(patches_applied, before_stats, after_stats, kept=False)
+
+        print("=" * 72)
+
+    # ------------------------------------------------------------------
+    # 9. 메인 최적화 루틴
     # ------------------------------------------------------------------
     def optimize(self):
         optimize_started = time.time()
@@ -829,6 +1090,12 @@ class StrategyOptimizer:
 
         # ── 6-B. US 주식 파라미터 최적화 ────────────────────────────────
         us_params = self.optimize_us_parameters(optimize_started)
+
+        # ── 6-C. Expert A/B 알고리즘 자동 개선 사이클 ────────────────────
+        if self.base_config.get('EXPERT_AB_ENABLED', True):
+            self.expert_ab_cycle(signal_perf, optimize_started)
+        else:
+            print("\n[Expert A/B] EXPERT_AB_ENABLED=False — 사이클 비활성화")
 
         # ── 7. 점진적 학습 적용 ──────────────────────────────────────────
         proposed_config = copy.deepcopy(self.base_config)
