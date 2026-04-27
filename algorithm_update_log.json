@@ -117,5 +117,72 @@
       "신뢰도": "높음 ✅"
     },
     "expert_cycle": "A분석→코드수정→B백테스트검증"
+  },
+  {
+    "timestamp": "2026-04-27T12:56:16.636036",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "detect_volume_spike: 단순 거래량 폭증은 하락 추세의 가속일 수 있으므로, 최소 2% 이상의 주가 상승을 동반한 양봉일 때만 신호로 인정하여 승률을 개선합니다.",
+      "is_taj_mahal_signal: 바닥권 반등의 신뢰도를 높이기 위해 거래량 필터를 평균의 0.8배에서 1.2배로 강화하여 실제 매수세 유입을 확인합니다.",
+      "detect_stoch_mfi_rebound: 지표상의 골든크로스뿐만 아니라 현재 봉이 양봉으로 마감되는지 확인하여 하락 중 일시적 지표 반등을 필터링합니다."
+    ],
+    "kept": false,
+    "before": {
+      "total": 168,
+      "wins": 66,
+      "win_rate": 39.2857,
+      "avg_ret": -0.2752,
+      "sharpe": -0.2211,
+      "mdd": 96.4331
+    },
+    "after": {
+      "total": 168,
+      "wins": 66,
+      "win_rate": 39.2857,
+      "avg_ret": -0.2752,
+      "sharpe": -0.2211,
+      "mdd": 96.4331
+    }
+  },
+  {
+    "title": "이번주 추천 종목 실적 기반 알고리즘 고도화 업데이트",
+    "timestamp": "2026-04-27 12:57:18",
+    "changes": {
+      "TIER1_WIN_RATE": {
+        "before": 50,
+        "after": 44
+      },
+      "TRAILING_STOP_PCT": {
+        "before": 0.037,
+        "after": 0.0382
+      },
+      "VALIDATE_MAX_HOLD_DAYS": {
+        "before": 16,
+        "after": 15
+      },
+      "US_TIER1_WIN_RATE": {
+        "before": 44,
+        "after": 40
+      }
+    },
+    "before_metrics": {
+      "count": 58,
+      "avg_return": 3.5922116721736943,
+      "win_rate": 60.3448275862069,
+      "max_return": 30.385995808643322,
+      "min_return": -12.56921035517074
+    },
+    "after_metrics": {
+      "count": 58,
+      "avg_return": 4.142706287918419,
+      "win_rate": 62.06896551724138,
+      "max_return": 30.385995808643322,
+      "min_return": -12.56921035517074
+    },
+    "notes": [
+      "실제 추천 종목 58개 성과 기반 고도화 최적화",
+      "시장 상황: BULL",
+      "최고 성과 신호: 거래가 조용해지며 다음 변동성을 준비하는 구간입니다. (승률 100.0%)"
+    ]
   }
 ]

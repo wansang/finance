@@ -1,5 +1,62 @@
 {
-    "signals": {},
+    "signals": {
+        "최근 급등 뒤 숨고르기 구간에 진입했습니다.": {
+            "total_count": 35,
+            "win_count": 26,
+            "total_return": 204.91005038098413,
+            "avg_return": 5.854572868028118,
+            "win_rate": 74.28571428571429
+        },
+        "거래가 조용해져 다음 움직임을 준비하는 모습입니다.": {
+            "total_count": 14,
+            "win_count": 8,
+            "total_return": 31.255386043901655,
+            "avg_return": 2.2325275745644038,
+            "win_rate": 57.14285714285714
+        },
+        "거래량 급증": {
+            "total_count": 7,
+            "win_count": 2,
+            "total_return": -28.874570818765143,
+            "avg_return": -4.12493868839502,
+            "win_rate": 28.57142857142857
+        },
+        "바닥권 반등 신호(BB 하단)": {
+            "total_count": 2,
+            "win_count": 1,
+            "total_return": 1.16888464946312,
+            "avg_return": 0.58444232473156,
+            "win_rate": 50.0
+        },
+        "거래가 조용해지며 다음 변동성을 준비하는 구간입니다.": {
+            "total_count": 9,
+            "win_count": 9,
+            "total_return": 59.99871210437928,
+            "avg_return": 6.666523567153253,
+            "win_rate": 100.0
+        },
+        "과매도 반등 신호": {
+            "total_count": 9,
+            "win_count": 5,
+            "total_return": 24.256516093406127,
+            "avg_return": 2.695168454822903,
+            "win_rate": 55.55555555555556
+        },
+        "RSI 반전 신호(상승 가능성)": {
+            "total_count": 2,
+            "win_count": 2,
+            "total_return": 9.01803686161834,
+            "avg_return": 4.50901843080917,
+            "win_rate": 100.0
+        },
+        "52주 신고가 돌파(모멘텀)": {
+            "total_count": 2,
+            "win_count": 2,
+            "total_return": 28.298160416696355,
+            "avg_return": 14.149080208348177,
+            "win_rate": 100.0
+        }
+    },
     "market_conditions": {
         "bull": {
             "optimal_params": {},
@@ -29,9 +86,9 @@
     "failure_patterns": {
         "high_volatility_stocks": {
             "description": "변동성이 높은 종목에서의 실패율",
-            "fail_count": 0,
-            "total_count": 0,
-            "fail_rate": 0.0
+            "fail_count": 6,
+            "total_count": 6,
+            "fail_rate": 100.0
         },
         "low_volume_stocks": {
             "description": "거래량이 적은 종목에서의 실패율",
@@ -46,5 +103,5 @@
             "fail_rate": 0.0
         }
     },
-    "last_updated": "2026-04-18 22:44:09"
+    "last_updated": "2026-04-27 12:11:17"
 }
