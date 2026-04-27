@@ -38,5 +38,15 @@
         "name": "OCI",
         "add_date": "2026-04-23",
         "source": "auto_recommendation"
+    },
+    "001515": {
+        "name": "SK증권우",
+        "add_date": "2026-04-27",
+        "source": "auto_recommendation"
+    },
+    "007120": {
+        "name": "미래아이앤지",
+        "add_date": "2026-04-27",
+        "source": "auto_recommendation"
     }
 }
