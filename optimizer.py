@@ -820,17 +820,132 @@ class StrategyOptimizer:
         with open(log_file, 'w', encoding='utf-8') as f:
             json.dump(existing, f, ensure_ascii=False, indent=2)
 
+    # --- AI 헬퍼 ---
+
+    def _call_ai_fresh(self, prompt):
+        """Gemini AI에 독립 세션으로 단일 호출 (대화 컨텍스트 오염 방지)"""
+        if not self.analyzer.ai_enabled:
+            return None
+        genai_lib = self.analyzer.genai_library
+        model_name = self.analyzer.model_name
+        api_key = self.analyzer.gemini_api_key
+        wait_times = [30, 60]
+        for attempt in range(3):
+            try:
+                if genai_lib == 'genai':
+                    import google.genai as _genai
+                    client = _genai.Client(api_key=api_key)
+                    fresh = client.chats.create(model=model_name)
+                    response = fresh.send_message(prompt)
+                elif genai_lib == 'generativeai':
+                    import google.generativeai as _genai
+                    _genai.configure(api_key=api_key)
+                    model = _genai.GenerativeModel(model_name)
+                    response = model.generate_content(prompt)
+                else:
+                    return None
+                return self.analyzer._normalize_ai_response(response)
+            except Exception as e:
+                if '429' in str(e) and attempt < 2:
+                    time.sleep(wait_times[attempt])
+                    continue
+                print(f"  [AI] 호출 오류: {e}")
+                return None
+        return None
+
+    def _extract_signal_functions(self):
+        """analyzer.py에서 신호 감지 함수 코드 추출"""
+        import ast as _ast
+        code = self._read_analyzer()
+        lines = code.split('\n')
+        target_funcs = {
+            'detect_volume_spike', 'is_taj_mahal_signal', 'detect_stoch_mfi_rebound',
+            'detect_divergence', 'detect_bb_squeeze', 'detect_macd_golden_cross',
+        }
+        result = {}
+        try:
+            tree = _ast.parse(code)
+            for node in _ast.walk(tree):
+                if isinstance(node, _ast.FunctionDef) and node.name in target_funcs:
+                    result[node.name] = '\n'.join(lines[node.lineno - 1:node.end_lineno])
+        except Exception:
+            pass
+        return result
+
+    def _parse_expert_a_patches(self, text):
+        """Expert A JSON 응답에서 패치 목록 파싱 및 안전성 검증"""
+        import re, ast as _ast
+        if not text:
+            return []
+        match = re.search(r'\{[\s\S]*\}', text)
+        if not match:
+            return []
+        try:
+            data = json.loads(match.group())
+        except Exception:
+            # JSON 파싱 실패 시 코드블록 내 JSON 재탐색
+            try:
+                code_match = re.search(r'```(?:json)?\s*(\{[\s\S]*?\})\s*```', text)
+                if not code_match:
+                    return []
+                data = json.loads(code_match.group(1))
+            except Exception:
+                return []
+
+        allowed = {
+            'detect_volume_spike', 'is_taj_mahal_signal', 'detect_stoch_mfi_rebound',
+            'detect_divergence', 'detect_bb_squeeze', 'detect_macd_golden_cross',
+        }
+        valid = []
+        current_code = self._read_analyzer()
+        for p in data.get('patches', []):
+            func = p.get('function', '')
+            old = p.get('old_code', '')
+            new = p.get('new_code', '')
+            reason = p.get('reason', '')
+            if func not in allowed:
+                print(f"  [Expert A] 허용되지 않는 함수 '{func}' 스킵")
+                continue
+            if not old or not new or old == new:
+                continue
+            if old not in current_code:
+                print(f"  [Expert A] '{func}' old_code 불일치 — 스킵")
+                continue
+            # 문법 검증
+            test_code = current_code.replace(old, new, 1)
+            try:
+                _ast.parse(test_code)
+            except SyntaxError as e:
+                print(f"  [Expert A] '{func}' 문법 오류 ({e}) — 스킵")
+                continue
+            valid.append({'function': func, 'reason': reason, 'old_code': old, 'new_code': new})
+        return valid
+
+    def _apply_ai_patches(self, patches):
+        """AI 패치를 analyzer.py에 적용, 적용된 patch 목록 반환"""
+        code = self._read_analyzer()
+        applied = []
+        for p in patches:
+            if p['old_code'] not in code:
+                continue
+            code = code.replace(p['old_code'], p['new_code'], 1)
+            applied.append(p)
+            print(f"  ✎ 적용: {p['function']} — {p['reason']}")
+        if applied:
+            self._write_analyzer(code)
+        return applied
+
     def expert_ab_cycle(self, signal_perf, optimize_started):
         """
-        Expert A → B 자동 개선 사이클
-        1. 신호 성과 기반 약세 신호 자동 식별
-        2. 사전 정의 패치를 analyzer.py에 적용
-        3. Before/After 경량 백테스트 비교
-        4. 성과 향상 시 유지, 미향상 시 rollback
+        Expert A (Gemini 투자분석전문가) → Expert B (백테스트 검증전문가) 자동 사이클
+
+        EXPERT_GUIDELINES.md 기반:
+        - Expert A: Gemini AI가 신호 성과 데이터와 현재 코드를 분석하여 개선안 제안
+        - Expert B: 경량 백테스트로 Before/After 성과를 객관적으로 비교 검증
+        - 성과 향상 시 채택, 미향상 시 자동 rollback
         """
         sample_size = self.base_config.get('EXPERT_AB_SAMPLE_SIZE', 50)
         periods = self.base_config.get('EXPERT_AB_PERIODS', 4)
-        # 최소 잔여 시간: (백테스트 2회) × 예상 소요 시간을 넉넉히 600초 × 2 = 1200초
         min_required = 1200
         remaining = self.time_limit_seconds - (time.time() - optimize_started)
         if remaining < min_required:
@@ -838,54 +953,131 @@ class StrategyOptimizer:
             return
 
         print("\n" + "=" * 72)
-        print("  [Expert A] 알고리즘 자동 개선 사이클 시작")
+        print("  [Expert A] 40년 경력 투자분석전문가 — 알고리즘 검토 시작")
         print("=" * 72)
 
         signals = signal_perf.get('signals', {})
         weak_threshold = self.base_config.get('WEAK_SIGNAL_WIN_RATE_THRESHOLD', 45)
-        weak_signals = {
-            k: v for k, v in signals.items()
-            if v.get('total_count', 0) >= 3 and v.get('win_rate', 100) < weak_threshold
-        }
 
-        if not weak_signals:
-            print(f"[Expert A] 승률 {weak_threshold}% 미만 약세 신호(3회 이상) 없음 — 코드 수정 불필요")
+        if not signals:
+            print("[Expert A] 신호 성과 데이터 없음 — 사이클 생략")
             return
 
-        print(f"[Expert A] 약세 신호 발견 (기준: 승률 < {weak_threshold}%):")
-        for sig, data in weak_signals.items():
-            print(f"  ✗ {sig}: 승률 {data['win_rate']:.1f}%, 평균 {data.get('avg_return', 0):+.2f}%")
+        # 전체 신호 성과 요약 (약세·강세 모두 Expert A에게 제공)
+        sig_summary = "\n".join(
+            f"  - {k}: 승률 {v['win_rate']:.1f}%, 평균 {v.get('avg_return', 0):+.2f}%, {v['total_count']}건"
+            for k, v in sorted(signals.items(), key=lambda x: x[1]['win_rate'])
+        )
+        print(f"[Expert A] 신호 성과 현황:\n{sig_summary}")
 
-        # 적용할 패치 결정
-        code = self._read_analyzer()
-        patched_code = code
-        patches_applied = []
+        # ── Expert A: Gemini AI로 코드 개선안 도출 ──────────────────────
+        proposed_patches = []
+        expert_a_analysis = ""
+        ai_used = self.analyzer.ai_enabled
 
-        if '거래량 급증' in weak_signals:
-            patched_code, applied = self._patch_volume_spike_bullish(patched_code)
-            if applied:
-                patches_applied.append('거래량급증_양봉필터: Close > Open 조건 추가 (패닉 매도 제외)')
+        if ai_used:
+            func_codes = self._extract_signal_functions()
+            func_text = "\n\n".join(
+                f"### {name}\n```python\n{code}\n```"
+                for name, code in func_codes.items()
+            )
 
-        if '바닥권 반등 신호(BB 하단)' in weak_signals:
-            patched_code, applied = self._patch_taj_mahal_rsi_35(patched_code)
-            if applied:
-                patches_applied.append('BB하단반등_RSI강화: 과매도 기준 40 → 35')
+            prompt_a = f"""당신은 40년 경력의 최고 주식투자 전문가입니다. 누적 수익 1000억원 이상을 달성했으며, 차트 중심의 기술적 분석이 특기입니다.
 
-        if '과매도 반등 신호' in weak_signals:
-            patched_code, applied = self._patch_stoch_mfi_volume(patched_code)
-            if applied:
-                patches_applied.append('과매도반등_거래량확인: VOL_AVG 1.2배 이상 조건 추가')
+아래는 현재 코스피 자동매매 시스템의 매수 신호별 실제 성과(최근 30일 실제 추천 기준)입니다:
 
-        if not patches_applied:
-            print("[Expert A] 매칭되는 패치 없음 — 수동 검토 필요")
-            return
+[신호별 성과]
+{sig_summary}
 
-        print(f"\n[Expert A] 적용 예정 패치 {len(patches_applied)}건:")
-        for p in patches_applied:
-            print(f"  ✎ {p}")
+[현재 신호 감지 함수들]
+{func_text}
 
-        # Before 백테스트
-        print(f"\n[Expert B] Before 백테스트 (KOSPI {sample_size}종목 × {periods}구간) 실행 중...")
+[임무]
+위 성과 데이터를 전문가 관점에서 분석하고, 승률이 낮거나 수익률이 마이너스인 신호를 개선하는 최소한의 코드 수정안을 제안하세요.
+
+반드시 아래 JSON 형식으로만 응답하세요 (다른 텍스트 없이):
+{{
+  "analysis": "전문가 분석 내용 (한국어, 2-3문장)",
+  "patches": [
+    {{
+      "function": "수정할 함수명",
+      "reason": "수정 이유 (한국어, 1문장)",
+      "old_code": "교체할 기존 코드 블록 (위 함수 코드에서 찾을 수 있는 정확한 문자열, 들여쓰기 포함)",
+      "new_code": "새 코드 블록 (들여쓰기 포함)"
+    }}
+  ]
+}}
+
+[제약 조건]
+- 수정 가능 함수: detect_volume_spike, is_taj_mahal_signal, detect_stoch_mfi_rebound, detect_divergence, detect_bb_squeeze, detect_macd_golden_cross
+- 변경은 최소화 (조건 1-2개 추가/강화 수준)
+- 기존 함수 시그니처와 반환값 타입(bool) 유지
+- old_code는 반드시 위 함수 코드에서 그대로 찾을 수 있는 문자열
+- 성과가 좋은 신호(승률 60% 이상)는 수정하지 말 것"""
+
+            print("\n[Expert A] Gemini AI에 코드 개선 요청 중...")
+            ai_text = self._call_ai_fresh(prompt_a)
+
+            if ai_text:
+                # 분석 내용 출력
+                import re
+                m = re.search(r'"analysis"\s*:\s*"([^"]+)"', ai_text)
+                if m:
+                    expert_a_analysis = m.group(1)
+                    print(f"  Expert A 분석: {expert_a_analysis}")
+
+                proposed_patches = self._parse_expert_a_patches(ai_text)
+                if proposed_patches:
+                    print(f"  Expert A 제안 패치 {len(proposed_patches)}건 검증 통과:")
+                    for p in proposed_patches:
+                        print(f"    ✎ {p['function']}: {p['reason']}")
+                else:
+                    print("  Expert A AI 패치 파싱 실패 → 규칙 기반으로 전환")
+                    ai_used = False
+            else:
+                print("  Expert A AI 호출 실패 → 규칙 기반으로 전환")
+                ai_used = False
+
+        # AI 패치 없을 경우: 규칙 기반 패치 (fallback)
+        if not proposed_patches:
+            print("[Expert A] 규칙 기반 패치 적용 시도...")
+            code = self._read_analyzer()
+            weak_signals = {
+                k: v for k, v in signals.items()
+                if v.get('total_count', 0) >= 3 and v.get('win_rate', 100) < weak_threshold
+            }
+            rule_patches = []
+            if '거래량 급증' in weak_signals:
+                code2, ok = self._patch_volume_spike_bullish(code)
+                if ok:
+                    rule_patches.append({'function': 'detect_volume_spike',
+                                         'reason': '규칙기반: 양봉 확인 조건 추가 (패닉 매도 제외)',
+                                         'old_code': '', 'new_code': '', '_code': code2})
+            if '바닥권 반등 신호(BB 하단)' in weak_signals:
+                base = rule_patches[-1]['_code'] if rule_patches else code
+                code2, ok = self._patch_taj_mahal_rsi_35(base)
+                if ok:
+                    rule_patches.append({'function': 'is_taj_mahal_signal',
+                                         'reason': '규칙기반: RSI 과매도 기준 40 → 35 강화',
+                                         'old_code': '', 'new_code': '', '_code': code2})
+            if '과매도 반등 신호' in weak_signals:
+                base = rule_patches[-1]['_code'] if rule_patches else code
+                code2, ok = self._patch_stoch_mfi_volume(base)
+                if ok:
+                    rule_patches.append({'function': 'detect_stoch_mfi_rebound',
+                                         'reason': '규칙기반: 거래량 1.2배 확인 조건 추가',
+                                         'old_code': '', 'new_code': '', '_code': code2})
+
+            if not rule_patches:
+                print("[Expert A] 적용 가능한 패치 없음 — 사이클 종료")
+                return
+
+            proposed_patches = rule_patches
+            print(f"  규칙 기반 패치 {len(proposed_patches)}건 준비 완료")
+
+        # ── Expert B: Before 백테스트 ────────────────────────────────────
+        print(f"\n[Expert B] 40년 경력 백테스트 검증전문가 — Before 백테스트 시작")
+        print(f"  (KOSPI {sample_size}종목 × {periods}구간, 현재 analyzer.py 기준)")
         before_stats = self.run_quick_backtest_stats(sample_size=sample_size, periods=periods)
         if not before_stats:
             print("[Expert B] Before 백테스트 실패 — 사이클 중단")
@@ -896,12 +1088,31 @@ class StrategyOptimizer:
             f"| MDD -{before_stats['mdd']:.1f}%"
         )
 
-        # 패치 적용
+        # ── Expert A 패치 적용 ───────────────────────────────────────────
         self._backup_analyzer()
-        self._write_analyzer(patched_code)
-        print(f"\n[Expert A] 패치 적용 완료. After 백테스트 실행 중...")
 
-        # After 백테스트
+        if ai_used:
+            # AI 패치: _apply_ai_patches 사용
+            applied_patches = self._apply_ai_patches(proposed_patches)
+        else:
+            # 규칙 기반: 최종 code를 직접 기록
+            final_code = proposed_patches[-1].get('_code', '')
+            if final_code:
+                self._write_analyzer(final_code)
+                applied_patches = proposed_patches
+            else:
+                applied_patches = []
+
+        if not applied_patches:
+            print("[Expert A] 패치 적용 실패 — 사이클 중단")
+            self._restore_analyzer()
+            return
+
+        patch_desc = [f"{p['function']}: {p['reason']}" for p in applied_patches]
+        print(f"\n[Expert A] 총 {len(applied_patches)}건 패치 적용 완료")
+
+        # ── Expert B: After 백테스트 ─────────────────────────────────────
+        print(f"\n[Expert B] After 백테스트 실행 중 (패치 적용 후)...")
         after_stats = self.run_quick_backtest_stats(sample_size=sample_size, periods=periods)
         if not after_stats:
             print("[Expert B] After 백테스트 실패 — rollback")
@@ -913,20 +1124,52 @@ class StrategyOptimizer:
             f"| MDD -{after_stats['mdd']:.1f}%"
         )
 
-        # 비교 및 결정
+        # ── Expert B: 정량 비교 → 채택/롤백 결정 ───────────────────────
         before_score = self._score_backtest(before_stats)
         after_score = self._score_backtest(after_stats)
         print(f"\n[Expert B] 종합 점수: Before {before_score:.2f}  →  After {after_score:.2f}")
 
-        if after_score > before_score:
-            print("  ✅ 성과 향상 확인 — 개선안 채택")
-            self._log_expert_ab_result(patches_applied, before_stats, after_stats, kept=True)
+        kept = after_score > before_score
+        if kept:
+            print("  ✅ 성과 향상 확인 — Expert A 개선안 채택")
         else:
-            print("  ❌ 성과 미향상 또는 동일 — 원복")
+            print("  ❌ 성과 미향상 또는 하락 — Expert A 개선안 롤백")
             self._restore_analyzer()
-            self._log_expert_ab_result(patches_applied, before_stats, after_stats, kept=False)
 
+        # Expert B AI 총평 (로그용, 결정에는 영향 없음)
+        if self.analyzer.ai_enabled:
+            prompt_b = f"""당신은 40년 경력의 주식 백테스트 전문가입니다.
+
+[Expert A 개선 내용]
+{chr(10).join(patch_desc)}
+
+[Expert A 분석]
+{expert_a_analysis}
+
+[Before 백테스트 결과]
+- 총 거래수: {before_stats['total']}건
+- 승률: {before_stats['win_rate']:.1f}%
+- 평균 수익률: {before_stats['avg_ret']:+.2f}%
+- Sharpe: {before_stats['sharpe']:.2f}
+- MDD: -{before_stats['mdd']:.1f}%
+
+[After 백테스트 결과]
+- 총 거래수: {after_stats['total']}건
+- 승률: {after_stats['win_rate']:.1f}%
+- 평균 수익률: {after_stats['avg_ret']:+.2f}%
+- Sharpe: {after_stats['sharpe']:.2f}
+- MDD: -{after_stats['mdd']:.1f}%
+
+[최종 결정]: {"채택" if kept else "롤백"}
+
+위 결과에 대한 전문가 총평을 2-3문장으로 간략히 작성해주세요."""
+            review = self._call_ai_fresh(prompt_b)
+            if review:
+                print(f"\n  [Expert B 총평] {review.strip()[:300]}")
+
+        self._log_expert_ab_result(patch_desc, before_stats, after_stats, kept=kept)
         print("=" * 72)
+
 
     # ------------------------------------------------------------------
     # 9. 메인 최적화 루틴
