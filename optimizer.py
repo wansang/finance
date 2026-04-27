@@ -946,11 +946,8 @@ class StrategyOptimizer:
         """
         sample_size = self.base_config.get('EXPERT_AB_SAMPLE_SIZE', 200)
         periods = self.base_config.get('EXPERT_AB_PERIODS', 8)
-        min_required = 7200  # Before + After 풀 백테스트 각 ~1시간 × 2
-        remaining = self.time_limit_seconds - (time.time() - optimize_started)
-        if remaining < min_required:
-            print(f"[Expert A/B] 잔여 시간 {remaining:.0f}초 < 필요 {min_required}초. 생략합니다.")
-            return
+        # Expert A/B는 파라미터 최적화 종료 후 독립 실행 — time_limit_seconds 체크 불필요
+        # (GitHub Actions timeout-minutes: 360 이 보호막 역할)
 
         print("\n" + "=" * 72)
         print("  [Expert A] 40년 경력 투자분석전문가 — 알고리즘 검토 시작")
