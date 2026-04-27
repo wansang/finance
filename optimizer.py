@@ -1073,6 +1073,11 @@ class StrategyOptimizer:
             print(f"  규칙 기반 패치 {len(proposed_patches)}건 준비 완료")
 
         # ── Expert B: Before 백테스트 ────────────────────────────────────
+        # 항상 최신 analyzer.py를 로드하도록 캐시 초기화
+        import sys
+        for _mod in ['analyzer', 'backtester']:
+            if _mod in sys.modules:
+                del sys.modules[_mod]
         print(f"\n[Expert B] 40년 경력 백테스트 검증전문가 — Before 백테스트 시작")
         print(f"  (KOSPI {sample_size}종목 × {periods}구간, 현재 analyzer.py 기준)")
         before_stats = self.run_quick_backtest_stats(sample_size=sample_size, periods=periods)
@@ -1109,6 +1114,11 @@ class StrategyOptimizer:
         print(f"\n[Expert A] 총 {len(applied_patches)}건 패치 적용 완료")
 
         # ── Expert B: After 백테스트 ─────────────────────────────────────
+        # 패치된 analyzer.py를 반영하려면 Python 모듈 캐시를 초기화해야 함
+        import sys
+        for _mod in ['analyzer', 'backtester']:
+            if _mod in sys.modules:
+                del sys.modules[_mod]
         print(f"\n[Expert B] After 백테스트 실행 중 (패치 적용 후)...")
         after_stats = self.run_quick_backtest_stats(sample_size=sample_size, periods=periods)
         if not after_stats:
