@@ -1241,8 +1241,8 @@ class StockAnalyzer:
         if not (rsi_was_oversold and rsi_rising):
             return False
         
-        # 조건 4: 거래량 평균 이상
-        if last['Volume'] < last['VOL_AVG'] * 0.8:
+        # 조건 4: 거래량이 평균을 확실히 상회 (강한 저점 매수세 유입 확인)
+        if last['Volume'] < last['VOL_AVG'] * 1.1:
             return False
         
         # 조건 5: 양봉
@@ -1310,7 +1310,8 @@ class StockAnalyzer:
         if len(df_target) < 2: return False
         
         last = df_target.iloc[-1]
-        if last['Volume'] > last['VOL_AVG'] * 2.5:
+        # 거래량 폭증 시 주가가 상승 추세(전일 대비 상승 및 양봉)일 때만 신뢰
+        if last['Volume'] > last['VOL_AVG'] * 2.5 and last['Close'] > df_target['Close'].iloc[-2] and last['Close'] > last['Open']:
             return True
         return False
 
