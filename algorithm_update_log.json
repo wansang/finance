@@ -242,5 +242,71 @@
       "시장 상황: BULL",
       "최고 성과 신호: 거래가 조용해지며 다음 변동성을 준비하는 구간입니다. (승률 100.0%)"
     ]
+  },
+  {
+    "timestamp": "2026-04-28T12:19:13.941556",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "detect_volume_spike: 단순 거래량 급증은 고점 매물 소화 실패 시 급락 위험이 크므로, 4% 이상의 확실한 가격 돌파와 RSI 65 이하의 과열 미진입 구간으로 제한합니다.",
+      "is_taj_mahal_signal: 바닥권에서 10% 수준의 거래량 증가는 하락 추세를 돌리기에 역부족이므로, 평균 대비 60% 이상의 강한 수급 유입을 확인하여 승률을 보정합니다."
+    ],
+    "kept": false,
+    "before": {
+      "total": 244,
+      "wins": 118,
+      "win_rate": 48.3607,
+      "avg_ret": 0.9427,
+      "sharpe": 0.2521,
+      "mdd": 91.788
+    },
+    "after": {
+      "total": 229,
+      "wins": 111,
+      "win_rate": 48.4716,
+      "avg_ret": 0.9239,
+      "sharpe": 0.2425,
+      "mdd": 90.3592
+    }
+  },
+  {
+    "title": "이번주 추천 종목 실적 기반 알고리즘 고도화 업데이트",
+    "timestamp": "2026-04-28 12:20:18",
+    "changes": {
+      "TREND_TEMPLATE_PEAK_FACTOR": {
+        "before": 0.85,
+        "after": 0.858
+      },
+      "TIER1_WIN_RATE": {
+        "before": 40,
+        "after": 38
+      },
+      "VALIDATE_MAX_HOLD_DAYS": {
+        "before": 15,
+        "after": 13
+      },
+      "US_TIER1_WIN_RATE": {
+        "before": 38,
+        "after": 35
+      }
+    },
+    "before_metrics": {
+      "count": 60,
+      "avg_return": 4.496932118178644,
+      "win_rate": 68.33333333333333,
+      "max_return": 30.385995808643322,
+      "min_return": -21.275084728315438
+    },
+    "after_metrics": {
+      "count": 60,
+      "avg_return": 4.496932118178644,
+      "win_rate": 68.33333333333333,
+      "max_return": 30.385995808643322,
+      "min_return": -21.275084728315438
+    },
+    "notes": [
+      "실제 추천 종목 60개 성과 기반 고도화 최적화",
+      "시장 상황: BULL",
+      "최고 성과 신호: RSI 반전 신호(상승 가능성) (승률 100.0%)"
+    ]
   }
 ]

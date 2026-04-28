@@ -1,59 +1,59 @@
 {
     "signals": {
         "최근 급등 뒤 숨고르기 구간에 진입했습니다.": {
-            "total_count": 35,
-            "win_count": 27,
-            "total_return": 236.83873809417818,
-            "avg_return": 6.766821088405091,
-            "win_rate": 77.14285714285715
+            "total_count": 36,
+            "win_count": 31,
+            "total_return": 266.465083170773,
+            "avg_return": 7.401807865854806,
+            "win_rate": 86.11111111111111
         },
         "거래가 조용해져 다음 움직임을 준비하는 모습입니다.": {
-            "total_count": 14,
-            "win_count": 9,
-            "total_return": 63.18407375709573,
-            "avg_return": 4.513148125506838,
-            "win_rate": 64.28571428571429
+            "total_count": 16,
+            "win_count": 10,
+            "total_return": 110.3456095921654,
+            "avg_return": 6.896600599510338,
+            "win_rate": 62.5
         },
         "거래량 급증": {
-            "total_count": 7,
-            "win_count": 2,
-            "total_return": -28.874570818765143,
-            "avg_return": -4.12493868839502,
-            "win_rate": 28.57142857142857
+            "total_count": 8,
+            "win_count": 3,
+            "total_return": -57.86410541087956,
+            "avg_return": -7.233013176359945,
+            "win_rate": 37.5
         },
         "바닥권 반등 신호(BB 하단)": {
             "total_count": 2,
             "win_count": 1,
-            "total_return": 1.16888464946312,
-            "avg_return": 0.58444232473156,
+            "total_return": 0.7018244828838248,
+            "avg_return": 0.3509122414419124,
             "win_rate": 50.0
         },
         "거래가 조용해지며 다음 변동성을 준비하는 구간입니다.": {
-            "total_count": 9,
+            "total_count": 10,
             "win_count": 9,
-            "total_return": 59.99871210437928,
-            "avg_return": 6.666523567153253,
-            "win_rate": 100.0
+            "total_return": 104.59132289459755,
+            "avg_return": 10.459132289459756,
+            "win_rate": 90.0
         },
         "과매도 반등 신호": {
             "total_count": 9,
             "win_count": 6,
-            "total_return": 56.185203806600185,
-            "avg_return": 6.242800422955576,
+            "total_return": 67.86588450873839,
+            "avg_return": 7.5406538343042655,
             "win_rate": 66.66666666666666
         },
         "RSI 반전 신호(상승 가능성)": {
             "total_count": 2,
             "win_count": 2,
-            "total_return": 9.01803686161834,
-            "avg_return": 4.50901843080917,
+            "total_return": 18.624254086637265,
+            "avg_return": 9.312127043318633,
             "win_rate": 100.0
         },
         "52주 신고가 돌파(모멘텀)": {
             "total_count": 2,
             "win_count": 2,
-            "total_return": 28.298160416696355,
-            "avg_return": 14.149080208348177,
+            "total_return": 28.446645606604434,
+            "avg_return": 14.223322803302217,
             "win_rate": 100.0
         }
     },
@@ -86,15 +86,15 @@
     "failure_patterns": {
         "high_volatility_stocks": {
             "description": "변동성이 높은 종목에서의 실패율",
-            "fail_count": 12,
-            "total_count": 12,
+            "fail_count": 18,
+            "total_count": 18,
             "fail_rate": 100.0
         },
         "low_volume_stocks": {
             "description": "거래량이 적은 종목에서의 실패율",
-            "fail_count": 0,
-            "total_count": 0,
-            "fail_rate": 0.0
+            "fail_count": 3,
+            "total_count": 3,
+            "fail_rate": 100.0
         },
         "false_breakouts": {
             "description": "가짜 돌파 후 실패",
@@ -103,5 +103,5 @@
             "fail_rate": 0.0
         }
     },
-    "last_updated": "2026-04-27 13:05:35"
+    "last_updated": "2026-04-28 11:34:08"
 }
