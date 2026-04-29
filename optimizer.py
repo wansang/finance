@@ -939,7 +939,7 @@ class StrategyOptimizer:
         """
         Expert A (Gemini 투자분석전문가) → Expert B (백테스트 검증전문가) 자동 사이클
 
-        EXPERT_GUIDELINES.md 기반:
+        agent/agent_stock.md, agent/agent_backtest.md 기반:
         - Expert A: Gemini AI가 신호 성과 데이터와 현재 코드를 분석하여 개선안 제안
         - Expert B: 경량 백테스트로 Before/After 성과를 객관적으로 비교 검증
         - 성과 향상 시 채택, 미향상 시 자동 rollback

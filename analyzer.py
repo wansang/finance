@@ -158,7 +158,12 @@ class StockAnalyzer:
                 "NFLX", "COST", "AMD", "QCOM", "INTC", "AMAT", "MU", "PANW", "CRWD", "ASML"
             ],
             "KOSPI_ETF_TICKERS": ["069500", "091170", "305720", "233740"],
-            "US_ETF_TICKERS": ["SPY", "QQQ", "DIA"]
+            "US_ETF_TICKERS": ["SPY", "QQQ", "DIA"],
+            "ETF_EXPERT_TICKERS": [
+                "069500", "102110", "091160", "091170", "114800",
+                "305720", "261110", "139230", "091230", "251340",
+                "278530", "233740", "364980", "396500"
+            ]
         }
         if os.path.exists(self.strategy_config_file):
             try:
@@ -981,6 +986,8 @@ class StockAnalyzer:
 - **어투**: 신뢰감 있고 친숙한 한국어 존댓말로 작성해줘.
 - **언어 제약**: 영어 표현과 전문 용어를 쓰지 말고, 쉬운 한국어로 풀어 설명해줘.
 - **핵심 요구**: 각 추천 종목 설명에 반드시 입력된 `현재가` 수치를 포함해줘. 전달된 숫자를 변경하지 말고, 가능한 한 그대로 반영해서 작성해줘.
+- **진입가 안내**: 추천 종목 데이터에 `진입가`, `손절`, `목표` 가격이 포함되어 있으면 반드시 언급하고, 각 가격의 의미(어디서 사야 하는지, 어디서 손절해야 하는지, 목표 수익은 어느 수준인지)를 쉬운 말로 설명해줘.
+- **진입가 안내**: 추천 종목 데이터에 `진입가`, `손절`, `목표` 가격이 포함되어 있으면 반드시 언급하고, 각 가격의 의미(어디서 사야 하는지, 어디서 손절해야 하는지, 목표 수익은 어느 수준인지)를 쉬운 말로 설명해줘.
 - **신고가 해석**: 데이터에 '52주 신고가 돌파' 또는 '52주 신고가 근접' 표시가 있는 종목은 반드시 이를 언급하고, 신고가 돌파/근접이 갖는 의미(추가 상승 모멘텀 가능성, 또는 차익실현 압력 등)를 한 문장으로 설명해줘.
 - **중요**: 보유 종목과 추천 종목 정보를 명확히 구분해서 작성해줘. 각 섹션은 분리되어 있어야 하며, 제목을 지나치게 생략하지 말고 구분이 쉽게 유지되도록 해줘.
 - **필수 섹션**: `[국제정세 뉴스 요약]` 섹션을 반드시 포함하고, 입력 데이터의 국제정세 뉴스에서 시장에 영향이 큰 2~3개를 간단히 요약해줘.
@@ -990,6 +997,7 @@ class StockAnalyzer:
   2. [국제정세 뉴스 요약] 섹션을 만들어서, 오늘 시장에 영향을 줄 수 있는 이슈를 정리해줘.
   3. [보유 종목] 섹션을 만들어서, 각 종목에 대해 왜 매도/보유 판단을 했는지 설명해줘.
   4. [추천 종목] 섹션을 만들어서, 각 종목에 대해 왜 추천하는지, 왜 지금 매수 또는 매수를 보류해야 하는지 설명해줘.
+  5. 추천 종목 데이터에 '[ETF 전문가 추천]' 섹션이 포함되어 있으면, [ETF 추천] 섹션을 별도로 만들어서 해당 ETF를 간략히 소개해줘.
 - **표현 금지**: '트레일링 스톱', '깃발형 패턴', '에너지 응축', '변동성 수렴' 등의 전문 용어를 쓰지 말고, 쉬운 설명으로 바꿔줘.
 - **문장 구성**: 각 설명은 새 문단으로 구분하고, 항목 사이에는 빈 줄을 넣어줘.
 - **가장 중요한 것**: 왜 추천하는지 이유를 분명하게 설명해줘.
@@ -1037,6 +1045,81 @@ class StockAnalyzer:
                     continue
                 print(f"AI 호출 중 오류 발생: {e}")
                 return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data)
+
+    def calculate_entry_price(self, df, code, is_etf=False):
+        """
+        agent_stock / agent_etf 전문가 관점의 최적 진입가 계산.
+
+        전략:
+        - 1순위 (가장 보수적): BB 하단 + SMA50 중 높은 값 → 지지선 기반 진입
+        - 2순위 (기본):        SMA50 기준 (중기 지지선)
+        - 3순위 (적극적):      현재가 기준 소폭 조정 대기 (-1.5%)
+        ETF는 SMA50을 더 중시 (변동성 낮음).
+        반환: {'entry': float, 'basis': str, 'stop_loss': float, 'target': float}
+        """
+        if df is None or len(df) < 20:
+            return None
+        last = df.iloc[-1]
+        close = float(last['Close'])
+
+        bbl = float(last['BBL']) if 'BBL' in last.index and pd.notna(last['BBL']) else None
+        bbm = float(last['BBM']) if 'BBM' in last.index and pd.notna(last['BBM']) else None
+        sma50 = float(last['SMA50']) if 'SMA50' in last.index and pd.notna(last['SMA50']) else None
+        sma200 = float(last['SMA200']) if 'SMA200' in last.index and pd.notna(last['SMA200']) else None
+
+        # 진입가 결정
+        if bbl and sma50 and close > bbl:
+            # BB 하단과 SMA50 중 높은 값 → 강한 지지선
+            entry = max(bbl, sma50) if not is_etf else sma50
+            basis = "BB하단·SMA50 지지선"
+        elif sma50 and close > sma50:
+            entry = sma50
+            basis = "SMA50 중기 지지선"
+        elif bbl and close > bbl:
+            entry = bbl
+            basis = "BB하단 지지선"
+        else:
+            # 현재가에서 1.5% 조정 대기
+            entry = round(close * 0.985, 0)
+            basis = "현재가 -1.5% 조정 대기"
+
+        # 현재가보다 높으면 현재가 그대로 (이미 지지선 위)
+        if entry > close:
+            entry = close
+            basis = "현재가 (즉시 진입 가능)"
+
+        # 손절가: 진입가에서 -3% (트레일링 스톱 기준)
+        trailing_stop_pct = self.config.get('TRAILING_STOP_PCT', 3.0)
+        stop_loss = round(entry * (1 - trailing_stop_pct / 100), 0)
+
+        # 목표가: BB 중단 또는 진입가 +8%
+        if bbm and bbm > entry:
+            target = round(bbm, 0)
+            target_basis = "BB중단"
+        else:
+            target = round(entry * 1.08, 0)
+            target_basis = "+8%"
+
+        return {
+            'entry': round(entry, 0),
+            'basis': basis,
+            'stop_loss': stop_loss,
+            'target': target,
+            'target_basis': target_basis,
+        }
+
+    def format_entry_info(self, entry_info, code):
+        """진입가 정보를 텍스트로 포맷"""
+        if not entry_info:
+            return ""
+        entry_text = self.format_price(entry_info['entry'], code)
+        stop_text = self.format_price(entry_info['stop_loss'], code)
+        target_text = self.format_price(entry_info['target'], code)
+        return (
+            f"진입가 {entry_text}({entry_info['basis']}) "
+            f"/ 손절 {stop_text} "
+            f"/ 목표 {target_text}({entry_info['target_basis']})"
+        )
 
     def get_indicators(self, df, kospi_index=None):
         """기술적 지표 계산 (SMA, RSI, MACD, BB, StochRSI, MFI)"""
@@ -1593,6 +1676,7 @@ class StockAnalyzer:
                     'prev_close': prev_close,
                     'avg_vol': avg_vol,
                     'sector': sector,
+                    '_df': df,
                 }
 
                 # Tier Classification
@@ -1675,6 +1759,7 @@ class StockAnalyzer:
                     'prev_close': prev_close,
                     'avg_vol': avg_vol,
                     'sector': 'ETF',
+                    '_df': df,
                 }
 
                 min_signals = self.config.get('TIER1_MIN_SIGNALS', 2)
@@ -1740,7 +1825,9 @@ class StockAnalyzer:
                     current_price = intraday.get('last', current_price)
                 price_text = self.format_price(current_price, r['code']) if current_price is not None else '가격 정보 없음'
                 combo_mark = " ⭐" if r.get('power_combo') else ""
-                msg = f"• <b>{r['name']}</b>({r['code']}): 현재가 {price_text} - {r['reasons']}{combo_mark}"
+                entry_info = self.calculate_entry_price(r.get('_df'), r['code'], is_etf=(r.get('sector') == 'ETF'))
+                entry_text = f" | {self.format_entry_info(entry_info, r['code'])}" if entry_info else ""
+                msg = f"• <b>{r['name']}</b>({r['code']}): 현재가 {price_text} - {r['reasons']}{combo_mark}\n  └ {entry_text}"
                 formatted_recs.append(msg)
             formatted_recs.append("")
             
@@ -1847,7 +1934,8 @@ class StockAnalyzer:
                     'rs_score': rs_score,
                     'last': float(last['Close']),
                     'prev_close': prev_close,
-                    'avg_vol': avg_vol
+                    'avg_vol': avg_vol,
+                    '_df': df,
                 }
 
                 min_signals = self.config.get('TIER1_MIN_SIGNALS', 2)
@@ -1898,13 +1986,115 @@ class StockAnalyzer:
                 if intraday:
                     current_price = intraday.get('last', current_price)
                 price_text = self.format_price(current_price, r['code']) if current_price is not None else '가격 정보 없음'
-                msg = f"• <b>{r['name']}</b>({r['code']}, {r.get('market', 'US')}): 현재가 {price_text} - {r['reasons']}"
+                entry_info = self.calculate_entry_price(r.get('_df'), r['code'], is_etf=False)
+                entry_text = f" | {self.format_entry_info(entry_info, r['code'])}" if entry_info else ""
+                msg = f"• <b>{r['name']}</b>({r['code']}, {r.get('market', 'US')}): 현재가 {price_text} - {r['reasons']}\n  └ {entry_text}"
                 formatted.append(msg)
             formatted.append("")
 
         if formatted and formatted[-1] == "":
             formatted.pop()
         return formatted, results
+
+    def analyze_etf_expert(self):
+        """ETF 전문가(agent_etf) 관점의 한국 ETF 추천 분석"""
+        etf_tickers = [str(x).strip() for x in self.config.get('ETF_EXPERT_TICKERS', []) if str(x).strip()]
+        if not etf_tickers:
+            return [], []
+
+        print(f"\n[ETF Expert] 한국 ETF {len(etf_tickers)}개 분석 시작...")
+        kospi_index = fdr.DataReader('KS11', start=(datetime.datetime.now() - datetime.timedelta(days=365)).strftime('%Y-%m-%d'))
+
+        candidates = []
+        for code in etf_tickers:
+            try:
+                df = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=400)).strftime('%Y-%m-%d'))
+                if len(df) < 60:
+                    continue
+                df = self.get_indicators(df, kospi_index)
+                target_idx = len(df) - 1
+                reasons = self.check_signals(df, target_idx)
+                if not reasons:
+                    continue
+                last = df.iloc[target_idx]
+                win_rate, avg_ret = self.validate_strategy(df, target_idx)
+                rs_score = last['RS_LINE'] if 'RS_LINE' in last else 0
+                prev_close = float(df.iloc[target_idx - 1]['Close']) if target_idx > 0 else float(last['Close'])
+                candidates.append({
+                    'code': code,
+                    'reasons': ", ".join(reasons),
+                    'win_rate': win_rate,
+                    'avg_ret': avg_ret,
+                    'rs_score': rs_score,
+                    'last': float(last['Close']),
+                    'prev_close': prev_close,
+                    '_df': df,
+                })
+            except Exception:
+                continue
+
+        if not candidates:
+            print("[ETF Expert] 매수 신호 ETF 없음")
+            return [], []
+
+        # 수익률 기준 정렬 (ETF 전문가: 신중 + 차트 기반 → rs_score + win_rate 복합)
+        candidates.sort(key=lambda x: (x['win_rate'], x['rs_score']), reverse=True)
+        top_candidates = candidates[:5]
+
+        # AI ETF 전문가 코멘트 생성
+        etf_comment = ""
+        if self.ai_enabled:
+            cand_text = "\n".join(
+                f"- {c['code']}: 신호={c['reasons']}, 승률={c['win_rate']:.1f}%, 평균수익={c['avg_ret']:+.2f}%"
+                for c in top_candidates
+            )
+            prompt = f"""당신은 40년간 한국 ETF 시장에서 활동한 ETF 투자 전문가입니다.
+수익률 50% 이상을 꾸준히 달성했으며, 차트 분석을 바탕으로 신중하게 종목을 선정하는 것으로 유명합니다.
+
+아래는 오늘 차트 신호가 발생한 한국 ETF 목록입니다:
+{cand_text}
+
+전문가 관점에서 각 ETF를 간략히 평가하고, 가장 주목할 ETF 1~2개를 추천해 주세요.
+반드시 차트 신호와 승률 데이터를 근거로 설명하고, 수익률 50% 미만으로 판단되면 추천하지 마세요.
+2~3문장으로 간결하게 한국어로 작성해 주세요."""
+            try:
+                import time
+                for attempt in range(2):
+                    try:
+                        if self.genai_library == 'genai':
+                            response = self.client.models.generate_content(
+                                model=self.model_name, contents=prompt
+                            )
+                            etf_comment = response.text.strip()
+                        else:
+                            response = self.model.generate_content(prompt)
+                            etf_comment = response.text.strip()
+                        break
+                    except Exception:
+                        if attempt == 0:
+                            time.sleep(30)
+            except Exception:
+                pass
+
+        # 포맷팅
+        formatted = ["<b>[ETF 전문가 추천]</b>"]
+        for r in top_candidates:
+            intraday = self.get_latest_price(r['code'])
+            current_price = r['last']
+            if intraday:
+                current_price = intraday.get('last', current_price)
+            price_text = self.format_price(current_price, r['code']) if current_price is not None else '가격 정보 없음'
+            entry_info = self.calculate_entry_price(r.get('_df'), r['code'], is_etf=True)
+            entry_text = f" | {self.format_entry_info(entry_info, r['code'])}" if entry_info else ""
+            formatted.append(
+                f"• <b>{r['code']}</b>: 현재가 {price_text} - {html.escape(r['reasons'])}\n  └ {entry_text}"
+            )
+        if etf_comment:
+            formatted.append("")
+            formatted.append(f"<i>📊 ETF 전문가 코멘트: {html.escape(etf_comment)}</i>")
+
+        print(f"[ETF Expert] 추천 ETF {len(top_candidates)}개 분석 완료")
+        return formatted, top_candidates
 
     def analyze_holdings(self):
         """보유 종목의 매도 타이밍(트레일링 스톱) 분석"""
@@ -1965,6 +2155,7 @@ class StockAnalyzer:
         sentiment_msg, is_positive = self.get_market_sentiment()
         recs_msg_kr, recs_raw_kr = self.analyze_kospi()
         recs_msg_us, recs_raw_us = self.analyze_us_candidates()
+        etf_msg, etf_raw = self.analyze_etf_expert()
         recs_msg = []
         if recs_msg_kr:
             recs_msg.append("<b>[국내 추천]</b>")
@@ -1973,6 +2164,9 @@ class StockAnalyzer:
             recs_msg.append("")
             recs_msg.append("<b>[미국 추천: Dow/Nasdaq 후보군]</b>")
             recs_msg.extend(recs_msg_us)
+        if etf_msg:
+            recs_msg.append("")
+            recs_msg.extend(etf_msg)
         recs_raw = self.merge_tier_results(recs_raw_kr, recs_raw_us)
         sell_alerts = self.analyze_holdings()
 
@@ -2000,10 +2194,11 @@ class StockAnalyzer:
         
         # 추천 종목을 'watch_data' 항목으로 전달
         us_recommendation_note = "[미국 주요 지수 참고]\n" + us_summary
+        etf_note = ("\n\n[ETF 전문가 추천]\n" + "\n".join(etf_msg)) if etf_msg else ""
         if recs_msg:
-            recommendation_context = "\n".join(recs_msg) + "\n\n" + us_recommendation_note
+            recommendation_context = "\n".join(recs_msg) + "\n\n" + us_recommendation_note + etf_note
         else:
-            recommendation_context = "추천 종목 없음\n\n" + us_recommendation_note
+            recommendation_context = "추천 종목 없음\n\n" + us_recommendation_note + etf_note
         
         # 3. AI 리포트 생성
         final_report = self.ask_ai_report(

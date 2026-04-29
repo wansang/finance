@@ -151,13 +151,17 @@ class MarketMonitor:
                     else:
                         near_high_label = " 📈 52주 신고가 근접"
 
+                # 진입가 계산 (신호 있을 때만)
+                entry_info = self.analyzer.calculate_entry_price(df, code) if reasons else None
+                entry_suffix = (f" | {self.analyzer.format_entry_info(entry_info, code)}") if entry_info else ""
+
                 if is_ai_recommended:
                     # Tier 1 지표 추가 계산 (승률 / 평균수익률)
                     win_rate, avg_ret = self.analyzer.validate_strategy(df, len(df) - 1)
                     add_date = info.get('add_date', '')
                     detail = (
                         f"신호: {sig_text}, 승률: {win_rate:.1f}%, "
-                        f"평균수익률: {avg_ret:+.2f}%, 추가일: {add_date}{near_high_label}"
+                        f"평균수익률: {avg_ret:+.2f}%, 추가일: {add_date}{near_high_label}{entry_suffix}"
                     )
                     ai_watch_data.append(
                         self._format_monitor_line(
@@ -178,7 +182,7 @@ class MarketMonitor:
                             change_text,
                             high_text,
                             volume_text,
-                            f"신호: {sig_text}{near_high_label}",
+                            f"신호: {sig_text}{near_high_label}{entry_suffix}",
                             high_52w_text=high_52w_text
                         )
                     )

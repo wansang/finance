@@ -35,7 +35,19 @@
 - `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`를 GitHub Secrets에 등록하면 매일 아침 자동으로 리포트가 전송됩니다.
 - `Elite Stock Analysis` 리포트에는 오늘의 주요 주식/증시 관련 뉴스 요약도 포함됩니다.
 
-## 🚀 기술 스택
+## � 전문가 역할 (Agent)
+
+역할별 상세 지침은 `agent/` 폴더를 참조하세요.
+
+| 역할 | 파일 | 설명 |
+|------|------|------|
+| A. 투자분석전문가 | [agent/agent_stock.md](agent/agent_stock.md) | 기술적 분석 기반 알고리즘 검증·개선 |
+| B. 백테스트 검증전문가 | [agent/agent_backtest.md](agent/agent_backtest.md) | 수익률·승률·MDD 등 성과 지표 검증 |
+| C. 자동화 전문가 | [agent/agent_auto.md](agent/agent_auto.md) | 주간 Self-Evolution 자동화 루프 운영 |
+| ETF. ETF 투자 전문가 | [agent/agent_etf.md](agent/agent_etf.md) | 차트 분석 기반 ETF 종목 선정 및 포트폴리오 최적화 |
+| 검색. 검색 전문가 | [agent/agent_search.md](agent/agent_search.md) | 역할 정의 예정 |
+
+## �🚀 기술 스택
 - **Language**: Python 3.9+
 - **Data**: FinanceDataReader
 - **Indicators**: pandas-ta-classic
