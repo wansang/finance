@@ -861,7 +861,7 @@ class StrategyOptimizer:
         target_funcs = {
             'detect_volume_spike', 'is_taj_mahal_signal', 'detect_stoch_mfi_rebound',
             'detect_divergence', 'detect_bb_squeeze', 'detect_macd_golden_cross',
-            'calculate_entry_price',
+            'calculate_entry_price', 'calculate_holding_targets',
         }
         result = {}
         try:
@@ -896,7 +896,7 @@ class StrategyOptimizer:
         allowed = {
             'detect_volume_spike', 'is_taj_mahal_signal', 'detect_stoch_mfi_rebound',
             'detect_divergence', 'detect_bb_squeeze', 'detect_macd_golden_cross',
-            'calculate_entry_price',
+            'calculate_entry_price', 'calculate_holding_targets',
         }
         valid = []
         current_code = self._read_analyzer()
@@ -1258,8 +1258,9 @@ class StrategyOptimizer:
 }}
 
 [제약 조건]
-- 수정 가능 함수: detect_volume_spike, is_taj_mahal_signal, detect_stoch_mfi_rebound, detect_divergence, detect_bb_squeeze, detect_macd_golden_cross, calculate_entry_price
+- 수정 가능 함수: detect_volume_spike, is_taj_mahal_signal, detect_stoch_mfi_rebound, detect_divergence, detect_bb_squeeze, detect_macd_golden_cross, calculate_entry_price, calculate_holding_targets
 - calculate_entry_price 수정 시: 진입가 산출 로직(entry 계산, basis 문자열, stop_loss/target 계산)만 수정 가능. 반환값 키(entry, basis, stop_loss, target, target_basis) 유지 필수
+- calculate_holding_targets 수정 시: 보유종목 손절가(stop_loss, stop_basis)·목표가(target, target_basis) 계산 로직만 수정 가능. 반환값 키(stop_loss, stop_basis, target, target_basis) 유지 필수
 - 변경은 최소화 (조건 1-2개 추가/강화 수준), 기존 반환값 타입(bool 또는 dict) 유지
 - 성과가 좋은 신호(승률 60% 이상)는 수정하지 말 것
 - old_code는 반드시 위 함수 코드에서 그대로 찾을 수 있는 문자열"""
@@ -1283,6 +1284,10 @@ ETF 투자 관점에서 아래 두 가지를 제안하세요.
 현재 로직: BB하단+SMA50 지지선 기반 진입, 손절=진입가×(1-TRAILING_STOP_PCT), 목표=BB중단 or +8%
 ETF 특성(낮은 변동성, 추세 추종)에 맞게 진입 조건이나 손절·목표가 비율을 더 적합하게 개선하는 방안을 제안하세요.
 
+3. calculate_holding_targets 함수의 보유종목 손절가·목표가 로직 개선
+현재 로직: 손절=매수 후 최고가×(1-TRAILING_STOP_PCT), 목표=BBU(BB상단) or 현재가+8%
+ETF 보유 시 더 넓은 손절 기준이나 추세 기반 목표가 조정이 필요한지 제안하세요.
+
 반드시 아래 JSON 형식으로만 응답하세요:
 {{
   "analysis": "ETF 관점 분석 (한국어, 2문장)",
@@ -1298,6 +1303,12 @@ ETF 특성(낮은 변동성, 추세 추종)에 맞게 진입 조건이나 손절
   "entry_price_patch": {{
     "function": "calculate_entry_price",
     "reason": "ETF 특성 반영 진입가 로직 개선 (1문장)",
+    "old_code": "교체할 기존 코드 블록 (정확한 문자열, 없으면 null)",
+    "new_code": "새 코드 블록 (없으면 null)"
+  }},
+  "holding_targets_patch": {{
+    "function": "calculate_holding_targets",
+    "reason": "ETF 보유 시 손절가·목표가 기준 개선 (1문장)",
     "old_code": "교체할 기존 코드 블록 (정확한 문자열, 없으면 null)",
     "new_code": "새 코드 블록 (없으면 null)"
   }}
@@ -1457,6 +1468,16 @@ ETF 특성(낮은 변동성, 추세 추종)에 맞게 진입 조건이나 손절
                                     'new_code': ep_patch['new_code'],
                                 })
                                 print(f"  agent_etf calculate_entry_price 패치 제안 수신: {ep_patch.get('reason','')}")
+                            # calculate_holding_targets 패치 제안 추출
+                            ht_patch = etf_data.get('holding_targets_patch', {})
+                            if ht_patch and ht_patch.get('old_code') and ht_patch.get('new_code'):
+                                proposed_patches.append({
+                                    'function': 'calculate_holding_targets',
+                                    'reason': ht_patch.get('reason', 'agent_etf: ETF 보유 손절·목표 로직 개선'),
+                                    'old_code': ht_patch['old_code'],
+                                    'new_code': ht_patch['new_code'],
+                                })
+                                print(f"  agent_etf calculate_holding_targets 패치 제안 수신: {ht_patch.get('reason','')}")
                         except Exception:
                             pass
 
