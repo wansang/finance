@@ -1177,9 +1177,380 @@ class StrategyOptimizer:
         self._log_expert_ab_result(patch_desc, before_stats, after_stats, kept=kept)
         print("=" * 72)
 
+    # ------------------------------------------------------------------
+    # 9. Auto Evolution — agent_auto 기반 전문가 협업 3사이클 루프
+    # ------------------------------------------------------------------
+
+    def _prompt_agent_search(self, sig_summary, func_text):
+        """agent_search: 현재 시스템에 없는 신규 투자 방법론 탐색 요청"""
+        return f"""당신은 40년 주식·ETF 시장 흐름 분석 전문가입니다. 검증된 외부 방법론을 발굴·도입하는 것이 특기입니다.
+
+[현재 시스템 신호별 성과]
+{sig_summary}
+
+[현재 구현된 신호 함수 목록]
+{', '.join(func_text.keys())}
+
+[임무]
+현재 시스템에 없는 새로운 매수 신호 또는 필터링 로직을 1~2개 제안하세요.
+제안은 아래 카테고리 중 하나여야 합니다:
+- 모멘텀 전략 (듀얼 모멘텀, RS 등)
+- 변동성 기반 (ATR 포지션 사이징 등)
+- 거래량 분석 (OBV, VWAP 등)
+- 계절성·패턴
+
+반드시 아래 JSON 형식으로만 응답하세요:
+{{
+  "new_methods": [
+    {{
+      "name": "신호명",
+      "category": "카테고리",
+      "description": "방법론 설명 (2문장)",
+      "implementation_hint": "현재 analyzer.py 신호 함수에 추가 가능한 구체적 조건 (1문장)"
+    }}
+  ]
+}}"""
+
+    def _prompt_agent_stock(self, sig_summary, func_text, search_proposals, feedback, cycle):
+        """agent_stock: 주식 알고리즘 분석 및 개선 제안 (사이클별 피드백 반영)"""
+        feedback_section = ""
+        if feedback:
+            feedback_section = f"""
+[이전 사이클({cycle-1}) agent_backtest 피드백]
+{feedback}
+
+위 피드백을 반드시 반영하여 수정된 제안을 작성하세요.
+"""
+        search_section = ""
+        if search_proposals:
+            search_section = f"""
+[agent_search 신규 방법론 제안]
+{search_proposals}
+
+위 신규 방법론 중 현실적으로 적용 가능한 것이 있으면 반영하세요.
+"""
+        return f"""당신은 40년 경력 최고 주식투자 전문가입니다. 누적 수익 1000억원 이상을 달성했으며, 차트 기반 기술적 분석이 특기입니다.
+
+[현재 시스템 신호별 성과 — 사이클 {cycle}]
+{sig_summary}
+
+[현재 신호 감지 함수들]
+{chr(10).join(f"### {name}" + chr(10) + "```python" + chr(10) + code + chr(10) + "```" for name, code in func_text.items())}
+{search_section}{feedback_section}
+[임무]
+위 성과 데이터를 분석하여 승률이 낮거나 수익률이 마이너스인 신호를 개선하는 최소한의 코드 수정안을 제안하세요.
+이전 사이클의 거부 피드백이 있다면 반드시 반영하세요.
+
+반드시 아래 JSON 형식으로만 응답하세요:
+{{
+  "analysis": "전문가 분석 (한국어, 2-3문장)",
+  "cycle": {cycle},
+  "patches": [
+    {{
+      "function": "수정할 함수명",
+      "reason": "수정 이유 (한국어, 1문장)",
+      "old_code": "교체할 기존 코드 블록 (들여쓰기 포함, 정확한 문자열)",
+      "new_code": "새 코드 블록 (들여쓰기 포함)"
+    }}
+  ]
+}}
+
+[제약 조건]
+- 수정 가능 함수: detect_volume_spike, is_taj_mahal_signal, detect_stoch_mfi_rebound, detect_divergence, detect_bb_squeeze, detect_macd_golden_cross
+- 변경은 최소화 (조건 1-2개 추가/강화 수준), 기존 반환값 타입(bool) 유지
+- 성과가 좋은 신호(승률 60% 이상)는 수정하지 말 것
+- old_code는 반드시 위 함수 코드에서 그대로 찾을 수 있는 문자열"""
+
+    def _prompt_agent_etf(self, sig_summary, search_proposals, feedback, cycle):
+        """agent_etf: ETF 전략 분석 및 strategy_config 파라미터 개선 제안"""
+        feedback_section = f"\n[이전 사이클({cycle-1}) 피드백]\n{feedback}\n위 피드백을 반영하세요." if feedback else ""
+        search_section = f"\n[agent_search 신규 방법론]\n{search_proposals}\n적용 가능한 것이 있으면 반영하세요." if search_proposals else ""
+        return f"""당신은 40년 한국·미국 ETF 시장 전문가입니다. 차트 분석 기반 ETF 종목 선정과 포트폴리오 최적화가 특기입니다.
+
+[현재 시스템 신호별 성과 — 사이클 {cycle}]
+{sig_summary}
+{search_section}{feedback_section}
+[임무]
+ETF 투자 관점에서 아래 strategy_config.json 파라미터 중 개선이 필요한 항목을 제안하세요.
+대상: TRAILING_STOP_PCT, TRAILING_STOP_ACTIVATE_PCT, PROFIT_TARGET_PCT, ATR_STOP_MULTIPLIER, ATR_TARGET_MULTIPLIER, MAX_HARD_STOP_PCT
+
+반드시 아래 JSON 형식으로만 응답하세요:
+{{
+  "analysis": "ETF 관점 분석 (한국어, 2문장)",
+  "cycle": {cycle},
+  "param_suggestions": [
+    {{
+      "param": "파라미터명",
+      "current": "현재값",
+      "suggested": "제안값",
+      "reason": "이유 (1문장)"
+    }}
+  ]
+}}"""
+
+    def _prompt_agent_backtest(self, cycle, stock_analysis, etf_suggestions,
+                                before_stats, after_stats, patch_desc, kept):
+        """agent_backtest: Before/After 백테스트 결과 검증 및 피드백 생성"""
+        etf_section = f"\n[agent_etf 파라미터 제안]\n{etf_suggestions}" if etf_suggestions else ""
+        return f"""당신은 40년 주식·ETF 백테스트 전문가입니다. 어떤 전략이든 반드시 데이터로 검증하며, 과최적화와 통계 불충분을 엄격히 경계합니다.
+
+[사이클 {cycle} 검증]
+
+[agent_stock 분석]
+{stock_analysis}
+{etf_section}
+
+[패치 내용]
+{chr(10).join(f"  - {p}" for p in patch_desc)}
+
+[Before 백테스트]
+- 거래수: {before_stats['total']}건 | 승률: {before_stats['win_rate']:.1f}% | 평균: {before_stats['avg_ret']:+.2f}% | Sharpe: {before_stats['sharpe']:.2f} | MDD: -{before_stats['mdd']:.1f}%
+
+[After 백테스트]
+- 거래수: {after_stats['total']}건 | 승률: {after_stats['win_rate']:.1f}% | 평균: {after_stats['avg_ret']:+.2f}% | Sharpe: {after_stats['sharpe']:.2f} | MDD: -{after_stats['mdd']:.1f}%
+
+[최종 결정]: {"✅ 채택" if kept else "❌ 롤백"}
+
+[임무]
+1. 채택/롤백 결정에 대한 정량적 근거를 설명하세요.
+2. 거부된 경우: agent_stock이 다음 사이클에서 반드시 반영해야 할 구체적 개선 방향을 제시하세요.
+3. 채택된 경우: 다음 사이클에서 추가로 개선할 수 있는 항목을 제안하세요.
+4. 샘플 수({before_stats['total']}건)가 50건 미만이면 통계 신뢰도 경고를 포함하세요.
+
+2-4문장으로 간결하게 한국어로 작성하세요."""
+
+    def auto_evolution_cycle(self, signal_perf, optimize_started):
+        """
+        agent_auto 기반 전문가 협업 3사이클 자동 진화 루프
+
+        흐름:
+          STEP 1. agent_search  — 신규 투자 방법론 탐색
+          STEP 2-A. agent_stock — 주식 알고리즘 개선 제안 (사이클마다 피드백 반영)
+          STEP 2-B. agent_etf   — ETF 파라미터 개선 제안 (병렬)
+          STEP 3. agent_backtest — Before/After 검증, 채택/롤백 결정 + 피드백
+          → 최소 3사이클 반복 후 최종 확정
+        """
+        sample_size = self.base_config.get('EXPERT_AB_SAMPLE_SIZE', 200)
+        periods = self.base_config.get('EXPERT_AB_PERIODS', 8)
+        max_cycles = 3  # 최소 3사이클
+
+        signals = signal_perf.get('signals', {})
+        if not signals:
+            print("[Auto Evolution] 신호 성과 데이터 없음 — 사이클 생략")
+            return
+
+        sig_summary = "\n".join(
+            f"  - {k}: 승률 {v['win_rate']:.1f}%, 평균 {v.get('avg_return', 0):+.2f}%, {v['total_count']}건"
+            for k, v in sorted(signals.items(), key=lambda x: x[1]['win_rate'])
+        )
+
+        print("\n" + "=" * 72)
+        print("  [Auto Evolution] agent_auto 기반 전문가 협업 시작")
+        print(f"  최소 {max_cycles}사이클 실행 예정")
+        print("=" * 72)
+
+        # ── STEP 1: agent_search — 신규 방법론 탐색 ─────────────────────
+        func_text = self._extract_signal_functions()
+        search_proposals = ""
+        if self.analyzer.ai_enabled:
+            print("\n[STEP 1] agent_search — 신규 투자 방법론 탐색 중...")
+            prompt_search = self._prompt_agent_search(sig_summary, func_text)
+            search_raw = self._call_ai_fresh(prompt_search)
+            if search_raw:
+                import re, json as _json
+                m = re.search(r'\{[\s\S]*\}', search_raw)
+                if m:
+                    try:
+                        search_data = _json.loads(m.group())
+                        methods = search_data.get('new_methods', [])
+                        if methods:
+                            lines = []
+                            for mt in methods:
+                                lines.append(f"  [{mt.get('category','')}] {mt.get('name','')}: {mt.get('description','')} → {mt.get('implementation_hint','')}")
+                            search_proposals = "\n".join(lines)
+                            print(f"  agent_search 제안 {len(methods)}건:")
+                            print(search_proposals)
+                    except Exception:
+                        pass
+            if not search_proposals:
+                print("  agent_search 결과 없음 — 기존 방법론 기반으로 진행")
+        else:
+            print("\n[STEP 1] agent_search — AI 비활성화, 스킵")
+
+        # ── STEP 2~4: 3사이클 반복 ──────────────────────────────────────
+        backtest_feedback = ""
+        best_cycle_kept = False
+
+        for cycle in range(1, max_cycles + 1):
+            print(f"\n{'─'*72}")
+            print(f"  [사이클 {cycle}/{max_cycles}]")
+            print(f"{'─'*72}")
+
+            # STEP 2-A: agent_stock
+            proposed_patches = []
+            stock_analysis = ""
+            if self.analyzer.ai_enabled:
+                print(f"\n[사이클 {cycle}] STEP 2-A: agent_stock — 주식 알고리즘 분석 중...")
+                prompt_stock = self._prompt_agent_stock(
+                    sig_summary, func_text, search_proposals, backtest_feedback, cycle
+                )
+                stock_raw = self._call_ai_fresh(prompt_stock)
+                if stock_raw:
+                    import re
+                    m = re.search(r'"analysis"\s*:\s*"([^"]+)"', stock_raw)
+                    if m:
+                        stock_analysis = m.group(1)
+                        print(f"  agent_stock 분석: {stock_analysis}")
+                    proposed_patches = self._parse_expert_a_patches(stock_raw)
+                    if proposed_patches:
+                        print(f"  agent_stock 제안 패치 {len(proposed_patches)}건:")
+                        for p in proposed_patches:
+                            print(f"    ✎ {p['function']}: {p['reason']}")
+                    else:
+                        print("  agent_stock 패치 파싱 실패 → 규칙 기반 fallback")
+
+            # STEP 2-B: agent_etf (병렬 — AI 호출 순차 처리)
+            etf_suggestions = ""
+            if self.analyzer.ai_enabled:
+                print(f"\n[사이클 {cycle}] STEP 2-B: agent_etf — ETF 파라미터 분석 중...")
+                prompt_etf = self._prompt_agent_etf(
+                    sig_summary, search_proposals, backtest_feedback, cycle
+                )
+                etf_raw = self._call_ai_fresh(prompt_etf)
+                if etf_raw:
+                    import re, json as _json
+                    m = re.search(r'\{[\s\S]*\}', etf_raw)
+                    if m:
+                        try:
+                            etf_data = _json.loads(m.group())
+                            etf_analysis = etf_data.get('analysis', '')
+                            suggestions = etf_data.get('param_suggestions', [])
+                            if etf_analysis:
+                                print(f"  agent_etf 분석: {etf_analysis}")
+                            if suggestions:
+                                etf_lines = [f"  {s['param']}: {s['current']} → {s['suggested']} ({s['reason']})" for s in suggestions]
+                                etf_suggestions = "\n".join(etf_lines)
+                                print(f"  agent_etf 파라미터 제안:")
+                                print(etf_suggestions)
+                        except Exception:
+                            pass
+
+            # AI 패치 없으면 규칙 기반 fallback
+            if not proposed_patches:
+                print(f"[사이클 {cycle}] 규칙 기반 패치 시도...")
+                code = self._read_analyzer()
+                weak_threshold = self.base_config.get('WEAK_SIGNAL_WIN_RATE_THRESHOLD', 45)
+                weak_signals = {
+                    k: v for k, v in signals.items()
+                    if v.get('total_count', 0) >= 3 and v.get('win_rate', 100) < weak_threshold
+                }
+                rule_patches = []
+                if '거래량 급증' in weak_signals:
+                    code2, ok = self._patch_volume_spike_bullish(code)
+                    if ok:
+                        rule_patches.append({'function': 'detect_volume_spike',
+                                             'reason': '규칙기반: 양봉 확인 조건 추가',
+                                             'old_code': '', 'new_code': '', '_code': code2})
+                if '바닥권 반등 신호(BB 하단)' in weak_signals:
+                    base = rule_patches[-1]['_code'] if rule_patches else code
+                    code2, ok = self._patch_taj_mahal_rsi_35(base)
+                    if ok:
+                        rule_patches.append({'function': 'is_taj_mahal_signal',
+                                             'reason': '규칙기반: RSI 기준 40→35 강화',
+                                             'old_code': '', 'new_code': '', '_code': code2})
+                if not rule_patches:
+                    print(f"[사이클 {cycle}] 적용 가능한 패치 없음 — 이 사이클 스킵")
+                    continue
+                proposed_patches = rule_patches
+
+            # STEP 3: agent_backtest — Before 백테스트
+            import sys
+            for _mod in ['analyzer', 'backtester']:
+                if _mod in sys.modules:
+                    del sys.modules[_mod]
+            print(f"\n[사이클 {cycle}] STEP 3: agent_backtest — Before 백테스트...")
+            before_stats = self.run_quick_backtest_stats(sample_size=sample_size, periods=periods)
+            if not before_stats:
+                print(f"[사이클 {cycle}] Before 백테스트 실패 — 스킵")
+                continue
+            print(
+                f"  Before: {before_stats['total']}건 | 승률 {before_stats['win_rate']:.1f}% "
+                f"| 평균 {before_stats['avg_ret']:+.2f}% | Sharpe {before_stats['sharpe']:.2f} "
+                f"| MDD -{before_stats['mdd']:.1f}%"
+            )
+
+            # 패치 적용
+            self._backup_analyzer()
+            if all('_code' not in p for p in proposed_patches):
+                applied_patches = self._apply_ai_patches(proposed_patches)
+            else:
+                final_code = proposed_patches[-1].get('_code', '')
+                if final_code:
+                    self._write_analyzer(final_code)
+                    applied_patches = proposed_patches
+                else:
+                    applied_patches = []
+
+            if not applied_patches:
+                print(f"[사이클 {cycle}] 패치 적용 실패 — 스킵")
+                self._restore_analyzer()
+                continue
+
+            patch_desc = [f"{p['function']}: {p['reason']}" for p in applied_patches]
+            print(f"  패치 {len(applied_patches)}건 적용 완료")
+
+            # After 백테스트
+            import sys
+            for _mod in ['analyzer', 'backtester']:
+                if _mod in sys.modules:
+                    del sys.modules[_mod]
+            print(f"  After 백테스트 실행 중...")
+            after_stats = self.run_quick_backtest_stats(sample_size=sample_size, periods=periods)
+            if not after_stats:
+                print(f"[사이클 {cycle}] After 백테스트 실패 — rollback")
+                self._restore_analyzer()
+                continue
+            print(
+                f"  After:  {after_stats['total']}건 | 승률 {after_stats['win_rate']:.1f}% "
+                f"| 평균 {after_stats['avg_ret']:+.2f}% | Sharpe {after_stats['sharpe']:.2f} "
+                f"| MDD -{after_stats['mdd']:.1f}%"
+            )
+
+            # 채택/롤백 결정
+            before_score = self._score_backtest(before_stats)
+            after_score = self._score_backtest(after_stats)
+            kept = after_score > before_score
+            print(f"\n  [agent_backtest] 점수: Before {before_score:.2f} → After {after_score:.2f}")
+            if kept:
+                print(f"  ✅ 사이클 {cycle} 채택 — 개선 확인")
+                best_cycle_kept = True
+            else:
+                print(f"  ❌ 사이클 {cycle} 롤백 — 성과 미향상")
+                self._restore_analyzer()
+
+            # agent_backtest AI 피드백 생성 (다음 사이클에 반영)
+            if self.analyzer.ai_enabled:
+                prompt_bt = self._prompt_agent_backtest(
+                    cycle, stock_analysis, etf_suggestions,
+                    before_stats, after_stats, patch_desc, kept
+                )
+                bt_feedback = self._call_ai_fresh(prompt_bt)
+                if bt_feedback:
+                    backtest_feedback = bt_feedback.strip()
+                    print(f"\n  [agent_backtest 피드백 → 다음 사이클 반영]\n  {backtest_feedback[:400]}")
+
+            self._log_expert_ab_result(patch_desc, before_stats, after_stats, kept=kept)
+
+            # 최종 사이클 함수 코드 갱신 (다음 사이클 분석 기준)
+            func_text = self._extract_signal_functions()
+
+        print("\n" + "=" * 72)
+        print(f"  [Auto Evolution 완료] {max_cycles}사이클 종료 — "
+              f"{'최소 1건 채택됨' if best_cycle_kept else '모든 사이클 롤백'}")
+        print("=" * 72)
 
     # ------------------------------------------------------------------
-    # 9. 메인 최적화 루틴
+    # 10. 메인 최적화 루틴
     # ------------------------------------------------------------------
     def optimize(self):
         optimize_started = time.time()
@@ -1341,11 +1712,11 @@ class StrategyOptimizer:
         # ── 6-B. US 주식 파라미터 최적화 ────────────────────────────────
         us_params = self.optimize_us_parameters(optimize_started)
 
-        # ── 6-C. Expert A/B 알고리즘 자동 개선 사이클 ────────────────────
+        # ── 6-C. Auto Evolution — agent_auto 기반 전문가 협업 3사이클 ──────
         if self.base_config.get('EXPERT_AB_ENABLED', True):
-            self.expert_ab_cycle(signal_perf, optimize_started)
+            self.auto_evolution_cycle(signal_perf, optimize_started)
         else:
-            print("\n[Expert A/B] EXPERT_AB_ENABLED=False — 사이클 비활성화")
+            print("\n[Auto Evolution] EXPERT_AB_ENABLED=False — 사이클 비활성화")
 
         # ── 7. 점진적 학습 적용 ──────────────────────────────────────────
         proposed_config = copy.deepcopy(self.base_config)
