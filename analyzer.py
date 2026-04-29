@@ -1113,6 +1113,9 @@ class StockAnalyzer:
         if df is None or len(df) < 20:
             return None
         last = df.iloc[-1]
+        # 장기 하락 추세(SMA200 하단) 종목 진입 원천 차단 (리스크 관리)
+        if 'SMA200' in last.index and last['Close'] < last['SMA200']:
+            return None
         close = float(last['Close'])
 
         bbl = float(last['BBL']) if 'BBL' in last.index and pd.notna(last['BBL']) else None
@@ -1452,7 +1455,7 @@ class StockAnalyzer:
         
         last = df_target.iloc[-1]
         # 거래량 폭증 시 주가가 상승 추세(전일 대비 상승 및 양봉)일 때만 신뢰
-        if last['Volume'] > last['VOL_AVG'] * 2.5 and last['Close'] > df_target['Close'].iloc[-2] and last['Close'] > last['Open']:
+        if last['Volume'] > last['VOL_AVG'] * 2.5 and last['Close'] > last.get('SMA200', 0) and last['Close'] > last['Open']:
             return True
         return False
 
