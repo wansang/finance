@@ -151,8 +151,8 @@ class MarketMonitor:
                     else:
                         near_high_label = " 📈 52주 신고가 근접"
 
-                # 진입가 계산 (신호 있을 때만)
-                entry_info = self.analyzer.calculate_entry_price(df, code) if reasons else None
+                # 진입가 계산 (신호 유무 상관없이 항상 계산)
+                entry_info = self.analyzer.calculate_entry_price(df, code)
                 entry_suffix = (f" | {self.analyzer.format_entry_info(entry_info, code)}") if entry_info else ""
 
                 if is_ai_recommended:
