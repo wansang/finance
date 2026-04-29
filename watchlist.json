@@ -14,11 +14,6 @@
     "357780": {
         "name": "솔브레인"
     },
-    "322000": {
-        "name": "HD현대에너지솔루션",
-        "add_date": "2026-04-21",
-        "source": "auto_recommendation"
-    },
     "120110": {
         "name": "코오롱인더",
         "add_date": "2026-04-22",
@@ -56,7 +51,12 @@
     },
     "006800": {
         "name": "미래에셋증권",
-        "add_date": "2026-04-28",
+        "add_date": "2026-04-29",
+        "source": "auto_recommendation"
+    },
+    "093370": {
+        "name": "후성",
+        "add_date": "2026-04-29",
         "source": "auto_recommendation"
     },
     "098460": {
