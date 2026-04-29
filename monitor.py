@@ -96,6 +96,11 @@ class MarketMonitor:
                         near_high_label = " 📈 52주 신고가 돌파!"
                     else:
                         near_high_label = " 📈 52주 신고가 근접"
+
+                # 보유종목 손절가·목표가 계산 (진입가 제외)
+                entry_info = self.analyzer.calculate_entry_price(df, code)
+                entry_suffix = (f" | {self.analyzer.format_entry_info(entry_info, code, holding=True)}") if entry_info else ""
+
                 holding_data.append(
                     self._format_monitor_line(
                         name,
@@ -103,7 +108,7 @@ class MarketMonitor:
                         change_text,
                         high_text,
                         volume_text,
-                        f"수익률 {profit_pct:+.2f}%, 상태: {status}. 이유: {reason}{near_high_label}",
+                        f"수익률 {profit_pct:+.2f}%, 상태: {status}. 이유: {reason}{near_high_label}{entry_suffix}",
                         high_52w_text=high_52w_text
                     )
                 )

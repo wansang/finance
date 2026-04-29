@@ -987,8 +987,7 @@ class StockAnalyzer:
 - **어투**: 신뢰감 있고 친숙한 한국어 존댓말로 작성해줘.
 - **언어 제약**: 영어 표현과 전문 용어를 쓰지 말고, 쉬운 한국어로 풀어 설명해줘.
 - **핵심 요구**: 각 추천 종목 설명에 반드시 입력된 `현재가` 수치를 포함해줘. 전달된 숫자를 변경하지 말고, 가능한 한 그대로 반영해서 작성해줘.
-- **진입가 안내**: 추천 종목 데이터에 `진입가`, `손절`, `목표` 가격이 포함되어 있으면 반드시 언급하고, 각 가격의 의미(어디서 사야 하는지, 어디서 손절해야 하는지, 목표 수익은 어느 수준인지)를 쉬운 말로 설명해줘.
-- **진입가 안내**: 추천 종목 데이터에 `진입가`, `손절`, `목표` 가격이 포함되어 있으면 반드시 언급하고, 각 가격의 의미(어디서 사야 하는지, 어디서 손절해야 하는지, 목표 수익은 어느 수준인지)를 쉬운 말로 설명해줘.
+- **진입가 안내**: 보유 종목 및 추천 종목 데이터에 `진입가`, `손절`, `목표` 가격이 포함되어 있으면 반드시 언급하고, 각 가격의 의미(어디서 사야 하는지, 어디서 손절해야 하는지, 목표 수익은 어느 수준인지)를 쉬운 말로 설명해줘.
 - **신고가 해석**: 데이터에 '52주 신고가 돌파' 또는 '52주 신고가 근접' 표시가 있는 종목은 반드시 이를 언급하고, 신고가 돌파/근접이 갖는 의미(추가 상승 모멘텀 가능성, 또는 차익실현 압력 등)를 한 문장으로 설명해줘.
 - **중요**: 보유 종목과 추천 종목 정보를 명확히 구분해서 작성해줘. 각 섹션은 분리되어 있어야 하며, 제목을 지나치게 생략하지 말고 구분이 쉽게 유지되도록 해줘.
 - **필수 섹션**: `[국제정세 뉴스 요약]` 섹션을 반드시 포함하고, 입력 데이터의 국제정세 뉴스에서 시장에 영향이 큰 2~3개를 간단히 요약해줘.
@@ -1109,13 +1108,18 @@ class StockAnalyzer:
             'target_basis': target_basis,
         }
 
-    def format_entry_info(self, entry_info, code):
-        """진입가 정보를 텍스트로 포맷"""
+    def format_entry_info(self, entry_info, code, holding=False):
+        """진입가 정보를 텍스트로 포맷. holding=True이면 손절·목표가만 표시"""
         if not entry_info:
             return ""
-        entry_text = self.format_price(entry_info['entry'], code)
         stop_text = self.format_price(entry_info['stop_loss'], code)
         target_text = self.format_price(entry_info['target'], code)
+        if holding:
+            return (
+                f"손절 {stop_text} "
+                f"/ 목표 {target_text}({entry_info['target_basis']})"
+            )
+        entry_text = self.format_price(entry_info['entry'], code)
         return (
             f"진입가 {entry_text}({entry_info['basis']}) "
             f"/ 손절 {stop_text} "
@@ -2114,10 +2118,24 @@ class StockAnalyzer:
                 df = self.get_indicators(df)
                 
                 triggered, drop_pct = self.check_trailing_stop(df, buy_date)
-                
+                buy_price = info.get('buy_price', 0)
+                current_price = float(df.iloc[-1]['Close'])
+                profit_pct = (current_price - buy_price) / buy_price * 100 if buy_price else 0
+
+                # 손절가·목표가 계산 (진입가 제외)
+                entry_info = self.calculate_entry_price(df, code)
+                entry_suffix = (f" | {self.format_entry_info(entry_info, code, holding=True)}") if entry_info else ""
+
+                safe_name = html.escape(name)
                 if triggered:
-                    safe_name = html.escape(name)
-                    sell_alerts.append(f"🚨 <b>{safe_name}({code}) 매도 알림</b>: 고점 대비 {drop_pct:.2f}% 하락 (트레일링 스톱)")
+                    sell_alerts.append(
+                        f"🚨 <b>{safe_name}({code}) 매도 알림</b>: 고점 대비 {drop_pct:.2f}% 하락"
+                        f" | 수익률 {profit_pct:+.2f}%{entry_suffix}"
+                    )
+                else:
+                    sell_alerts.append(
+                        f"📊 <b>{safe_name}({code})</b>: 수익률 {profit_pct:+.2f}%{entry_suffix}"
+                    )
             except Exception as e:
                 continue
         return sell_alerts
