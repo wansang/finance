@@ -1046,6 +1046,59 @@ class StockAnalyzer:
                 print(f"AI 호출 중 오류 발생: {e}")
                 return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data)
 
+    def calculate_holding_targets(self, df, code, buy_date=None):
+        """
+        보유 종목 전용 손절가·목표가 계산.
+        - 손절가: 매수 이후 최고가 × (1 - TRAILING_STOP_PCT)  (실제 트레일링 스톱 발동 기준)
+        - 목표가: BBU(볼린저밴드 상단) 또는 현재가 +8%
+        """
+        if df is None or len(df) < 5:
+            return None
+        last = df.iloc[-1]
+        close = float(last['Close'])
+
+        trailing_stop_pct = self.config.get('TRAILING_STOP_PCT', 3.82) / 100
+
+        # 매수일 이후 최고가 계산
+        max_price = close
+        if buy_date:
+            try:
+                buy_dt = pd.to_datetime(buy_date)
+                df_since = df[df.index >= buy_dt]
+                if not df_since.empty:
+                    max_price = float(df_since['Close'].max())
+            except Exception:
+                pass
+
+        stop_loss = round(max_price * (1 - trailing_stop_pct), 0)
+
+        # 목표가: BBU(볼린저밴드 상단) 또는 현재가 +8%
+        bbu = float(last['BBU']) if 'BBU' in last.index and pd.notna(last['BBU']) else None
+        if bbu and bbu > close:
+            target = round(bbu, 0)
+            target_basis = "BB상단"
+        else:
+            target = round(close * 1.08, 0)
+            target_basis = "+8%"
+
+        return {
+            'stop_loss': stop_loss,
+            'stop_basis': f"최고가({self.format_price(max_price, code)}) 기준",
+            'target': target,
+            'target_basis': target_basis,
+        }
+
+    def format_holding_targets(self, targets, code):
+        """보유종목 손절가·목표가 텍스트 포맷"""
+        if not targets:
+            return ""
+        stop_text = self.format_price(targets['stop_loss'], code)
+        target_text = self.format_price(targets['target'], code)
+        return (
+            f"손절 {stop_text}({targets['stop_basis']}) "
+            f"/ 목표 {target_text}({targets['target_basis']})"
+        )
+
     def calculate_entry_price(self, df, code, is_etf=False):
         """
         agent_stock / agent_etf 전문가 관점의 최적 진입가 계산.
@@ -2123,8 +2176,8 @@ class StockAnalyzer:
                 profit_pct = (current_price - buy_price) / buy_price * 100 if buy_price else 0
 
                 # 손절가·목표가 계산 (진입가 제외)
-                entry_info = self.calculate_entry_price(df, code)
-                entry_suffix = (f" | {self.format_entry_info(entry_info, code, holding=True)}") if entry_info else ""
+                entry_info = self.calculate_holding_targets(df, code, buy_date)
+                entry_suffix = (f" | {self.format_holding_targets(entry_info, code)}") if entry_info else ""
 
                 safe_name = html.escape(name)
                 if triggered:

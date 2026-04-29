@@ -97,9 +97,9 @@ class MarketMonitor:
                     else:
                         near_high_label = " 📈 52주 신고가 근접"
 
-                # 보유종목 손절가·목표가 계산 (진입가 제외)
-                entry_info = self.analyzer.calculate_entry_price(df, code)
-                entry_suffix = (f" | {self.analyzer.format_entry_info(entry_info, code, holding=True)}") if entry_info else ""
+                # 보유종목 손절가·목표가 계산 (현재가 기준 트레일링 스톱 + BB상단)
+                entry_info = self.analyzer.calculate_holding_targets(df, code, buy_date)
+                entry_suffix = (f" | {self.analyzer.format_holding_targets(entry_info, code)}") if entry_info else ""
 
                 holding_data.append(
                     self._format_monitor_line(
