@@ -43,17 +43,35 @@ class StockBot:
 
             code = context.args[0]
             price = context.args[1]
-            
+
+            # 종목명 조회 (KOSPI/KOSDAQ/ETF 순서로 시도)
+            stock_name = code
+            try:
+                import FinanceDataReader as fdr
+                for market in ['KOSPI', 'KOSDAQ', 'ETF/KR']:
+                    try:
+                        listing = fdr.StockListing(market)
+                        sym_col = 'Symbol' if 'Symbol' in listing.columns else 'Code'
+                        name_col = 'Name'
+                        row = listing[listing[sym_col] == code]
+                        if not row.empty:
+                            stock_name = row.iloc[0][name_col]
+                            break
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+
             # holdings.json 업데이트
             holdings = self.analyzer.load_holdings()
             holdings[code] = {
-                "name": code, # 나중에 analyzer에서 이름을 채울 수 있음
+                "name": stock_name,
                 "buy_date": datetime.datetime.now().strftime('%Y-%m-%d'),
                 "buy_price": int(price.replace(',', ''))
             }
             self.analyzer.save_holdings(holdings)
-            
-            await update.message.reply_text(f"✅ {code} 종목이 포트폴리오에 추가되었습니다. (매수가: {price})")
+
+            await update.message.reply_text(f"✅ {stock_name}({code}) 종목이 포트폴리오에 추가되었습니다. (매수가: {price})")
         except Exception as e:
             await update.message.reply_text(f"❌ 오류 발생: {e}")
 
