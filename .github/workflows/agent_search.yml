@@ -1,0 +1,38 @@
+name: Agent Search
+
+description: >
+  신규 투자 방법론 탐색(agent_search 역할) 및 backlog 저장을 위한 워크플로우.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  agent_search:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run agent_search (backlog only)
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          python agent_search_run.py
+
+      - name: Commit and push backlog
+        uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "agent_search: 신규 방법론 backlog 저장 [skip ci]"
+          file_pattern: 'searchBacklog.json'
+          branch: main
