@@ -42,9 +42,9 @@ def get_existing_method_names():
 
 
 def create_gemini_model(model_name, api_key):
+    # 단발성 프롬프트는 GenerativeModel/generate_content만 사용
     if GENAI_LIBRARY == 'genai':
-        client = genai.Client(api_key=api_key)
-        return client.chats.create(model=model_name)
+        return genai.GenerativeModel(model_name)
     if GENAI_LIBRARY == 'generativeai':
         genai.configure(api_key=api_key)
         if hasattr(genai, 'GenerativeModel'):
@@ -70,17 +70,12 @@ def run_agent_search():
         "방법론명, 출처/근거, 핵심 아이디어, 현재 시스템과의 차이점, 예상 적용 시장, 기대 효과, 구현 난이도, 검증 요청 사항. "
         "예시: [{\"방법론명\":..., ...}, ...]"
     )
-    # 모델 종류에 따라 호출 방식 분기
-    if GENAI_LIBRARY == 'genai':
-        response = model.send_message(prompt)
-        content = response.text if hasattr(response, 'text') else str(response)
-    else:
-        response = model.generate_content(prompt)
-        content = response.text.strip()
-        if content.startswith("```"):
-            content = content.split("\n", 1)[1]
-            if content.endswith("```"):
-                content = content[:-3]
+    response = model.generate_content(prompt)
+    content = response.text.strip()
+    if content.startswith("```"):
+        content = content.split("\n", 1)[1]
+        if content.endswith("```"):
+            content = content[:-3]
     try:
         methods = json.loads(content)
         if not isinstance(methods, list):
