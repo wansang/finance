@@ -13,10 +13,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.9'
 
@@ -31,8 +31,11 @@ jobs:
           python agent_search_run.py
 
       - name: Commit and push backlog
-        uses: stefanzweifel/git-auto-commit-action@v4
+        uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "agent_search: 신규 방법론 backlog 저장 [skip ci]"
           file_pattern: 'searchBacklog.json'
           branch: main
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
