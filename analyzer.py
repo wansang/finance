@@ -1509,36 +1509,37 @@ class StockAnalyzer:
     def check_signals(self, df, idx=-1):
         """다양한 기술적 지표들을 종합하여 매수 신호 확인"""
         reasons = []
-        
-        # 1. RSI 다이버전스
+        last = df.iloc[idx] if idx != -1 else df.iloc[-1]
+
+        # 1. RS(상대강도) 필터: 50일/20일 모두 양수만 진입
+        if 'RS_LINE' in last and 'RS_LINE_BEAR' in last:
+            if (last['RS_LINE'] is not None and last['RS_LINE'] < 0) or (last['RS_LINE_BEAR'] is not None and last['RS_LINE_BEAR'] < 0):
+                return []
+
+        # 2. 추세(Trend Template) 필수
+        if not self.is_trend_template(df, idx):
+            return []
+
+        # 3. 신호 중첩(2개 이상)만 진입
+        signal_count = 0
         if self.detect_divergence(df, idx):
-            reasons.append("RSI 반전 신호(상승 가능성)")
-            
-        # 2. Wedge/Flag 패턴
+            reasons.append("RSI 반전 신호(상승 가능성)"); signal_count += 1
         patterns = self.detect_patterns(df, idx)
         if patterns:
-            reasons.append(patterns)
-            
-        # 3. 타지마할 밴드 (BB 하단 지지 + RSI 반등)
+            reasons.append(patterns); signal_count += 1
         if self.is_taj_mahal_signal(df, idx):
-            reasons.append("바닥권 반등 신호(BB 하단)")
-            
-        # 4. 볼린저 밴드 스퀴즈 (변동성 수렴)
+            reasons.append("바닥권 반등 신호(BB 하단)"); signal_count += 1
         if self.detect_bb_squeeze(df, idx):
-            reasons.append("거래가 조용해지며 다음 변동성을 준비하는 구간입니다.")
-            
-        # 5. 거래량 급증
+            reasons.append("거래가 조용해지며 다음 변동성을 준비하는 구간입니다."); signal_count += 1
         if self.detect_volume_spike(df, idx):
-            reasons.append("거래량 급증")
-            
-        # 6. Stochastic RSI & MFI 과매도 반등
+            reasons.append("거래량 급증"); signal_count += 1
         if self.detect_stoch_mfi_rebound(df, idx):
-            reasons.append("과매도 반등 신호")
-
-        # 7. MACD 골든크로스 (추세 반전 확인)
+            reasons.append("과매도 반등 신호"); signal_count += 1
         if self.detect_macd_golden_cross(df, idx):
-            reasons.append("MACD 골든크로스")
+            reasons.append("MACD 골든크로스"); signal_count += 1
 
+        if signal_count < 2:
+            return []
         return reasons
 
     def check_trailing_stop(self, df, buy_date, threshold=0.03):
@@ -1705,17 +1706,11 @@ class StockAnalyzer:
         for _, stock in stocks.iterrows():
             code = str(stock['Code']).strip()
             name = stock['Name']
-            
             try:
                 df = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=400)).strftime('%Y-%m-%d'))
-                if len(df) < 200: continue
-                
-                df = self.get_indicators(df, kospi_index)
-                target_idx = len(df) - 1
-                if target_date:
-                    df_target = df[df.index <= target_date]
-                    if len(df_target) < 1: continue
-                    target_idx = len(df_target) - 1
+                df_target = df[df.index <= target_date]
+                if len(df_target) < 1: continue
+                target_idx = len(df_target) - 1
                 
                 reasons = self.check_signals(df, target_idx)
                 if not reasons: continue
@@ -1727,34 +1722,7 @@ class StockAnalyzer:
                 is_above_200 = last['Close'] > last['SMA200']
                 rs_score = last['RS_LINE'] if 'RS_LINE' in last else 0
                 rs_bear = last['RS_LINE_BEAR'] if 'RS_LINE_BEAR' in last and pd.notna(last.get('RS_LINE_BEAR')) else 0
-                avg_vol = float(df['Volume'].tail(20).mean()) if 'Volume' in df.columns else 0
-                
-                safe_name = html.escape(name)
-                safe_reasons = html.escape(", ".join(reasons))
-                sector = str(stock.get('Sector', '') or '기타').strip()
-                
-                prev_close = float(df.iloc[target_idx - 1]['Close']) if target_idx > 0 else float(last['Close'])
-                stock_data = {
-                    'name': safe_name,
-                    'code': code,
-                    'reasons': safe_reasons,
-                    'win_rate': win_rate,
-                    'avg_ret': avg_ret,
-                    'rs_score': rs_score,
-                    'last': float(last['Close']),
-                    'prev_close': prev_close,
-                    'avg_vol': avg_vol,
-                    'sector': sector,
-                    '_df': df,
-                }
 
-                # Tier Classification
-                # Tier 1 고품질 필터: 신호 2개 이상 + 양수 RS + 최소 거래량
-                min_signals = self.config.get('TIER1_MIN_SIGNALS', 2)
-                min_rs = self.config.get('TIER1_MIN_RS', 0.03)
-                min_vol = self.config.get('MIN_AVG_VOLUME', 50000)
-                min_bear_defense = self.config.get('RS_MIN_BEAR_DEFENSE', -0.02)
-                
                 # 강력 콤비 신호: RSI 다이버전스 + 타지마할 동시 발생 시 신호 개수 패널티 면제
                 has_divergence = "RSI 반전 신호(상승 가능성)" in reasons
                 has_taj_mahal = "바닥권 반등 신호(BB 하단)" in reasons
