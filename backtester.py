@@ -232,7 +232,16 @@ class Backtester:
                 if market_name == 'US' and not has_either_signal:
                     continue
 
-                if not ((is_elite and win_rate >= tier1 and market_ok) or (is_above_200 and win_rate >= tier2 and market_ok)):
+                # RS 필터: 지수 대비 최소 초과 성과 확인 (TIER1_MIN_RS)
+                rs_score = last['RS_LINE'] if 'RS_LINE' in last.index and pd.notna(last.get('RS_LINE')) else 0
+                min_rs = self.analyzer.config.get('TIER1_MIN_RS', 0.03)
+                # 하락기 RS 방어 필터: 하락장일 때 20일 RS가 최소 임계값 이상인 종목만 통과
+                rs_bear = last['RS_LINE_BEAR'] if 'RS_LINE_BEAR' in last.index and pd.notna(last.get('RS_LINE_BEAR')) else 0
+                min_bear_defense = self.analyzer.config.get('RS_MIN_BEAR_DEFENSE', -0.02)
+                bear_rs_ok = market_uptrend or (rs_bear >= min_bear_defense)
+                tier1_rs_ok = rs_score >= min_rs and bear_rs_ok
+
+                if not ((is_elite and win_rate >= tier1 and market_ok and tier1_rs_ok) or (is_above_200 and win_rate >= tier2 and market_ok)):
                     continue
 
                 # 포지션 사이징: PowerCombo 1.5배, Tier1 1.0배, Tier2 0.5배

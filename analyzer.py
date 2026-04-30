@@ -1145,8 +1145,9 @@ class StockAnalyzer:
             basis = "현재가 (즉시 진입 가능)"
 
         # 손절가: 진입가에서 -3% (트레일링 스톱 기준)
-        trailing_stop_pct = self.config.get('TRAILING_STOP_PCT', 3.0)
-        stop_loss = round(entry * (1 - trailing_stop_pct / 100), 0)
+        trailing_stop_pct = self.config.get('TRAILING_STOP_PCT', 0.039)
+        # TRAILING_STOP_PCT는 소수 형태(예: 0.0389 = 3.89%)로 저장됨 — /100 하지 않음
+        stop_loss = round(entry * (1 - trailing_stop_pct), 0)
 
         # 목표가: BB 중단 또는 진입가 +8%
         if bbm and bbm > entry:
@@ -1203,6 +1204,12 @@ class StockAnalyzer:
                 stock_returns = df.loc[common_idx, 'Close'].pct_change(50)
                 index_returns = kospi_index.loc[common_idx, 'Close'].pct_change(50)
                 df.loc[common_idx, 'RS_LINE'] = stock_returns - index_returns
+            # RS_LINE_BEAR: 하락기 단기 RS (20일 기준 - 하락장 방어력 측정)
+            bear_lookback = self.config.get('RS_LOOKBACK_BEAR', 20)
+            if len(common_idx) > bear_lookback:
+                stock_ret_bear = df.loc[common_idx, 'Close'].pct_change(bear_lookback)
+                index_ret_bear = kospi_index.loc[common_idx, 'Close'].pct_change(bear_lookback)
+                df.loc[common_idx, 'RS_LINE_BEAR'] = stock_ret_bear - index_ret_bear
 
         # RSI
         rsi = ta.rsi(df['Close'], length=self.config.get('RSI_LENGTH', 14))
@@ -1719,6 +1726,7 @@ class StockAnalyzer:
                 is_elite = self.is_trend_template(df, target_idx)
                 is_above_200 = last['Close'] > last['SMA200']
                 rs_score = last['RS_LINE'] if 'RS_LINE' in last else 0
+                rs_bear = last['RS_LINE_BEAR'] if 'RS_LINE_BEAR' in last and pd.notna(last.get('RS_LINE_BEAR')) else 0
                 avg_vol = float(df['Volume'].tail(20).mean()) if 'Volume' in df.columns else 0
                 
                 safe_name = html.escape(name)
@@ -1743,8 +1751,9 @@ class StockAnalyzer:
                 # Tier Classification
                 # Tier 1 고품질 필터: 신호 2개 이상 + 양수 RS + 최소 거래량
                 min_signals = self.config.get('TIER1_MIN_SIGNALS', 2)
-                min_rs = self.config.get('TIER1_MIN_RS', 0.0)
+                min_rs = self.config.get('TIER1_MIN_RS', 0.03)
                 min_vol = self.config.get('MIN_AVG_VOLUME', 50000)
+                min_bear_defense = self.config.get('RS_MIN_BEAR_DEFENSE', -0.02)
                 
                 # 강력 콤비 신호: RSI 다이버전스 + 타지마할 동시 발생 시 신호 개수 패널티 면제
                 has_divergence = "RSI 반전 신호(상승 가능성)" in reasons
@@ -1752,10 +1761,13 @@ class StockAnalyzer:
                 power_combo = has_divergence and has_taj_mahal
                 has_either_signal = has_divergence or has_taj_mahal  # 하락장 완화 조건
                 effective_min_signals = 1 if power_combo else min_signals
+                # 하락기 RS 방어 조건: 하락장일 때 20일 RS가 최소 임계값 이상인 종목만 Tier1
+                bear_rs_ok = kospi_uptrend or (rs_bear >= min_bear_defense)
                 tier1_quality = (
                     len(reasons) >= effective_min_signals and
                     rs_score >= min_rs and
-                    (avg_vol >= min_vol or min_vol <= 0)
+                    (avg_vol >= min_vol or min_vol <= 0) and
+                    bear_rs_ok
                 )
                 
                 # 시장 필터: 하락장에서는 RSI 다이버전스 또는 BB 하단 중 하나 이상 필요
@@ -1805,6 +1817,7 @@ class StockAnalyzer:
                 is_elite = self.is_trend_template(df, target_idx)
                 is_above_200 = last['Close'] > last['SMA200']
                 rs_score = last['RS_LINE'] if 'RS_LINE' in last else 0
+                rs_bear = last['RS_LINE_BEAR'] if 'RS_LINE_BEAR' in last and pd.notna(last.get('RS_LINE_BEAR')) else 0
                 avg_vol = float(df['Volume'].tail(20).mean()) if 'Volume' in df.columns else 0
                 safe_name = html.escape(name)
                 safe_reasons = html.escape(", ".join(reasons))
@@ -1824,17 +1837,21 @@ class StockAnalyzer:
                 }
 
                 min_signals = self.config.get('TIER1_MIN_SIGNALS', 2)
-                min_rs = self.config.get('TIER1_MIN_RS', 0.0)
+                min_rs = self.config.get('TIER1_MIN_RS', 0.03)
                 min_vol = self.config.get('MIN_AVG_VOLUME', 50000)
+                min_bear_defense = self.config.get('RS_MIN_BEAR_DEFENSE', -0.02)
                 has_divergence = "RSI 반전 신호(상승 가능성)" in reasons
                 has_taj_mahal = "바닥권 반등 신호(BB 하단)" in reasons
                 power_combo = has_divergence and has_taj_mahal
                 has_either_signal = has_divergence or has_taj_mahal  # 하락장 완화 조건
                 effective_min_signals = 1 if power_combo else min_signals
+                # 하락기 RS 방어 조건: 하락장일 때 20일 RS가 최소 임계값 이상인 종목만 Tier1
+                bear_rs_ok = kospi_uptrend or (rs_bear >= min_bear_defense)
                 tier1_quality = (
                     len(reasons) >= effective_min_signals and
                     rs_score >= min_rs and
-                    (avg_vol >= min_vol or min_vol <= 0)
+                    (avg_vol >= min_vol or min_vol <= 0) and
+                    bear_rs_ok
                 )
                 market_ok = kospi_uptrend or not market_filter or has_either_signal
                 is_tier1 = is_elite and win_rate >= self.config.get('TIER1_WIN_RATE', 60) and tier1_quality and market_ok
@@ -1981,6 +1998,7 @@ class StockAnalyzer:
                 is_elite = self.is_trend_template(df, target_idx)
                 is_above_200 = last['Close'] > last['SMA200']
                 rs_score = last['RS_LINE'] if 'RS_LINE' in last else 0
+                rs_bear = last['RS_LINE_BEAR'] if 'RS_LINE_BEAR' in last and pd.notna(last.get('RS_LINE_BEAR')) else 0
                 safe_reasons = html.escape(", ".join(reasons))
                 prev_close = float(df.iloc[target_idx - 1]['Close']) if target_idx > 0 else float(last['Close'])
 
@@ -2000,14 +2018,18 @@ class StockAnalyzer:
                 }
 
                 min_signals = self.config.get('TIER1_MIN_SIGNALS', 2)
-                min_rs = self.config.get('TIER1_MIN_RS', 0.0)
+                min_rs = self.config.get('TIER1_MIN_RS', 0.03)
+                min_bear_defense = self.config.get('RS_MIN_BEAR_DEFENSE', -0.02)
                 has_divergence = "RSI 반전 신호(상승 가능성)" in reasons
                 has_taj_mahal = "바닥권 반등 신호(BB 하단)" in reasons
                 power_combo = has_divergence and has_taj_mahal
                 effective_min_signals = 1 if power_combo else min_signals
+                # 하락기 RS 방어 조건: 하락장일 때 20일 RS가 최소 임계값 이상인 종목만 Tier1
+                bear_rs_ok = us_market_uptrend or (rs_bear >= min_bear_defense)
                 tier1_quality = (
                     len(reasons) >= effective_min_signals and
-                    rs_score >= min_rs
+                    rs_score >= min_rs and
+                    bear_rs_ok
                 )
                 market_ok = us_market_uptrend or not market_filter or power_combo
                 is_tier1 = is_elite and win_rate >= self.config.get('US_TIER1_WIN_RATE', 45) and tier1_quality and market_ok
