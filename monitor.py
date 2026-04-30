@@ -59,8 +59,10 @@ class MarketMonitor:
                 buy_price = info.get('buy_price', 0)
                 
                 df = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=100)).strftime('%Y-%m-%d'))
-                df = self.analyzer.get_indicators(df)
-                
+            watch_data = []
+            ai_watch_data = []
+            instant_entry_watch_data = []
+            instant_entry_ai_watch_data = []
                 triggered, drop_pct = self.analyzer.check_trailing_stop(df, buy_date)
                 latest_price = self.analyzer.get_latest_price(code)
                 if latest_price:
@@ -83,61 +85,85 @@ class MarketMonitor:
                     sell_triggered = True
                 else:
                     status = "포지션 유지"
-                    if profit_pct >= 0:
-                        reason = "현재 수익 구간이며 하락 제한 조건이 아직 충족되지 않아 보유를 유지합니다."
+                    # 즉시 진입 가능 신호 감지 (상태/신호/가이드에 '즉시 진입' 또는 '바로 진입' 등 포함)
+                    # 우선 sig_text, entry_info, info 등에서 진입 가능 여부를 판별
+                    # 예시: sig_text, info.get('guide'), entry_info 등에서 '즉시 진입', '바로 진입', '진입이 가능' 등 포함 여부
+                    def is_instant_entry(*args):
+                        for arg in args:
+                            if not arg:
+                                continue
+                            if any(key in str(arg) for key in ["즉시 진입", "바로 진입", "진입이 가능"]):
+                                return True
+                        return False
+
+                    if is_ai_recommended:
+                        win_rate, avg_ret = self.analyzer.validate_strategy(df, len(df) - 1)
+                        add_date = info.get('add_date', '')
+                        detail = (
+                            f"신호: {sig_text}, 승률: {win_rate:.1f}%, "
+                            f"평균수익률: {avg_ret:+.2f}%, 추가일: {add_date}{near_high_label}{entry_suffix}"
+                        )
+                        line = self._format_monitor_line(
+                            name,
+                            price_text,
+                            change_text,
+                            high_text,
+                            volume_text,
+                            detail,
+                            high_52w_text=high_52w_text
+                        )
+                        if is_instant_entry(sig_text, info.get('guide'), entry_info, detail):
+                            instant_entry_ai_watch_data.append(line)
+                        else:
+                            ai_watch_data.append(line)
                     else:
-                        reason = "현재는 손실 구간이나 매도 기준에는 미달하여 추가 관찰이 필요합니다."
-
-                high_52w = self.analyzer.get_52week_high(code)
-                high_52w_text = self.analyzer.format_price(high_52w, code) if high_52w is not None else None
-                near_high_label = ""
-                if high_52w and current_price >= high_52w * 0.98:
-                    if current_price >= high_52w:
-                        near_high_label = " 📈 52주 신고가 돌파!"
-                    else:
-                        near_high_label = " 📈 52주 신고가 근접"
-
-                # 보유종목 손절가·목표가 계산 (현재가 기준 트레일링 스톱 + BB상단)
-                entry_info = self.analyzer.calculate_holding_targets(df, code, buy_date)
-                entry_suffix = (f" | {self.analyzer.format_holding_targets(entry_info, code)}") if entry_info else ""
-
-                holding_data.append(
-                    self._format_monitor_line(
-                        name,
-                        price_text,
-                        change_text,
-                        high_text,
-                        volume_text,
-                        f"수익률 {profit_pct:+.2f}%, 상태: {status}. 이유: {reason}{near_high_label}{entry_suffix}",
-                        high_52w_text=high_52w_text
-                    )
-                )
-            except Exception:
-                holding_data.append(f"- {code}: 분석 오류")
+                        line = self._format_monitor_line(
+                            name,
+                            price_text,
+                            change_text,
+                            high_text,
+                            volume_text,
+                            f"신호: {sig_text}{near_high_label}{entry_suffix}",
+                            high_52w_text=high_52w_text
+                        )
+                        if is_instant_entry(sig_text, info.get('guide'), entry_info):
+                            instant_entry_watch_data.append(line)
+                        else:
+                            watch_data.append(line)
 
         # 3. 관심 종목 데이터 수집 (일반 관심종목 / AI 추천 관심종목 분리)
         watch_data = []
         ai_watch_data = []
         for code, info in watchlist.items():
             try:
-                name = info.get('name', code)
-                is_ai_recommended = info.get('source') == 'auto_recommendation'
+            # 4. AI 리포트 생성
+            market_section = sentiment_msg.strip()
+            holding_section = "\n\n".join(holding_data) if holding_data else "없음"
+            watch_section = "\n\n".join(watch_data) if watch_data else "없음"
+            ai_watch_section = "\n\n".join(ai_watch_data) if ai_watch_data else "없음"
 
-                # AI 추천 종목은 승률/수익률 계산을 위해 더 많은 데이터 필요
-                fetch_days = 400 if is_ai_recommended else 100
-                df = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=fetch_days)).strftime('%Y-%m-%d'))
-                df = self.analyzer.get_indicators(df)
+            # 즉시 진입 가능 종목 섹션 생성
+            instant_entry_section = ""
+            instant_lines = []
+            if instant_entry_watch_data:
+                instant_lines.append("[관심종목 즉시 진입가능 종목]\n" + "\n".join(instant_entry_watch_data))
+            if instant_entry_ai_watch_data:
+                instant_lines.append("[AI 추천 관심종목 즉시 진입가능 종목]\n" + "\n".join(instant_entry_ai_watch_data))
+            if instant_lines:
+                instant_entry_section = "\n\n".join(instant_lines) + "\n\n"
 
-                latest_price = self.analyzer.get_latest_price(code)
-                if latest_price:
-                    current_price = latest_price['last']
-                    prev_price = latest_price.get('prev_close') or latest_price.get('previous')
-                else:
-                    current_price = df.iloc[-1]['Close']
-                    prev_price = df.iloc[-2]['Close'] if len(df) > 1 else current_price
-                price_text = self.analyzer.format_price(current_price, code)
-                change_text = self.analyzer.format_price_change(current_price, prev_price, code)
-                high_price = self.analyzer.get_intraday_high(code)
+            final_report = self.analyzer.ask_ai_report(
+                market_data=market_section,
+                holding_data=holding_section,
+                watch_data=watch_section,
+                report_mode="monitor",
+                ai_watch_data=ai_watch_section
+            )
+        
+            final_report = "🕒 <b>[실시간 모니터링 알림]</b>\n\n" + instant_entry_section + final_report.strip()
+
+            self.analyzer.notifier.send_message(final_report)
+            print("AI 감시 보고서 전송 완료.")
                 high_text = self.analyzer.format_price(high_price, code) if high_price is not None else None
                 volume = self.analyzer.get_intraday_volume(code)
                 volume_text = self.analyzer.format_volume(volume, code)
