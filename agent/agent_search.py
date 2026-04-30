@@ -6,18 +6,37 @@ agent/agent_search.py
 - 실제 구현은 향후 확장 가능, 예시는 더미 데이터
 """
 
+import os
+import json
+from google.generativeai import GenerativeModel
+
 def run_agent_search():
-    # TODO: 실제 유튜브/논문/커뮤니티 등에서 탐색 구현
-    # 예시: 더미 데이터
-    return [
-        {
-            "방법론명": "듀얼 모멘텀 전략",
-            "출처/근거": "Gary Antonacci의 Dual Momentum Investing",
-            "핵심 아이디어": "시장 모멘텀과 상대 모멘텀을 모두 활용해 강한 종목만 매수.",
-            "현재 시스템과의 차이점": "단일 모멘텀만 사용하던 기존 전략과 달리, 두 가지 모멘텀을 결합.",
-            "예상 적용 시장": "주식/ETF",
-            "기대 효과": "수익률 향상, MDD 감소",
-            "구현 난이도": "중간",
-            "검증 요청 사항": "최근 5년, KOSPI200/미국 ETF, 기존 모멘텀 전략과 비교"
-        }
-    ]
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise RuntimeError("GEMINI_API_KEY 환경변수가 필요합니다.")
+    # Gemini 모델 초기화
+    model = GenerativeModel('gemini-pro', api_key=api_key)
+    prompt = (
+        "최신 투자 전략 10가지를 아래 형식의 JSON 리스트로 요약해줘. "
+        "단, 우리 시스템(예: 모멘텀, 밸류, 퀀트, ETF 분산, 인덱스, AI 추천 등 기존에 적용된 전략)은 모두 제외하고, "
+        "아직 적용하지 않은 새로운 전략만 포함해줘. "
+        "각 전략은 반드시 고유해야 하며, 다음 key를 포함해야 해: "
+        "방법론명, 출처/근거, 핵심 아이디어, 현재 시스템과의 차이점, 예상 적용 시장, 기대 효과, 구현 난이도, 검증 요청 사항. "
+        "예시: [{\"방법론명\":..., ...}, ...]"
+    )
+    response = model.generate_content(prompt)
+    # Gemini 응답에서 JSON 파싱
+    try:
+        # Gemini가 코드블록으로 감싸서 줄 수도 있음
+        content = response.text.strip()
+        if content.startswith("```"):
+            content = content.split("\n", 1)[1]
+            if content.endswith("```"):
+                content = content[:-3]
+        methods = json.loads(content)
+        # 리스트가 아니면 예외
+        if not isinstance(methods, list):
+            raise ValueError("Gemini 응답이 리스트 형태가 아님")
+        return methods
+    except Exception as e:
+        raise RuntimeError(f"Gemini 응답 파싱 실패: {e}\n원본: {response.text}")
