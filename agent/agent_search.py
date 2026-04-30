@@ -99,14 +99,23 @@ def run_agent_search():
     else:
         raise RuntimeError('AI 모델 객체가 generate_content/send_message를 지원하지 않습니다.')
 
-    if content.startswith("```"):
-        content = content.split("\n", 1)[1]
-        if content.endswith("```"):
-            content = content[:-3]
+    # 코드블록 내 JSON만 추출
+    import re
+    json_block = None
+    # ```json ... ``` 또는 ``` ... ``` 블록 추출
+    match = re.search(r"```json\\s*([\s\S]+?)```", content)
+    if not match:
+        match = re.search(r"```[\s\S]*?([\[{][\s\S]+?)```", content)
+    if match:
+        json_block = match.group(1).strip()
+    else:
+        # 코드블록이 없으면 기존 content 전체 사용
+        json_block = content
+
     try:
-        methods = json.loads(content)
+        methods = json.loads(json_block)
         if not isinstance(methods, list):
             raise ValueError("Gemini 응답이 리스트 형태가 아님")
         return methods
     except Exception as e:
-        raise RuntimeError(f"Gemini 응답 파싱 실패: {e}\n원본: {content}")
+        raise RuntimeError(f"Gemini 응답 파싱 실패: {e}\n원본: {json_block}")
