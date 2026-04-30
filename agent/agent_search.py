@@ -39,7 +39,7 @@ def run_agent_search():
     exclude_names = get_existing_method_names()
     exclude_str = ", ".join(exclude_names) if exclude_names else "(없음)"
     # Gemini 모델 최신 방식 초기화
-    genai.configure(api_key=api_key)
+    # 최신 google-genai는 configure 없이 환경변수 인증만 사용
     model = genai.GenerativeModel('gemini-pro')
     prompt = (
         f"최신 투자 전략 10가지를 아래 형식의 JSON 리스트로 요약해줘. "
