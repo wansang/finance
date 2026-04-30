@@ -8,8 +8,9 @@ agent/agent_search.py
 
 
 import os
+
 import json
-from google.generativeai import GenerativeModel
+import google.genai as genai
 
 BACKLOG_HISTORY_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'searchBacklog_history.json')
 
@@ -37,8 +38,9 @@ def run_agent_search():
     # 기존 시스템에 적용된 전략명 동적 추출
     exclude_names = get_existing_method_names()
     exclude_str = ", ".join(exclude_names) if exclude_names else "(없음)"
-    # Gemini 모델 초기화
-    model = GenerativeModel('gemini-pro', api_key=api_key)
+    # Gemini 모델 최신 방식 초기화
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-pro')
     prompt = (
         f"최신 투자 전략 10가지를 아래 형식의 JSON 리스트로 요약해줘. "
         f"단, 우리 시스템에 이미 적용된 전략({exclude_str})은 모두 제외하고, "
