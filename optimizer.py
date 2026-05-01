@@ -79,8 +79,6 @@ class StrategyOptimizer:
         with open(backlog_file, 'w', encoding='utf-8') as f:
             json.dump([], f, ensure_ascii=False, indent=2)
         print("[agent_search backlog] backlog 처리 완료 및 초기화 (history에 백업)")
-            900
-        )
 
     @staticmethod
     def _safe_int(value, default):
