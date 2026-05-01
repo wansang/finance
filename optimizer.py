@@ -31,46 +31,6 @@ SIGNAL_PERFORMANCE_FILE = 'signal_performance.json'
 
 
 class StrategyOptimizer:
-        def process_search_backlog(self):
-            """
-            searchBacklog.json의 backlog를 불러와 agent_stock/agent_etf/agent_backtest에 검증 의뢰
-            (실제 검증/반영 로직은 후속 구현)
-            backlog 처리 후 searchBacklog_history.json에 append 백업
-            """
-            backlog_file = 'searchBacklog.json'
-            history_file = 'searchBacklog_history.json'
-            if not os.path.exists(backlog_file):
-                print("[agent_search backlog] 파일 없음 — 스킵")
-                return
-            try:
-                with open(backlog_file, 'r', encoding='utf-8') as f:
-                    backlog = json.load(f)
-            except Exception:
-                print("[agent_search backlog] 파일 파싱 오류 — 스킵")
-                return
-            if not backlog:
-                print("[agent_search backlog] 비어 있음 — 스킵")
-                return
-            print(f"[agent_search backlog] {len(backlog)}건의 신규 방법론 검증 시작 (agent_stock/agent_etf/agent_backtest 연동 필요)")
-            # TODO: 각 entry['method']를 agent_stock/agent_etf/agent_backtest에 전달하여 검증/반영
-            # (여기서는 단순 출력만)
-            for entry in backlog:
-                print(f"- {entry['searched_at']}: {entry['method'].get('방법론명', '')}")
-            # backlog 처리 후 history에 append
-            history = []
-            if os.path.exists(history_file):
-                try:
-                    with open(history_file, 'r', encoding='utf-8') as f:
-                        history = json.load(f)
-                except Exception:
-                    history = []
-            history.extend(backlog)
-            with open(history_file, 'w', encoding='utf-8') as f:
-                json.dump(history, f, ensure_ascii=False, indent=2)
-            # backlog 소비 후 파일 비우기
-            with open(backlog_file, 'w', encoding='utf-8') as f:
-                json.dump([], f, ensure_ascii=False, indent=2)
-            print("[agent_search backlog] backlog 처리 완료 및 초기화 (history에 백업)")
     def __init__(self, config_file='strategy_config.json'):
         self.config_file = config_file
         self.analyzer = StockAnalyzer()
@@ -78,6 +38,47 @@ class StrategyOptimizer:
         self.time_limit_seconds = self._safe_int(
             os.environ.get('OPTIMIZER_TIME_LIMIT_SECONDS',
                            self.base_config.get('OPTIMIZER_TIME_LIMIT_SECONDS', 900)),
+
+    def process_search_backlog(self):
+        """
+        searchBacklog.json의 backlog를 불러와 agent_stock/agent_etf/agent_backtest에 검증 의뢰
+        (실제 검증/반영 로직은 후속 구현)
+        backlog 처리 후 searchBacklog_history.json에 append 백업
+        """
+        backlog_file = 'searchBacklog.json'
+        history_file = 'searchBacklog_history.json'
+        if not os.path.exists(backlog_file):
+            print("[agent_search backlog] 파일 없음 — 스킵")
+            return
+        try:
+            with open(backlog_file, 'r', encoding='utf-8') as f:
+                backlog = json.load(f)
+        except Exception:
+            print("[agent_search backlog] 파일 파싱 오류 — 스킵")
+            return
+        if not backlog:
+            print("[agent_search backlog] 비어 있음 — 스킵")
+            return
+        print(f"[agent_search backlog] {len(backlog)}건의 신규 방법론 검증 시작 (agent_stock/agent_etf/agent_backtest 연동 필요)")
+        # TODO: 각 entry['method']를 agent_stock/agent_etf/agent_backtest에 전달하여 검증/반영
+        # (여기서는 단순 출력만)
+        for entry in backlog:
+            print(f"- {entry['searched_at']}: {entry['method'].get('방법론명', '')}")
+        # backlog 처리 후 history에 append
+        history = []
+        if os.path.exists(history_file):
+            try:
+                with open(history_file, 'r', encoding='utf-8') as f:
+                    history = json.load(f)
+            except Exception:
+                history = []
+        history.extend(backlog)
+        with open(history_file, 'w', encoding='utf-8') as f:
+            json.dump(history, f, ensure_ascii=False, indent=2)
+        # backlog 소비 후 파일 비우기
+        with open(backlog_file, 'w', encoding='utf-8') as f:
+            json.dump([], f, ensure_ascii=False, indent=2)
+        print("[agent_search backlog] backlog 처리 완료 및 초기화 (history에 백업)")
             900
         )
 
