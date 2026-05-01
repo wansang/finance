@@ -37,7 +37,7 @@ class StrategyOptimizer:
         self.base_config = copy.deepcopy(self.analyzer.config)
         self.time_limit_seconds = self._safe_int(
             os.environ.get('OPTIMIZER_TIME_LIMIT_SECONDS',
-                           self.base_config.get('OPTIMIZER_TIME_LIMIT_SECONDS', 900)),
+                           self.base_config.get('OPTIMIZER_TIME_LIMIT_SECONDS', 900)))
 
     def process_search_backlog(self):
         """
