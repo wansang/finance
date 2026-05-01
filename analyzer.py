@@ -1329,8 +1329,9 @@ class StockAnalyzer:
         if p2_rsi > 45:
             return False
         
-        # 두 번째 저점이 최근 12봉 이내여야 함 (타이밍 유효성)
-        if p2_idx < len(recent_closes) - 12:
+        # 두 번째 저점이 최근 12봉 이내여야 하며, 현재 가격이 전일보다 상승하며 반등 확증 시 유효
+        prev_close = df_target['Close'].iloc[-2]
+        if p2_idx < len(recent_closes) - 12 or last['Close'] <= prev_close:
             return False
         
         return True
@@ -1461,8 +1462,9 @@ class StockAnalyzer:
         if len(df_target) < 2: return False
         
         last = df_target.iloc[-1]
-        # 거래량 폭증 시 주가가 상승 추세(전일 대비 상승 및 양봉)일 때만 신뢰
-        if last['Volume'] > last['VOL_AVG'] * 2.5 and last['Close'] > last.get('SMA200', 0) and last['Close'] > last['Open']:
+        # 중기 상승 추세(SMA50) 위에서 캔들 몸통이 60% 이상인 강한 양봉일 때만 신뢰 (Mansfield RS 전략 반영)
+        candle_body_ratio = (last['Close'] - last['Open']) / (last['High'] - last['Low'] + 1e-9)
+        if last['Volume'] > last['VOL_AVG'] * 2.5 and last['Close'] > last.get('SMA50', 0) and candle_body_ratio > 0.6:
             return True
         return False
 
