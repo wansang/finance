@@ -36,6 +36,6 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: "Auto-optimized strategy config [skip ci]"
-          file_pattern: 'strategy_config.json signal_performance.json analyzer.py algorithm_update_log.json'
+          file_pattern: 'strategy_config.json signal_performance.json analyzer.py algorithm_update_log.json searchBacklog.json searchBacklog_history.json'
           branch: main
           push_options: '--force'
