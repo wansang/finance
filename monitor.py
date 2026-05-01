@@ -1,3 +1,4 @@
+
 from analyzer import StockAnalyzer
 import FinanceDataReader as fdr
 import pandas as pd
@@ -42,100 +43,114 @@ class MarketMonitor:
         
         print(f"[{today}] AI 기반 실시간 감시 시작...")
         
-        holdings = self.analyzer.load_holdings()
-        self.analyzer.clean_watchlist()
-        watchlist = self.analyzer.load_watchlist()
-        
-        # 1. 시장 심리 요약 데이터 확보
-        sentiment_msg, is_positive = self.analyzer.get_market_sentiment()
-        
-        # 2. 보유 종목 데이터 수집
-        holding_data = []
-        sell_triggered = False
-        for code, info in holdings.items():
-            try:
-                name = info.get('name', code)
-                buy_date = info.get('buy_date')
-                buy_price = info.get('buy_price', 0)
-                
-                df = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=100)).strftime('%Y-%m-%d'))
-            watch_data = []
-            ai_watch_data = []
-            instant_entry_watch_data = []
-            instant_entry_ai_watch_data = []
-                triggered, drop_pct = self.analyzer.check_trailing_stop(df, buy_date)
-                latest_price = self.analyzer.get_latest_price(code)
-                if latest_price:
-                    current_price = latest_price['last']
-                    prev_price = latest_price.get('prev_close') or latest_price.get('previous')
-                else:
-                    current_price = df.iloc[-1]['Close']
-                    prev_price = df.iloc[-2]['Close'] if len(df) > 1 else current_price
-                profit_pct = (current_price - buy_price) / buy_price * 100
-                price_text = self.analyzer.format_price(current_price, code)
-                change_text = self.analyzer.format_price_change(current_price, prev_price, code)
-                high_price = self.analyzer.get_intraday_high(code)
-                high_text = self.analyzer.format_price(high_price, code) if high_price is not None else None
-                volume = self.analyzer.get_intraday_volume(code)
-                volume_text = self.analyzer.format_volume(volume, code)
 
-                if triggered:
-                    status = "매도 권장"
-                    reason = f"매수 이후 최고가 대비 {drop_pct:.2f}% 하락하여 손실 제한 조건이 충족되었습니다."
-                    sell_triggered = True
-                else:
-                    status = "포지션 유지"
-                    # 즉시 진입 가능 신호 감지 (상태/신호/가이드에 '즉시 진입' 또는 '바로 진입' 등 포함)
-                    # 우선 sig_text, entry_info, info 등에서 진입 가능 여부를 판별
-                    # 예시: sig_text, info.get('guide'), entry_info 등에서 '즉시 진입', '바로 진입', '진입이 가능' 등 포함 여부
-                    def is_instant_entry(*args):
-                        for arg in args:
-                            if not arg:
-                                continue
-                            if any(key in str(arg) for key in ["즉시 진입", "바로 진입", "진입이 가능"]):
-                                return True
-                        return False
+        class MarketMonitor:
+            def __init__(self):
+                self.analyzer = StockAnalyzer()
 
-                    if is_ai_recommended:
-                        win_rate, avg_ret = self.analyzer.validate_strategy(df, len(df) - 1)
-                        add_date = info.get('add_date', '')
-                        detail = (
-                            f"신호: {sig_text}, 승률: {win_rate:.1f}%, "
-                            f"평균수익률: {avg_ret:+.2f}%, 추가일: {add_date}{near_high_label}{entry_suffix}"
-                        )
-                        line = self._format_monitor_line(
-                            name,
-                            price_text,
-                            change_text,
-                            high_text,
-                            volume_text,
-                            detail,
-                            high_52w_text=high_52w_text
-                        )
-                        if is_instant_entry(sig_text, info.get('guide'), entry_info, detail):
-                            instant_entry_ai_watch_data.append(line)
-                        else:
-                            ai_watch_data.append(line)
+            def _format_monitor_line(self, name, price_text, change_text, high_text, volume_text, detail, high_52w_text=None):
+                high_segment = f", 당일최고가 {high_text}" if high_text else ""
+                high_52w_segment = f", 52주신고가 {high_52w_text}" if high_52w_text else ""
+                vol_segment = f", 거래량 {volume_text}" if volume_text else ""
+                return f"- {name}: 현재가 {price_text} {change_text}{high_segment}{high_52w_segment}{vol_segment}. {detail}"
+
+            def run(self):
+                import sys
+                import holidays
+                import os
+
+                today = datetime.datetime.now(ZoneInfo("Asia/Seoul"))
+                kr_holidays = holidays.KR()
+                is_manual = os.environ.get("GITHUB_EVENT_NAME") == "workflow_dispatch"
+                force_run = os.environ.get("FORCE_RUN", "").lower() in ("1", "true", "yes")
+
+                # 주말(5: 토요일, 6: 일요일) 또는 공휴일인 경우 스케줄 실행 안함
+                # 단, 수동 실행(workflow_dispatch) 또는 FORCE_RUN=true일 경우에는 강제 실행합니다.
+                if today.weekday() >= 5 or today.date() in kr_holidays:
+                    if is_manual or force_run:
+                        print(f"[{today}] 수동 실행/강제 실행 모드로 주말/공휴일 체크를 무시하고 실시간 감시를 진행합니다.")
                     else:
-                        line = self._format_monitor_line(
-                            name,
-                            price_text,
-                            change_text,
-                            high_text,
-                            volume_text,
-                            f"신호: {sig_text}{near_high_label}{entry_suffix}",
-                            high_52w_text=high_52w_text
-                        )
-                        if is_instant_entry(sig_text, info.get('guide'), entry_info):
-                            instant_entry_watch_data.append(line)
-                        else:
-                            watch_data.append(line)
+                        print(f"[{today}] 주말 또는 한국 공휴일 휴장일입니다. 실시간 감시를 건너뜁니다.")
+                        sys.exit(0)
 
-        # 3. 관심 종목 데이터 수집 (일반 관심종목 / AI 추천 관심종목 분리)
-        watch_data = []
+                if force_run and not is_manual:
+                    print("FORCE_RUN이 활성화되어 있어 강제 실행합니다.")
+
+                print(f"[{today}] AI 기반 실시간 감시 시작...")
+
+                holdings = self.analyzer.load_holdings()
+                self.analyzer.clean_watchlist()
+                watchlist = self.analyzer.load_watchlist()
+
+                # 1. 시장 심리 요약 데이터 확보
+                sentiment_msg, is_positive = self.analyzer.get_market_sentiment()
+
+                # 2. 보유 종목 데이터 수집
+                holding_data = []
+                sell_triggered = False
+                for code, info in holdings.items():
+                    try:
+                        name = info.get('name', code)
+                        buy_date = info.get('buy_date')
+                        buy_price = info.get('buy_price', 0)
+                        df = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=100)).strftime('%Y-%m-%d'))
+                        triggered, drop_pct = self.analyzer.check_trailing_stop(df, buy_date)
+                        latest_price = self.analyzer.get_latest_price(code)
+                        if latest_price:
+                            current_price = latest_price['last']
+                            prev_price = latest_price.get('prev_close') or latest_price.get('previous')
+                        else:
+                            current_price = df.iloc[-1]['Close']
+                            prev_price = df.iloc[-2]['Close'] if len(df) > 1 else current_price
+                        profit_pct = (current_price - buy_price) / buy_price * 100
+                        price_text = self.analyzer.format_price(current_price, code)
+                        change_text = self.analyzer.format_price_change(current_price, prev_price, code)
+                        high_price = self.analyzer.get_intraday_high(code)
+                        high_text = self.analyzer.format_price(high_price, code) if high_price is not None else None
+                        volume = self.analyzer.get_intraday_volume(code)
+                        volume_text = self.analyzer.format_volume(volume, code)
+                        detail = f"수익률: {profit_pct:+.2f}%"
+                        holding_data.append(self._format_monitor_line(name, price_text, change_text, high_text, volume_text, detail))
+                    except Exception as e:
+                        holding_data.append(f"- {code}: 데이터 오류")
+
+                # 3. 관심 종목 데이터 수집 (일반 관심종목 / AI 추천 관심종목 분리)
+                watch_data = []
+                ai_watch_data = []
+                for code, info in watchlist.items():
+                    try:
+                        name = info.get('name', code)
+                        add_date = info.get('add_date', '')
+                        source = info.get('source', '')
+                        detail = f"추가일: {add_date}" if add_date else ""
+                        if source == 'auto_recommendation':
+                            ai_watch_data.append(f"- {name} ({code}) {detail}")
+                        else:
+                            watch_data.append(f"- {name} ({code}) {detail}")
+                    except Exception as e:
+                        watch_data.append(f"- {code}: 데이터 오류")
+
+                market_section = sentiment_msg.strip()
+                holding_section = "\n\n".join(holding_data) if holding_data else "없음"
+                watch_section = "\n\n".join(watch_data) if watch_data else "없음"
+                ai_watch_section = "\n\n".join(ai_watch_data) if ai_watch_data else "없음"
+
+                final_report = self.analyzer.ask_ai_report(
+                    market_data=market_section,
+                    holding_data=holding_section,
+                    watch_data=watch_section,
+                    report_mode="monitor",
+                    ai_watch_data=ai_watch_section
+                )
+
+                final_report = "🕒 <b>[실시간 모니터링 알림]</b>\n\n" + final_report.strip()
+
+                self.analyzer.notifier.send_message(final_report)
+                print("AI 감시 보고서 전송 완료.")
         ai_watch_data = []
         for code, info in watchlist.items():
             try:
+<<<<<<< HEAD
             # 4. AI 리포트 생성
             market_section = sentiment_msg.strip()
             holding_section = "\n\n".join(holding_data) if holding_data else "없음"
@@ -222,6 +237,18 @@ class MarketMonitor:
                     ai_watch_data.append(f"- {code}: 분석 오류")
                 else:
                     watch_data.append(f"- {code}: 분석 오류")
+=======
+                name = info.get('name', code)
+                add_date = info.get('add_date', '')
+                source = info.get('source', '')
+                detail = f"추가일: {add_date}" if add_date else ""
+                if source == 'auto_recommendation':
+                    ai_watch_data.append(f"- {name} ({code}) {detail}")
+                else:
+                    watch_data.append(f"- {name} ({code}) {detail}")
+            except Exception as e:
+                watch_data.append(f"- {code}: 데이터 오류")
+>>>>>>> f134e30 (Restore monitor.py: report now reflects real holdings and watchlist data)
 
         # 4. AI 리포트 생성
         market_section = sentiment_msg.strip()
