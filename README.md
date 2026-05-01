@@ -35,72 +35,85 @@
 - `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID`를 GitHub Secrets에 등록하면 매일 아침 자동으로 리포트가 전송됩니다.
 - `Elite Stock Analysis` 리포트에는 오늘의 주요 주식/증시 관련 뉴스 요약도 포함됩니다.
 
-## � 전문가 역할 (Agent)
+## 🧑‍💼 전문가 역할 (Agent)
 
-역할별 상세 지침은 `agent/` 폴더를 참조하세요.
+각 역할별 상세 지침은 `agent/` 폴더를 참조하세요.
 
 | 역할 | 파일 | 설명 |
 |------|------|------|
-| A. 투자분석전문가 | [agent/agent_stock.md](agent/agent_stock.md) | 기술적 분석 기반 알고리즘 검증·개선 |
-| B. 백테스트 검증전문가 | [agent/agent_backtest.md](agent/agent_backtest.md) | 수익률·승률·MDD 등 성과 지표 검증 |
-| C. 자동화 전문가 | [agent/agent_auto.md](agent/agent_auto.md) | 주간 Self-Evolution 자동화 루프 운영 |
-| ETF. ETF 투자 전문가 | [agent/agent_etf.md](agent/agent_etf.md) | 차트 분석 기반 ETF 종목 선정 및 포트폴리오 최적화 |
-| 검색. 검색 전문가 | [agent/agent_search.md](agent/agent_search.md) | 역할 정의 예정 |
+| 투자분석전문가 | [agent/agent_stock.md](agent/agent_stock.md) | 기술적 분석 기반 알고리즘 검증·개선 |
+| 백테스트 검증전문가 | [agent/agent_backtest.md](agent/agent_backtest.md) | 수익률·승률·MDD 등 성과 지표 검증 |
+| 자동화 전문가 | [agent/agent_auto.md](agent/agent_auto.md) | 주간 Self-Evolution 자동화 루프 운영 |
+| ETF 투자 전문가 | [agent/agent_etf.md](agent/agent_etf.md) | 차트 분석 기반 ETF 종목 선정 및 포트폴리오 최적화 |
+| 검색 전문가 | [agent/agent_search.md](agent/agent_search.md) | **차트의 기술 중심 탐색, 외부 방법론 발굴** |
 
-## �🚀 기술 스택
-- **Language**: Python 3.9+
+## 🚀 기술 스택
+- **Language**: Python 3.9+ (권장: 3.10 이상)
 - **Data**: FinanceDataReader
 - **Indicators**: pandas-ta-classic
 - **Notification**: python-telegram-bot
-- **Platform**: GitHub Actions (Automation)
+- **Platform**: GitHub Actions, Google Apps Script, Cloud Scheduler
 
-## ⏰ 정시 실행 설정 (외부 스케줄러 권장)
-- GitHub `schedule`은 지연될 수 있으므로, 정시 실행이 필요하면 외부 스케줄러에서 `workflow_dispatch` API를 호출하세요.
-- 이 저장소 워크플로우는 현재 `workflow_dispatch`만 허용됩니다.
+## ⏰ 자동화 및 스케줄링
+
+- GitHub Actions 워크플로우(분석, 모니터, 최적화, agent_search 등)는 `workflow_dispatch` API로 트리거됩니다.
+- 정시 실행이 필요하면 Google Cloud Scheduler, Apps Script 등 외부 스케줄러에서 API를 호출하세요.
+
+### 주요 워크플로우 및 호출 예시
+
+| 워크플로우 | API URL |
+|---|---|
+| Elite Stock Analysis | `POST /actions/workflows/analyze.yml/dispatches` |
+| Real-Time Market Monitor | `POST /actions/workflows/monitor.yml/dispatches` |
+| Strategy Optimizer | `POST /actions/workflows/optimize.yml/dispatches` |
+| Agent Search (신규 전략 탐색) | `POST /actions/workflows/agent_search.yml/dispatches` |
+
+#### 예시 (curl)
+```bash
+curl -X POST "https://api.github.com/repos/wansang/finance/actions/workflows/agent_search.yml/dispatches" \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer <YOUR_GITHUB_PAT>" \
+  -d '{"ref":"main"}'
+```
+
+### Google Apps Script 연동 예시
+
+`google-scheduler/agent_search/Code.js` 참고. (GITHUB_PAT은 Script Properties에 등록)
+
+```js
+function dispatchAgentSearchWorkflow() {
+  var url = "https://api.github.com/repos/wansang/finance/actions/workflows/agent_search.yml/dispatches";
+  var payload = JSON.stringify({ ref: "main" });
+  var token = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT");
+  var options = {
+    method: "post",
+    contentType: "application/json",
+    headers: {
+      "Accept": "application/vnd.github+json",
+      "Authorization": "Bearer " + token
+    },
+    payload: payload,
+    muteHttpExceptions: true
+  };
+  var response = UrlFetchApp.fetch(url, options);
+  Logger.log(response.getContentText());
+}
+```
+
+### 크론 예시 (Asia/Seoul 기준)
+- 분석: 평일 08:30 → `30 8 * * 1-5`
+- 모니터: 평일 09:00~20:00 30분 간격 → `0,30 9-19 * * 1-5`, `0 20 * * 1-5`
+- 최적화: 토요일 09:00 → `0 0 * * 6`
+- agent_search: 금요일 23:00(UTC) → `0 23 * * 5`
 
 ### 1) GitHub 토큰 준비
 - GitHub PAT(Fine-grained) 생성
 - 권한: `Actions: Read and write`, `Contents: Read`
 - 대상 저장소: `wansang/finance`
 
-### 2) 호출 URL
-- Elite Stock Analysis:
-  - `POST https://api.github.com/repos/wansang/finance/actions/workflows/analyze.yml/dispatches`
-- Real-Time Market Monitor:
-  - `POST https://api.github.com/repos/wansang/finance/actions/workflows/monitor.yml/dispatches`
-- Strategy Optimizer:
-  - `POST https://api.github.com/repos/wansang/finance/actions/workflows/optimize.yml/dispatches`
 
-### 3) 요청 헤더/바디
-```bash
-curl -X POST "https://api.github.com/repos/wansang/finance/actions/workflows/analyze.yml/dispatches" \
-  -H "Accept: application/vnd.github+json" \
-  -H "Authorization: Bearer <YOUR_GITHUB_PAT>" \
-  -d '{"ref":"main"}'
-```
-
-```bash
-curl -X POST "https://api.github.com/repos/wansang/finance/actions/workflows/monitor.yml/dispatches" \
-  -H "Accept: application/vnd.github+json" \
-  -H "Authorization: Bearer <YOUR_GITHUB_PAT>" \
-  -d '{"ref":"main"}'
-```
-
-```bash
-curl -X POST "https://api.github.com/repos/wansang/finance/actions/workflows/optimize.yml/dispatches" \
-  -H "Accept: application/vnd.github+json" \
-  -H "Authorization: Bearer <YOUR_GITHUB_PAT>" \
-  -d '{"ref":"main"}'
-```
-
-### 4) 크론 설정 (Asia/Seoul 기준)
-- Elite Stock Analysis: 평일 08:30
-  - `30 8 * * 1-5`
-- Real-Time Market Monitor: 평일 09:00~20:00 30분 간격
-  - `0,30 9-19 * * 1-5`
-  - `0 20 * * 1-5`
-- Strategy Optimizer: 매주 토요일 09:00
-  - `0 0 * * 6`
+---
+*본 프로그램은 기술적 분석을 통한 보조 도구이며, 모든 투자의 책임은 투자자 본인에게 있습니다.*
 
 ---
 *본 프로그램은 기술적 분석을 통한 보조 도구이며, 모든 투자의 책임은 투자자 본인에게 있습니다.*
