@@ -1330,8 +1330,9 @@ class StockAnalyzer:
             return False
         
         # 두 번째 저점이 최근 12봉 이내여야 하며, 현재 가격이 전일보다 상승하며 반등 확증 시 유효
+        current_close = df_target['Close'].iloc[-1]
         prev_close = df_target['Close'].iloc[-2]
-        if p2_idx < len(recent_closes) - 12 or last['Close'] <= prev_close:
+        if p2_idx < len(recent_closes) - 12 or current_close <= prev_close:
             return False
         
         return True
