@@ -19,3 +19,62 @@
 - 확장/운영 가이드
 
 (필요한 세부 내용은 자유롭게 추가/수정하세요)
+
+---
+
+## 1. 에이전트 시스템 구조도 (예시)
+
+```mermaid
+flowchart TD
+	Main(Main System) -->|API| AgentStock
+	Main -->|API| AgentETF
+	Main -->|API| AgentSearch
+	Main -->|API| AgentAuto
+	AgentStock <-->|데이터| DB[(DB/스토리지)]
+	AgentETF <--> DB
+	AgentSearch <--> DB
+	AgentAuto <--> DB
+	Main <-->|워크플로우| Ext[외부 시스템 (GitHub Actions, Google Scheduler 등)]
+```
+
+## 2. 각 agent 역할 및 호출 흐름
+
+- **agent_stock**: 주식 종목 데이터 수집, 분석, 신호 생성, 주문 연동
+- **agent_etf**: ETF 데이터 수집, 분석, 신호 생성, 주문 연동
+- **agent_search**: 전략/종목/ETF 탐색 및 추천, 백로그 관리
+- **agent_auto**: 자동화된 반복 작업(스케줄러, 배치 등) 실행
+
+호출 흐름 예시:
+1. Main System이 agent_search에 전략 탐색 요청
+2. agent_search가 DB에서 데이터 조회 및 분석
+3. 결과를 Main System에 반환, 필요시 agent_stock/agent_etf에 신호 전달
+4. 외부 워크플로우(스케줄러, Actions)와 연동하여 자동화
+
+## 3. 데이터 흐름 및 저장소
+
+- 모든 agent는 DB/스토리지(예: json, DB, csv 등)와 연동
+- 데이터 흐름: 입력(시장 데이터, 사용자 요청) → 처리(분석/탐색/신호) → 출력(추천, 주문, 알림)
+- 백로그/히스토리: searchBacklog.json, searchBacklog_history.json 등으로 관리
+
+## 4. 백로그/히스토리 관리 정책
+
+- 모든 전략/탐색/신호 기록은 백로그(json/csv)로 저장
+- 주요 변경 이력은 searchBacklog_history.json, algorithm_update_log.json 등으로 관리
+- 주기적 백업 및 무결성 점검 권장
+
+## 5. 외부 워크플로우 연동 예시
+
+- **GitHub Actions**: 코드 변경 시 자동 테스트/배포, 워크플로우 트리거
+- **Google Scheduler**: 정기적(예: 매일 09:00)으로 agent_search/agent_auto 실행
+- 연동 스크립트 예시: google-scheduler/ 폴더 내 shell, js 파일 참고
+
+## 6. 확장/운영 가이드
+
+- 신규 agent 추가 시 구조도/호출 흐름/데이터 흐름에 반영
+- 장애 발생 시 로그(algorithm_update_log.json 등) 및 알림(notifier.py) 활용
+- 보안: 외부 연동 시 인증/권한 관리, 민감 정보 분리
+- 버전 관리: 주요 정책/구조 변경 시 update_log, update_report, summary 등 기록
+
+---
+
+실제 운영 환경/정책에 맞게 세부 내용을 계속 보완하세요.
