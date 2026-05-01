@@ -216,6 +216,6 @@ class MarketMonitor:
         self.analyzer.notifier.send_message(final_report)
         print("AI 감시 보고서 전송 완료.")
 
-if __name__ == \"__main__\":
+if __name__ == "__main__":
     monitor = MarketMonitor()
     monitor.run()
