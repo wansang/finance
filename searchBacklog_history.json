@@ -568,5 +568,213 @@
       },
       "validated_at": "2026-05-02T04:35:05.419082"
     }
+  },
+  {
+    "searched_at": "2026-05-02T02:57:07.252347",
+    "method": {
+      "방법론명": "고빈도 인트라데이 초단기 스윙",
+      "출처/근거": "Day Trading Systems",
+      "핵심 아이디어": "당일 발생한 신호를 짧은 타임아웃과 함께 처리하여 리스크 최소화",
+      "현재 시스템과의 차이점": "INTRADAY 기능을 활성화하고 재시도 횟수 및 타임아웃 조정",
+      "예상 적용 시장": "거래대금이 상위권인 종목",
+      "기대 효과": "오버나이트 리스크 감소 및 자전 효과 극대화",
+      "구현 난이도": "높음",
+      "검증 요청 사항": "INTRADAY_MAX_RETRIES에 따른 체결률 변화",
+      "제안_파라미터_변경": {
+        "INTRADAY_ENABLED": 1,
+        "INTRADAY_TIMEOUT": 60,
+        "INTRADAY_MAX_RETRIES": 5,
+        "VALIDATE_MAX_HOLD_DAYS": 1
+      }
+    },
+    "validation_result": {
+      "stock": {
+        "verdict": "rejected",
+        "reason": "After 결과의 MDD(23.5918%)가 합격 기준인 20% 미만을 초과하여 탈락함. 또한 Before 대비 샘플 수는 확보되었으나, MDD가 9.45%에서 23.59%로 2.5배 가까이 폭증하고 Sharpe 지수(2.57->0.52) 및 평균수익률(4.65%->0.92%)이 심각하게 퇴행하여 전략의 안정성이 훼손됨.",
+        "before_metrics": {
+          "count": 12,
+          "win_rate": 75.0,
+          "avg_return": 4.658077160850135,
+          "mdd": 9.4508,
+          "sharpe": 2.5717
+        },
+        "after_metrics": {
+          "count": 25,
+          "win_rate": 44.0,
+          "avg_return": 0.9241017566283848,
+          "mdd": 23.5918,
+          "sharpe": 0.5276
+        },
+        "proposed_changes": {
+          "INTRADAY_ENABLED": 1,
+          "INTRADAY_TIMEOUT": 60,
+          "INTRADAY_MAX_RETRIES": 5,
+          "VALIDATE_MAX_HOLD_DAYS": 1
+        }
+      },
+      "etf": {
+        "verdict": "sparse_market",
+        "reason": "ETF Before 샘플 희소 — 현재 시장 신호 부족으로 통계 검증 불가"
+      },
+      "validated_at": "2026-05-02T09:28:12.452031"
+    }
+  },
+  {
+    "searched_at": "2026-05-02T02:57:07.252347",
+    "method": {
+      "방법론명": "섹터 주도주 집중 투자 전략",
+      "출처/근거": "Relative Strength Analysis",
+      "핵심 아이디어": "강한 섹터 내 소수 종목에 자산을 집중하여 초과 수익 달성",
+      "현재 시스템과의 차이점": "포트폴리오 분산보다는 섹터 집중도를 높여 수익률 극대화",
+      "예상 적용 시장": "순환매가 빠른 장세",
+      "기대 효과": "주도 섹터 상승 시 시장 평균을 압도하는 성과",
+      "구현 난이도": "중간",
+      "검증 요청 사항": "MAX_SECTOR_POSITIONS 축소 시 변동성 확대 여부",
+      "제안_파라미터_변경": {
+        "MAX_POSITIONS": 5,
+        "MAX_SECTOR_POSITIONS": 2,
+        "TIER1_MIN_RS": 90
+      }
+    },
+    "validation_result": {
+      "stock": {
+        "verdict": "no_effect",
+        "reason": "파라미터 변경이 백테스트 결과에 영향을 주지 않음 — backtester 미지원 파라미터"
+      },
+      "etf": {
+        "verdict": "sparse_market",
+        "reason": "ETF Before 샘플 희소 — 현재 시장 신호 부족으로 통계 검증 불가"
+      },
+      "validated_at": "2026-05-02T09:32:14.970842"
+    }
+  },
+  {
+    "searched_at": "2026-05-02T02:57:07.252347",
+    "method": {
+      "방법론명": "하드 스톱로스 보호 전략",
+      "출처/근거": "Risk Management 101",
+      "핵심 아이디어": "시스템적 급락 시나리오에 대비하여 매우 타이트한 하드 손절 적용",
+      "현재 시스템과의 차이점": "심리적 마지노선을 파라미터로 강제하여 큰 손실 방지",
+      "예상 적용 시장": "변동성이 극심한 테마주 장세",
+      "기대 효과": "계좌 파산 위험(Risk of Ruin) 원천 차단",
+      "구현 난이도": "낮음",
+      "검증 요청 사항": "MAX_HARD_STOP_PCT 설정 시 생존율(Survival Rate)",
+      "제안_파라미터_변경": {
+        "MAX_HARD_STOP_PCT": 0.05,
+        "US_MAX_HARD_STOP_PCT": 0.04,
+        "VALIDATE_STOP_LOSS_PCT": 0.05
+      }
+    },
+    "validation_result": {
+      "stock": {
+        "verdict": "no_effect",
+        "reason": "파라미터 변경이 백테스트 결과에 영향을 주지 않음 — backtester 미지원 파라미터"
+      },
+      "etf": {
+        "verdict": "sparse_market",
+        "reason": "ETF Before 샘플 희소 — 현재 시장 신호 부족으로 통계 검증 불가"
+      },
+      "validated_at": "2026-05-02T09:36:20.156024"
+    }
+  },
+  {
+    "searched_at": "2026-05-02T02:57:07.252347",
+    "method": {
+      "방법론명": "미국 시장 거래 비용 최적화",
+      "출처/근거": "Trading Cost Analysis (TCA)",
+      "핵심 아이디어": "높은 세금/수수료를 감안하여 매매 빈도를 낮추고 큰 추세를 추종",
+      "현재 시스템과의 차이점": "거래 비용 설정을 실제값에 가깝게 조정하고 목표 수익을 상향",
+      "예상 적용 시장": "미국 시장",
+      "기대 효과": "잦은 매매로 인한 수익 갉아먹기 현상 방지",
+      "구현 난이도": "낮음",
+      "검증 요청 사항": "거래 비용 반영 후 순수익(Net Profit) 비교",
+      "제안_파라미터_변경": {
+        "US_TRANSACTION_COST_BUY_PCT": 0.003,
+        "US_TRANSACTION_COST_SELL_PCT": 0.003,
+        "US_VALIDATE_MAX_HOLD_DAYS": 60,
+        "US_TIER1_WIN_RATE": 0.65
+      }
+    },
+    "validation_result": {
+      "stock": {
+        "verdict": "rejected",
+        "reason": "판정 기준 중 샘플 수 요건 미달 및 주요 지표의 과도한 퇴행으로 인해 거절함. After 샘플 수(8건)가 Before 대비 80% 기준인 9.6건에 미달하여 통계적 유효성이 부족함. 또한 MDD가 소폭 개선(9.45%→9.01%)되었으나, 샤프 지수(2.57→1.01)와 평균수익률(4.65%→2.13%)이 50% 이상 급감하며 전략의 효율성이 크게 훼손됨.",
+        "before_metrics": {
+          "count": 12,
+          "win_rate": 75.0,
+          "avg_return": 4.658077160850135,
+          "mdd": 9.4508,
+          "sharpe": 2.5717
+        },
+        "after_metrics": {
+          "count": 8,
+          "win_rate": 50.0,
+          "avg_return": 2.132045068348374,
+          "mdd": 9.0096,
+          "sharpe": 1.0185
+        },
+        "proposed_changes": {
+          "TRANSACTION_COST_BUY_PCT": 0.003,
+          "TRANSACTION_COST_SELL_PCT": 0.003,
+          "VALIDATE_MAX_HOLD_DAYS": 60,
+          "TIER1_WIN_RATE": 65,
+          "PROFIT_TARGET_PCT": 0.15,
+          "TRAILING_STOP_PCT": 0.05
+        }
+      },
+      "etf": {
+        "verdict": "sparse_market",
+        "reason": "ETF Before 샘플 희소 — 현재 시장 신호 부족으로 통계 검증 불가"
+      },
+      "validated_at": "2026-05-02T09:40:36.541632"
+    }
+  },
+  {
+    "searched_at": "2026-05-02T02:57:07.252347",
+    "method": {
+      "방법론명": "트렌드 템플릿 정밀 감도 전략",
+      "출처/근거": "Quantitative Trend Following",
+      "핵심 아이디어": "추세 판단의 기준인 피크 팩터를 조정하여 가짜 추세 배제",
+      "현재 시스템과의 차이점": "PEAK_FACTOR를 낮추어 더 엄격한 추세 형성 기준 적용",
+      "예상 적용 시장": "추세 형성이 어려운 횡보장",
+      "기대 효과": "확실한 상승 추세 확증 이후 진입",
+      "구현 난이도": "중간",
+      "검증 요청 사항": "TREND_TEMPLATE_PEAK_FACTOR 하향 시 진입 횟수 변화",
+      "제안_파라미터_변경": {
+        "TREND_TEMPLATE_PEAK_FACTOR": 0.2,
+        "TREND_TEMPLATE_LOOKBACK": 200,
+        "TIER1_MIN_SIGNALS": 2
+      }
+    },
+    "validation_result": {
+      "stock": {
+        "verdict": "approved",
+        "reason": "모든 주식 합격 기준을 충족하며 성과가 대폭 개선됨. 승률(81.25% ≥ 38%), 평균수익(6.95% > 0.5%), MDD(10.16% < 20%), Sharpe(3.34 > 0.5), 샘플 수(16 ≥ 9.6) 모두 기준치 이상임. Before 대비 승률(+6.25%p), 평균수익(+2.30%p), Sharpe(+0.78)가 크게 개선되었고, MDD가 0.72%p 소폭 상승했으나 수익성 향상폭 대비 미미하므로 최종 승인함.",
+        "before_metrics": {
+          "count": 12,
+          "win_rate": 75.0,
+          "avg_return": 4.658077160850135,
+          "mdd": 9.4508,
+          "sharpe": 2.5717
+        },
+        "after_metrics": {
+          "count": 16,
+          "win_rate": 81.25,
+          "avg_return": 6.954147530023077,
+          "mdd": 10.1664,
+          "sharpe": 3.3499
+        },
+        "proposed_changes": {
+          "TREND_TEMPLATE_PEAK_FACTOR": 0.2,
+          "TREND_TEMPLATE_LOOKBACK": 200,
+          "TIER1_MIN_SIGNALS": 2
+        }
+      },
+      "etf": {
+        "verdict": "sparse_market",
+        "reason": "ETF Before 샘플 희소 — 현재 시장 신호 부족으로 통계 검증 불가"
+      },
+      "validated_at": "2026-05-02T09:44:43.100321"
+    }
   }
 ]

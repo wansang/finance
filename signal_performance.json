@@ -86,14 +86,14 @@
     "failure_patterns": {
         "high_volatility_stocks": {
             "description": "변동성이 높은 종목에서의 실패율",
-            "fail_count": 58,
-            "total_count": 58,
+            "fail_count": 69,
+            "total_count": 69,
             "fail_rate": 100.0
         },
         "low_volume_stocks": {
             "description": "거래량이 적은 종목에서의 실패율",
-            "fail_count": 32,
-            "total_count": 32,
+            "fail_count": 40,
+            "total_count": 40,
             "fail_rate": 100.0
         },
         "false_breakouts": {
@@ -103,5 +103,5 @@
             "fail_rate": 0.0
         }
     },
-    "last_updated": "2026-05-02 04:36:42"
+    "last_updated": "2026-05-02 09:45:56"
 }

@@ -757,5 +757,140 @@
       "시장 상황: BULL",
       "최고 성과 신호: 바닥권 반등 신호(BB 하단) (승률 100.0%)"
     ]
+  },
+  {
+    "title": "[backlog 검증]  방법론 파라미터 반영",
+    "timestamp": "2026-05-02 09:44:43",
+    "changes": {
+      "TREND_TEMPLATE_PEAK_FACTOR": {
+        "before": 0.2,
+        "after": 0.2
+      },
+      "TREND_TEMPLATE_LOOKBACK": {
+        "before": 200,
+        "after": 200
+      },
+      "TIER1_MIN_SIGNALS": {
+        "before": 2,
+        "after": 2
+      }
+    },
+    "before_metrics": {
+      "count": 12,
+      "win_rate": 75.0,
+      "avg_return": 4.658077160850135,
+      "mdd": 9.4508,
+      "sharpe": 2.5717
+    },
+    "after_metrics": {},
+    "notes": []
+  },
+  {
+    "timestamp": "2026-05-02T10:07:29.912271",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "detect_divergence: 과매도 기준을 강화하고 MACD 히스토그램의 상승 전환을 확인하여 가짜 다이버전스로 인한 손실을 방지함.",
+      "detect_volume_spike: 단순 거래량 폭발은 고점 신호일 확률이 높으므로, SMA50 근처의 이격도가 낮은 초기 돌파 구간만 선별함."
+    ],
+    "kept": false,
+    "before": {
+      "total": 21,
+      "wins": 14,
+      "win_rate": 66.6667,
+      "avg_ret": 5.0246,
+      "sharpe": 1.638,
+      "mdd": 21.8737
+    },
+    "after": {
+      "total": 21,
+      "wins": 14,
+      "win_rate": 66.6667,
+      "avg_ret": 5.0246,
+      "sharpe": 1.638,
+      "mdd": 21.8737
+    }
+  },
+  {
+    "timestamp": "2026-05-02T10:16:31.023083",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "calculate_entry_price: 단순 지지선 진입 대신 RS(상대강도) 상위 종목이 변동성을 수축(VCP)하며 에너지를 모은 후 돌파하는 '핵심 가격 구간'을 최우선 진입 타점으로 재정의합니다.",
+      "detect_divergence: 0% 승률의 다이버전스 신호가 '떨어지는 칼날'이 되지 않도록, 주가가 최소한 20일 이동평균선 위로 올라타며 단기 추세를 회복했을 때만 신호를 확정합니다."
+    ],
+    "kept": false,
+    "before": {
+      "total": 21,
+      "wins": 14,
+      "win_rate": 66.6667,
+      "avg_ret": 5.0246,
+      "sharpe": 1.638,
+      "mdd": 21.8737
+    },
+    "after": {
+      "total": 21,
+      "wins": 14,
+      "win_rate": 66.6667,
+      "avg_ret": 5.0246,
+      "sharpe": 1.638,
+      "mdd": 21.8737
+    }
+  },
+  {
+    "timestamp": "2026-05-02T10:25:33.185424",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "calculate_entry_price: VCP 및 시장 주도주(RS) 전략의 유효 빈도를 높이기 위해 RS Rating 기준을 1.0에서 0.85로 완화하고, 50일 이평선 확증 조건을 추가하여 신뢰도를 높입니다.",
+      "detect_volume_spike: 승률 25%에 불과한 거래량 급증 신호의 허수를 제거하기 위해, 임계치를 3.5배에서 2.8배로 현실화하되 50일 이평선 위라는 추세 조건을 필수화합니다."
+    ],
+    "kept": false,
+    "before": {
+      "total": 21,
+      "wins": 14,
+      "win_rate": 66.6667,
+      "avg_ret": 5.0246,
+      "sharpe": 1.638,
+      "mdd": 21.8737
+    },
+    "after": {
+      "total": 21,
+      "wins": 14,
+      "win_rate": 66.6667,
+      "avg_ret": 5.0246,
+      "sharpe": 1.638,
+      "mdd": 21.8737
+    }
+  },
+  {
+    "title": "이번주 추천 종목 실적 기반 알고리즘 고도화 업데이트",
+    "timestamp": "2026-05-02 10:26:28",
+    "changes": {
+      "TIER1_WIN_RATE": {
+        "before": 58,
+        "after": 60
+      },
+      "US_TRAILING_STOP_PCT": {
+        "before": 0.0418,
+        "after": 0.0391
+      }
+    },
+    "before_metrics": {
+      "count": 66,
+      "avg_return": 6.197088619339963,
+      "win_rate": 63.63636363636363,
+      "max_return": 59.39530735016428,
+      "min_return": -24.772316314108604
+    },
+    "after_metrics": {
+      "count": 66,
+      "avg_return": 6.197088619339963,
+      "win_rate": 63.63636363636363,
+      "max_return": 59.39530735016428,
+      "min_return": -24.772316314108604
+    },
+    "notes": [
+      "실제 추천 종목 66개 성과 기반 고도화 최적화",
+      "시장 상황: BULL",
+      "최고 성과 신호: 바닥권 반등 신호(BB 하단) (승률 100.0%)"
+    ]
   }
 ]
