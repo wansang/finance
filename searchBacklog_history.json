@@ -1,1 +1,572 @@
-[]
+[
+  {
+    "searched_at": "2026-05-02T02:57:07.252347",
+    "method": {
+      "방법론명": "마크 미너비니 트렌드 템플릿 전략",
+      "출처/근거": "Mark Minervini, Trade Like a Stock Market Wizard",
+      "핵심 아이디어": "정배열 상태의 강한 상승 추세주만 선별하여 매수",
+      "현재 시스템과의 차이점": "단기 변동성보다는 장기 이평선의 정배열 상태와 상대적 강도(RS)에 집중",
+      "예상 적용 시장": "미국/한국 성장주 시장",
+      "기대 효과": "상승장 초입에서 가장 강력한 주도주 포착",
+      "구현 난이도": "낮음",
+      "검증 요청 사항": "SMA200 상향 각도 및 현재가가 SMA200 위에 있는지 확인",
+      "제안_파라미터_변경": {
+        "SMA50": 50,
+        "SMA150": 150,
+        "SMA200": 200,
+        "TIER1_MIN_RS": 80,
+        "TREND_TEMPLATE_LOOKBACK": 252
+      }
+    },
+    "validation_result": {
+      "stock": {
+        "verdict": "rejected",
+        "reason": "After 지표의 샘플 수(0건)가 최소 합격 기준인 50건에 미달하여 통계적 유의성을 확보하지 못함. 또한 승률(0% < 38%), 평균수익(0% < 0.5%), Sharpe(0 < 0.5) 등 모든 지표가 기준치 미만이며, Before 대비 개선된 지표가 전혀 없음.",
+        "before_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "after_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "proposed_changes": {
+          "SMA50": 50,
+          "SMA150": 150,
+          "SMA200": 200,
+          "TIER1_MIN_RS": 80,
+          "TREND_TEMPLATE_LOOKBACK": 252
+        }
+      },
+      "etf": {
+        "verdict": "skipped",
+        "reason": "ETF 전용 파라미터로 구현 불가"
+      },
+      "validated_at": "2026-05-02T03:46:24.731485"
+    }
+  },
+  {
+    "searched_at": "2026-05-02T02:57:07.252347",
+    "method": {
+      "방법론명": "단기 RSI 과매도 반등 스윙",
+      "출처/근거": "Larry Connors, RSI(2) Strategy",
+      "핵심 아이디어": "극심한 단기 과매도 구간에서 기술적 반등을 노리는 전략",
+      "현재 시스템과의 차이점": "RSI 기간을 대폭 축소하여 민감도를 높이고 보유 기간을 단축",
+      "예상 적용 시장": "변동성이 큰 대형주",
+      "기대 효과": "평균 회귀 현상을 이용한 높은 승률의 단기 수익",
+      "구현 난이도": "낮음",
+      "검증 요청 사항": "RSI 20 이하 진입 시 승률 데이터 확인",
+      "제안_파라미터_변경": {
+        "RSI_LENGTH": 7,
+        "VALIDATE_MAX_HOLD_DAYS": 5,
+        "PROFIT_TARGET_PCT": 0.05,
+        "VALIDATE_STOP_LOSS_PCT": 0.03
+      }
+    },
+    "validation_result": {
+      "stock": {
+        "verdict": "rejected",
+        "reason": "After 지표가 주식 합격 기준을 전혀 충족하지 못함. 샘플 수(0 < 50), 승률(0% < 38%), 평균수익률(0% < 0.5%), Sharpe 지수(0 < 0.5) 모두 미달이며, Before 대비 지표 개선이 전혀 없음.",
+        "before_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "after_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "proposed_changes": {
+          "RSI_LENGTH": 7,
+          "VALIDATE_MAX_HOLD_DAYS": 5,
+          "PROFIT_TARGET_PCT": 0.05,
+          "VALIDATE_STOP_LOSS_PCT": 0.03
+        }
+      },
+      "etf": {
+        "verdict": "skipped",
+        "reason": "ETF 전용 파라미터로 구현 불가"
+      },
+      "validated_at": "2026-05-02T03:51:49.539482"
+    }
+  },
+  {
+    "searched_at": "2026-05-02T02:57:07.252347",
+    "method": {
+      "방법론명": "ATR 기반 변동성 돌파 손절 최적화",
+      "출처/근거": "Chuck LeBeau, Chandelier Exit",
+      "핵심 아이디어": "종목별 변동성(ATR)에 맞추어 손절선을 유동적으로 설정",
+      "현재 시스템과의 차이점": "고정 백분율 손절 대신 ATR 배수를 사용하여 시장 소음(Noise)에 의한 손절 방지",
+      "예상 적용 시장": "모든 시장",
+      "기대 효과": "추세 지속 시 불필요한 손절 최소화 및 수익 극대화",
+      "구현 난이도": "중간",
+      "검증 요청 사항": "ATR_STOP_MULTIPLIER 변경에 따른 MDD 변화",
+      "제안_파라미터_변경": {
+        "ATR_LENGTH": 14,
+        "ATR_STOP_MULTIPLIER": 2.5,
+        "ATR_TARGET_MULTIPLIER": 3.5,
+        "TRAILING_STOP_ACTIVATE_PCT": 0.08
+      }
+    },
+    "validation_result": {
+      "stock": {
+        "verdict": "rejected",
+        "reason": "샘플 수(count=0)가 합격 기준인 50건에 미달하며, 승률(0% < 38%), 평균수익(0% <= 0.5%), Sharpe(0 <= 0.5) 등 모든 핵심 지표가 주식 합격 기준을 충족하지 못함. 또한 Before와 After 지표가 동일하여 성능 개선이 전혀 확인되지 않음.",
+        "before_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "after_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "proposed_changes": {
+          "ATR_LENGTH": 14,
+          "ATR_STOP_MULTIPLIER": 2.5,
+          "ATR_TARGET_MULTIPLIER": 3.5,
+          "TRAILING_STOP_ACTIVATE_PCT": 0.08
+        }
+      },
+      "etf": {
+        "verdict": "rejected",
+        "reason": "After 지표의 샘플 수(0건)가 최소 기준인 10건 미달이며, 승률(0%), 평균수익(0%), Sharpe 지수(0) 등 모든 성과 지표가 ETF 합격 기준(승률 ≥ 35%, 평균수익 > 0.5%, Sharpe > 0.5)을 충족하지 못함. 데이터가 없는 상태에서는 전략의 유효성을 검증할 수 없음.",
+        "before_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "after_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "proposed_changes": {
+          "US_ATR_STOP_MULTIPLIER": 2.5,
+          "US_ATR_TARGET_MULTIPLIER": 3.5,
+          "US_MAX_HARD_STOP_PCT": 0.08,
+          "US_VALIDATE_STOP_LOSS_PCT": -0.1
+        }
+      },
+      "validated_at": "2026-05-02T03:57:15.540214"
+    }
+  },
+  {
+    "searched_at": "2026-05-02T02:57:07.252347",
+    "method": {
+      "방법론명": "보수적 티어1 승률 필터링 전략",
+      "출처/근거": "통계적 유의성 기반 자체 퀀트 모델",
+      "핵심 아이디어": "검증된 승률이 매우 높은(Tier 1) 신호에만 집중 투자",
+      "현재 시스템과의 차이점": "진입 장벽을 높여 거래 횟수는 줄이되 개별 거래의 질을 향상",
+      "예상 적용 시장": "안정적인 우량주 시장",
+      "기대 효과": "자산 곡선의 안정성 향상 및 슬리피지 감소",
+      "구현 난이도": "낮음",
+      "검증 요청 사항": "TIER1_WIN_RATE 70% 이상 시의 총 수익금 변화",
+      "제안_파라미터_변경": {
+        "TIER1_WIN_RATE": 0.7,
+        "TIER1_MIN_SIGNALS": 5,
+        "WEAK_SIGNAL_WIN_RATE_THRESHOLD": 0.55
+      }
+    },
+    "validation_result": {
+      "stock": {
+        "verdict": "rejected",
+        "reason": "After 지표가 주식 합격 기준(승률 ≥ 38%, 평균수익 > 0.5%, Sharpe > 0.5, 샘플 수 ≥ 50건)을 전혀 충족하지 못함. 특히 샘플 수(count)가 0건으로 통계적 유의성이 없으며, Before 대비 지표 개선이 발생하지 않았으므로 승인 불가함.",
+        "before_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "after_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "proposed_changes": {
+          "TIER1_WIN_RATE": 0.7,
+          "TIER1_MIN_SIGNALS": 5,
+          "WEAK_SIGNAL_WIN_RATE_THRESHOLD": 0.55
+        }
+      },
+      "etf": {
+        "verdict": "rejected",
+        "reason": "After 지표의 샘플 수(count)가 0으로 최소 합격 기준인 10건을 충족하지 못하며, Before 대비 어떠한 지표 개선도 확인되지 않음. 또한 승률(0%), 평균수익(0%), Sharpe(0) 등 모든 절대 지표가 ETF 합격 기준치에 미달함.",
+        "before_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "after_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "proposed_changes": {
+          "US_TIER1_WIN_RATE": 70,
+          "US_TIER2_WIN_RATE": 55
+        }
+      },
+      "validated_at": "2026-05-02T04:02:43.821616"
+    }
+  },
+  {
+    "searched_at": "2026-05-02T02:57:07.252347",
+    "method": {
+      "방법론명": "미국 시장 공격적 추격 매수 전략",
+      "출처/근거": "William O'Neil, CANSLIM",
+      "핵심 아이디어": "미국 시장의 강력한 모멘텀을 활용하여 목표 수익률을 상향",
+      "현재 시스템과의 차이점": "익절 구간을 넓게 잡고 추세 템플릿 민감도를 조정",
+      "예상 적용 시장": "나스닥(NASDAQ) 성장주",
+      "기대 효과": "대세 상승장에서의 수익률 극대화",
+      "구현 난이도": "중간",
+      "검증 요청 사항": "US_PROFIT_TARGET_PCT 상향에 따른 최종 수익률 비교",
+      "제안_파라미터_변경": {
+        "US_PROFIT_TARGET_PCT": 0.3,
+        "US_TRAILING_STOP_PCT": 0.1,
+        "TREND_TEMPLATE_PEAK_FACTOR": 0.15,
+        "US_TIER1_WIN_RATE": 0.6
+      }
+    },
+    "validation_result": {
+      "stock": {
+        "verdict": "rejected",
+        "reason": "After 지표가 주식 합격 기준(샘플 수 ≥ 50건, 승률 ≥ 38%, 평균수익 > 0.5%, Sharpe > 0.5)을 전혀 충족하지 못함. 샘플 수가 0건으로 통계적 유의성이 없으며, Before 대비 지표 개선이 전혀 이루어지지 않음.",
+        "before_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "after_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "proposed_changes": {
+          "TREND_TEMPLATE_PEAK_FACTOR": 0.15
+        }
+      },
+      "etf": {
+        "verdict": "rejected",
+        "reason": "After 지표의 샘플 수(count=0)가 최소 합격 기준인 10건에 미달하며, 승률(0% < 35%), 평균수익(0% < 0.5%), Sharpe(0.0 < 0.5) 등 모든 핵심 지표가 통계적 유의성 및 합격 기준을 충족하지 못함. 또한 Before 대비 개선된 지표가 전혀 없음.",
+        "before_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "after_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "proposed_changes": {
+          "US_PROFIT_TARGET_PCT": 0.3,
+          "US_TRAILING_STOP_PCT": 0.1,
+          "US_TIER1_WIN_RATE": 0.6
+        }
+      },
+      "validated_at": "2026-05-02T04:07:34.846109"
+    }
+  },
+  {
+    "searched_at": "2026-05-02T02:57:07.252347",
+    "method": {
+      "방법론명": "하락장 방어형 RS 필터링 전략",
+      "출처/근거": "Stan Weinstein, Stage Analysis",
+      "핵심 아이디어": "지수 대비 강한 종목(RS)만 매수하고, 시장 필터를 강화하여 하락장 회피",
+      "현재 시스템과의 차이점": "MARKET_FILTER를 활성화하고 약세장에서의 RS 기준을 강화",
+      "예상 적용 시장": "하락 전환이 우려되는 변동성 시장",
+      "기대 효과": "하락장에서의 자산 방어 및 조기 현금화",
+      "구현 난이도": "중간",
+      "검증 요청 사항": "MARKET_FILTER_ENABLED 활성 시 하락장 수익률 방어 여부",
+      "제안_파라미터_변경": {
+        "MARKET_FILTER_ENABLED": 1,
+        "RS_LOOKBACK_BEAR": 120,
+        "RS_MIN_BEAR_DEFENSE": 85,
+        "DAILY_LOSS_KILL_PCT": 0.03
+      }
+    },
+    "validation_result": {
+      "stock": {
+        "verdict": "rejected",
+        "reason": "샘플 수(count: 0)가 합격 기준인 50건 이상을 충족하지 못하며, 승률(0%), 평균수익(0%), Sharpe(0) 등 모든 지표가 주식 합격 기준 및 Before 대비 개선 조건을 만족하지 못함.",
+        "before_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "after_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "proposed_changes": {
+          "MARKET_FILTER_ENABLED": 1,
+          "RS_LOOKBACK_BEAR": 120,
+          "RS_MIN_BEAR_DEFENSE": 85,
+          "DAILY_LOSS_KILL_PCT": 0.03
+        }
+      },
+      "etf": {
+        "verdict": "skipped",
+        "reason": "ETF 전용 파라미터로 구현 불가"
+      },
+      "validated_at": "2026-05-02T04:12:46.200642"
+    }
+  },
+  {
+    "searched_at": "2026-05-02T02:57:07.252347",
+    "method": {
+      "방법론명": "볼린저 밴드 스퀴즈 돌파 전략",
+      "출처/근거": "John Bollinger, Bollinger on Bollinger Bands",
+      "핵심 아이디어": "변동성이 수축된 구간(Squeeze) 이후의 폭발적 에너지를 포착",
+      "현재 시스템과의 차이점": "BB 표준편차를 좁혀 변동성 돌파 신호를 민감하게 수용",
+      "예상 적용 시장": "횡보 후 추세 전환 종목",
+      "기대 효과": "낮은 리스크 구간에서 진입하여 큰 추세 수익 획득",
+      "구현 난이도": "낮음",
+      "검증 요청 사항": "BB_STD 1.5 설정 시의 돌파 신호 정확도",
+      "제안_파라미터_변경": {
+        "BB_LENGTH": 20,
+        "BB_STD": 1.5,
+        "VOL_AVG_WINDOW": 20,
+        "MIN_AVG_VOLUME": 500000
+      }
+    },
+    "validation_result": {
+      "stock": {
+        "verdict": "rejected",
+        "reason": "After 데이터의 샘플 수(count)가 0건으로 최소 기준인 50건을 충족하지 못하며, 승률(0.0%), 평균수익(0.0%), Sharpe(0.0) 등 모든 지표가 합격 기준 미달입니다. 또한 Before 대비 개선된 지표가 전혀 없어 승인이 불가능합니다.",
+        "before_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "after_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "proposed_changes": {
+          "BB_LENGTH": 20,
+          "BB_STD": 1.5,
+          "VOL_AVG_WINDOW": 20,
+          "MIN_AVG_VOLUME": 500000
+        }
+      },
+      "etf": {
+        "verdict": "skipped",
+        "reason": "ETF 전용 파라미터로 구현 불가"
+      },
+      "validated_at": "2026-05-02T04:18:05.499990"
+    }
+  },
+  {
+    "searched_at": "2026-05-02T02:57:07.252347",
+    "method": {
+      "방법론명": "스토캐스틱 RSI 모멘텀 스윙",
+      "출처/근거": "Technical Analysis of Stocks & Commodities",
+      "핵심 아이디어": "StochRSI의 골든크로스를 활용하여 추세 중간의 눌림목 포착",
+      "현재 시스템과의 차이점": "RSI보다 민감한 StochRSI를 주 지표로 활용하여 진입 타이밍 정밀화",
+      "예상 적용 시장": "강한 추세가 형성된 시장의 조정 구간",
+      "기대 효과": "추세 추종 전략의 진입 타점 개선",
+      "구현 난이도": "중간",
+      "검증 요청 사항": "STOCH_K, STOCH_D 교차 시 승률 데이터",
+      "제안_파라미터_변경": {
+        "STOCH_RSI_LENGTH": 14,
+        "STOCH_K": 3,
+        "STOCH_D": 3,
+        "TIER2_WIN_RATE": 0.55
+      }
+    },
+    "validation_result": {
+      "stock": {
+        "verdict": "rejected",
+        "reason": "After 지표의 샘플 수(0건)가 최소 기준인 50건에 미달하며, 승률(0%), 평균수익(0%), 샤프지수(0) 등 모든 수치가 합격 기준을 충족하지 못함. 또한 Before 대비 개선된 지표가 존재하지 않음.",
+        "before_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "after_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "proposed_changes": {
+          "STOCH_RSI_LENGTH": 14,
+          "STOCH_K": 3,
+          "STOCH_D": 3,
+          "TIER2_WIN_RATE": 0.55
+        }
+      },
+      "etf": {
+        "verdict": "rejected",
+        "reason": "백테스트 결과 Before와 After 모두 샘플 수(count)가 0으로, 전략의 유효성을 검증할 수 있는 최소 데이터가 존재하지 않습니다. ETF 판정 기준인 샘플 수 10건 이상을 충족하지 못했을 뿐만 아니라, 승률(0%), 평균수익(0%), Sharpe(0) 등 모든 지표가 합격 기준치를 하회합니다. Before 대비 개선된 지표가 전혀 없으므로 승인이 불가능합니다.",
+        "before_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "after_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "proposed_changes": {
+          "US_TIER2_WIN_RATE": 55,
+          "US_TIER1_WIN_RATE": 60
+        }
+      },
+      "validated_at": "2026-05-02T04:23:30.945846"
+    }
+  },
+  {
+    "searched_at": "2026-05-02T02:57:07.252347",
+    "method": {
+      "방법론명": "MFI 자금 유입 집중 전략",
+      "출처/근거": "Gene Quong, Money Flow Index",
+      "핵심 아이디어": "가격 변동뿐만 아니라 거래량(자금 유입)이 동반된 상승세만 선별",
+      "현재 시스템과의 차이점": "MFI를 통해 '스마트 머니'의 유입 확인 후 진입",
+      "예상 적용 시장": "유동성이 풍부한 대형주 및 테마주",
+      "기대 효과": "거래량 없는 가짜 돌파(False Breakout) 배제",
+      "구현 난이도": "낮음",
+      "검증 요청 사항": "MFI_LENGTH 조정에 따른 거래 신호 빈도",
+      "제안_파라미터_변경": {
+        "MFI_LENGTH": 10,
+        "VOL_AVG_WINDOW": 50,
+        "TIER1_MIN_SIGNALS": 3
+      }
+    },
+    "validation_result": {
+      "stock": {
+        "verdict": "rejected",
+        "reason": "After 지표가 주식 합격 기준(샘플 수 ≥ 50, 승률 ≥ 38%, 평균수익 > 0.5%, Sharpe > 0.5)을 전혀 충족하지 못함. 특히 샘플 수가 0건으로 통계적 유의성이 결여되었으며, Before 대비 지표 개선이 전혀 이루어지지 않음.",
+        "before_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "after_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "proposed_changes": {
+          "MFI_LENGTH": 10,
+          "VOL_AVG_WINDOW": 50,
+          "TIER1_MIN_SIGNALS": 3
+        }
+      },
+      "etf": {
+        "verdict": "skipped",
+        "reason": "ETF 전용 파라미터로 구현 불가"
+      },
+      "validated_at": "2026-05-02T04:29:06.112005"
+    }
+  },
+  {
+    "searched_at": "2026-05-02T02:57:07.252347",
+    "method": {
+      "방법론명": "장기 이평선 이격도 매매",
+      "출처/근거": "이평선 괴리율 분석",
+      "핵심 아이디어": "SMA200 근처에서의 지지 확인 후 매수하여 장기 추세 편입",
+      "현재 시스템과의 차이점": "과도한 이격을 피하고 이평선 수렴 구간에서 진입",
+      "예상 적용 시장": "우량 가치주/성장주",
+      "기대 효과": "손익비가 우수한 안전한 진입 타점 확보",
+      "구현 난이도": "낮음",
+      "검증 요청 사항": "SMA200 돌파 후 리테스트 시 승률",
+      "제안_파라미터_변경": {
+        "SMA200": 200,
+        "SMA50": 50,
+        "TRAILING_STOP_ACTIVATE_PCT": 0.1,
+        "VALIDATE_LOOKBACK_DAYS": 365
+      }
+    },
+    "validation_result": {
+      "stock": {
+        "verdict": "rejected",
+        "reason": "After 지표의 모든 수치가 0으로 나타나 합격 기준인 최소 샘플 수(50건 이상), 승률(38% 이상), Sharpe(0.5 이상), 평균수익(0.5% 초과)을 전혀 충족하지 못하며, Before 대비 지표 개선이 전혀 이루어지지 않았습니다.",
+        "before_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "after_metrics": {
+          "count": 0,
+          "win_rate": 0.0,
+          "avg_return": 0.0,
+          "mdd": 0.0,
+          "sharpe": 0.0
+        },
+        "proposed_changes": {
+          "SMA200": 200,
+          "SMA50": 50,
+          "TRAILING_STOP_ACTIVATE_PCT": 0.1,
+          "VALIDATE_LOOKBACK_DAYS": 365
+        }
+      },
+      "etf": {
+        "verdict": "skipped",
+        "reason": "ETF 전용 파라미터로 구현 불가"
+      },
+      "validated_at": "2026-05-02T04:35:05.419082"
+    }
+  }
+]

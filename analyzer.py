@@ -1123,8 +1123,13 @@ class StockAnalyzer:
         sma50 = float(last['SMA50']) if 'SMA50' in last.index and pd.notna(last['SMA50']) else None
         sma200 = float(last['SMA200']) if 'SMA200' in last.index and pd.notna(last['SMA200']) else None
 
-        # 진입가 결정
-        if bbl and sma50 and close > bbl:
+        # 진입가 결정 (Relative Strength 및 Volatility Breakout 반영)
+        is_vbo = close >= df['High'].tail(20).iloc[:-1].max()
+        # RS_Rating이 1.0 이상인 시장 주도주가 전고점을 돌파할 때 최우선 진입
+        if last.get('RS_Rating', 1.0) >= 1.0 and is_vbo:
+            entry = close
+            basis = "주도주 상대강도(RS) 및 변동성 돌파(VBO)"
+        elif bbl and sma50 and close > bbl:
             # BB 하단과 SMA50 중 높은 값 → 강한 지지선
             entry = max(bbl, sma50) if not is_etf else sma50
             basis = "BB하단·SMA50 지지선"
@@ -1465,7 +1470,9 @@ class StockAnalyzer:
         last = df_target.iloc[-1]
         # 중기 상승 추세(SMA50) 위에서 캔들 몸통이 60% 이상인 강한 양봉일 때만 신뢰 (Mansfield RS 전략 반영)
         candle_body_ratio = (last['Close'] - last['Open']) / (last['High'] - last['Low'] + 1e-9)
-        if last['Volume'] > last['VOL_AVG'] * 2.5 and last['Close'] > last.get('SMA50', 0) and candle_body_ratio > 0.6:
+        # 거래량 임계치 상향 및 20일 전고점 돌파(VBO) 조건 결합
+        is_vbo = last['Close'] >= df_target['High'].tail(21).iloc[:-1].max()
+        if last['Volume'] > last['VOL_AVG'] * 3.5 and is_vbo and candle_body_ratio > 0.7:
             return True
         return False
 
