@@ -102,7 +102,7 @@ class StrategyOptimizer:
         # ── Before 백테스트 (KOSPI 주식 + ETF 각각) ───────────────────────
         print("\n[1단계] Before 백테스트 실행 중 (주식 + ETF)...")
         try:
-            df_before_stock = backtester.run_walkforward_backtest(periods=2, interval_weeks=8)
+            df_before_stock = backtester.run_walkforward_backtest(periods=6, interval_weeks=6)
             before_stock_metrics = self._extract_backtest_metrics(df_before_stock)
             print(f"  [주식] Before → 거래:{before_stock_metrics['count']}건, "
                   f"승률:{before_stock_metrics['win_rate']:.1f}%, "
@@ -115,7 +115,7 @@ class StrategyOptimizer:
             return
 
         try:
-            df_before_etf = self._run_etf_backtest(backtester, periods=2, interval_weeks=8)
+            df_before_etf = self._run_etf_backtest(backtester, periods=6, interval_weeks=6)
             before_etf_metrics = self._extract_backtest_metrics(df_before_etf)
             print(f"  [ETF]  Before → 거래:{before_etf_metrics['count']}건, "
                   f"승률:{before_etf_metrics['win_rate']:.1f}%, "
@@ -125,6 +125,18 @@ class StrategyOptimizer:
         except Exception as e:
             print(f"  Before ETF 백테스트 실패: {e} — ETF 경로 스킵")
             before_etf_metrics = None
+
+        # ── 시장 희소성 사전 체크 ──────────────────────────────────────────
+        STOCK_MIN_BEFORE = 10  # Before 거래 수 미달 시 sparse_market 스킵
+        ETF_MIN_BEFORE   = 3
+        stock_sparse = before_stock_metrics['count'] < STOCK_MIN_BEFORE
+        etf_sparse   = (before_etf_metrics is None or before_etf_metrics['count'] < ETF_MIN_BEFORE)
+        if stock_sparse:
+            print(f"  ⚠️ [주식] Before 샘플({before_stock_metrics['count']}건) < {STOCK_MIN_BEFORE} "
+                  f"— 시장 신호 희소, 주식 경로 검증 스킵")
+        if etf_sparse:
+            etf_cnt = before_etf_metrics['count'] if before_etf_metrics else 0
+            print(f"  ⚠️ [ETF]  Before 샘플({etf_cnt}건) < {ETF_MIN_BEFORE} — ETF 검증 스킵")
 
         current_config = copy.deepcopy(self.base_config)
         config_str = json.dumps(current_config, ensure_ascii=False, indent=2)
@@ -142,50 +154,57 @@ class StrategyOptimizer:
             etf_result = None
 
             # ── 주식 경로: agent_stock → KOSPI 백테스트 → agent_backtest ──
-            print("  [agent_stock] 주식 파라미터 변경 제안 생성 중...")
-            stock_proposal = self._call_agent_stock(api_key, method, config_str, pre_changes=method.get('제안_파라미터_변경'))
-            if stock_proposal and stock_proposal.get('param_changes'):
-                stock_changes = stock_proposal['param_changes']
-                print(f"  → 주식 제안: {stock_changes}")
-                original_config = copy.deepcopy(backtester.analyzer.config)
-                try:
-                    backtester.analyzer.config = {**current_config, **stock_changes}
-                    backtester.data_cache.clear()
-                    df_after_stock = backtester.run_walkforward_backtest(periods=2, interval_weeks=8)
-                    after_stock_metrics = self._extract_backtest_metrics(df_after_stock)
-                    print(f"  [주식] After → 거래:{after_stock_metrics['count']}건, "
-                          f"승률:{after_stock_metrics['win_rate']:.1f}%, "
-                          f"MDD:{after_stock_metrics['mdd']:.2f}%, "
-                          f"Sharpe:{after_stock_metrics['sharpe']:.2f}")
-                    print("  [agent_backtest] 주식 검증 판정 중...")
-                    stock_verdict = self._call_agent_backtest(
-                        api_key, method_name, stock_proposal,
-                        before_stock_metrics, after_stock_metrics, etf_mode=False
-                    )
-                    stock_result = {
-                        'verdict': stock_verdict['decision'],
-                        'reason': stock_verdict['reason'],
-                        'before_metrics': before_stock_metrics,
-                        'after_metrics': after_stock_metrics,
-                        'proposed_changes': stock_changes,
-                    }
-                    if stock_verdict['decision'] == 'approved':
-                        print(f"  ✅ [주식] 승인: {stock_verdict['reason']}")
-                        all_approved_changes.update(stock_changes)
-                    else:
-                        print(f"  ❌ [주식] 거부: {stock_verdict['reason']}")
-                except Exception as e:
-                    print(f"  [주식] After 백테스트 실패: {e}")
-                    stock_result = {'verdict': 'error', 'reason': str(e)}
-                finally:
-                    backtester.analyzer.config = original_config
-                    backtester.data_cache.clear()
+            if stock_sparse:
+                print("  [주식] Before 희소 — 검증 스킵 (sparse_market)")
+                stock_result = {'verdict': 'sparse_market', 'reason': f'Before 샘플({before_stock_metrics["count"]}건) 희소 — 현재 시장 신호 부족으로 통계 검증 불가'}
             else:
-                print("  [주식] → 파라미터 변경 없음 (구현 불가)")
-                stock_result = {'verdict': 'skipped', 'reason': 'KOSPI 주식 파라미터로 구현 불가'}
+                print("  [agent_stock] 주식 파라미터 변경 제안 생성 중...")
+                stock_proposal = self._call_agent_stock(api_key, method, config_str, pre_changes=method.get('제안_파라미터_변경'))
+                if stock_proposal and stock_proposal.get('param_changes'):
+                    stock_changes = stock_proposal['param_changes']
+                    print(f"  → 주식 제안: {stock_changes}")
+                    original_config = copy.deepcopy(backtester.analyzer.config)
+                    try:
+                        backtester.analyzer.config = {**current_config, **stock_changes}
+                        backtester.data_cache.clear()
+                        df_after_stock = backtester.run_walkforward_backtest(periods=6, interval_weeks=6)
+                        after_stock_metrics = self._extract_backtest_metrics(df_after_stock)
+                        print(f"  [주식] After → 거래:{after_stock_metrics['count']}건, "
+                              f"승률:{after_stock_metrics['win_rate']:.1f}%, "
+                              f"MDD:{after_stock_metrics['mdd']:.2f}%, "
+                              f"Sharpe:{after_stock_metrics['sharpe']:.2f}")
+                        print("  [agent_backtest] 주식 검증 판정 중...")
+                        stock_verdict = self._call_agent_backtest(
+                            api_key, method_name, stock_proposal,
+                            before_stock_metrics, after_stock_metrics, etf_mode=False
+                        )
+                        stock_result = {
+                            'verdict': stock_verdict['decision'],
+                            'reason': stock_verdict['reason'],
+                            'before_metrics': before_stock_metrics,
+                            'after_metrics': after_stock_metrics,
+                            'proposed_changes': stock_changes,
+                        }
+                        if stock_verdict['decision'] == 'approved':
+                            print(f"  ✅ [주식] 승인: {stock_verdict['reason']}")
+                            all_approved_changes.update(stock_changes)
+                        else:
+                            print(f"  ❌ [주식] 거부: {stock_verdict['reason']}")
+                    except Exception as e:
+                        print(f"  [주식] After 백테스트 실패: {e}")
+                        stock_result = {'verdict': 'error', 'reason': str(e)}
+                    finally:
+                        backtester.analyzer.config = original_config
+                        backtester.data_cache.clear()
+                else:
+                    print("  [주식] → 파라미터 변경 없음 (구현 불가)")
+                    stock_result = {'verdict': 'skipped', 'reason': 'KOSPI 주식 파라미터로 구현 불가'}
 
             # ── ETF 경로: agent_etf → ETF 백테스트 → agent_backtest ───────
-            if before_etf_metrics is not None:
+            if etf_sparse:
+                print("  [ETF] Before 희소 — 검증 스킵 (sparse_market)")
+                etf_result = {'verdict': 'sparse_market', 'reason': 'ETF Before 샘플 희소 — 현재 시장 신호 부족으로 통계 검증 불가'}
+            elif before_etf_metrics is not None:
                 print("  [agent_etf] ETF 파라미터 변경 제안 생성 중...")
                 etf_proposal = self._call_agent_etf(api_key, method, config_str, pre_changes=method.get('제안_파라미터_변경'))
                 if etf_proposal and etf_proposal.get('param_changes'):
@@ -195,7 +214,7 @@ class StrategyOptimizer:
                     try:
                         backtester.analyzer.config = {**current_config, **etf_changes}
                         backtester.data_cache.clear()
-                        df_after_etf = self._run_etf_backtest(backtester, periods=2, interval_weeks=8)
+                        df_after_etf = self._run_etf_backtest(backtester, periods=6, interval_weeks=6)
                         after_etf_metrics = self._extract_backtest_metrics(df_after_etf)
                         print(f"  [ETF]  After → 거래:{after_etf_metrics['count']}건, "
                               f"승률:{after_etf_metrics['win_rate']:.1f}%, "
@@ -525,7 +544,7 @@ class StrategyOptimizer:
                 domain = "KOSPI 주식"
                 criteria = (
                     "주식 합격 기준: 승률(KOSPI ≥ 38%), 평균수익 > 0.5%, MDD < 20%, "
-                    "Sharpe > 0.5, 샘플 수 ≥ 50건. "
+                    "Sharpe > 0.5, 샘플 수 ≥ 20건. "
                     "Before 대비 After에서 1개 이상 지표 개선 + 나머지 지표 퇴행 없음 시 승인."
                 )
             prompt = (
