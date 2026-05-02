@@ -324,7 +324,7 @@ class StrategyOptimizer:
                 pass
         if genai is None:
             raise RuntimeError("google-genai 또는 google-generativeai 패키지가 필요합니다.")
-        model_name = 'gemini-2.0-flash'
+        model_name = 'gemini-flash-latest'
         if lib == 'generativeai':
             genai.configure(api_key=api_key)
             return genai.GenerativeModel(model_name)
