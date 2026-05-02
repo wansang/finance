@@ -102,7 +102,7 @@ class StrategyOptimizer:
         # ── Before 백테스트 (KOSPI 주식 + ETF 각각) ───────────────────────
         print("\n[1단계] Before 백테스트 실행 중 (주식 + ETF)...")
         try:
-            df_before_stock = backtester.run_backtest(days_ago=20)
+            df_before_stock = backtester.run_walkforward_backtest(periods=2, interval_weeks=8)
             before_stock_metrics = self._extract_backtest_metrics(df_before_stock)
             print(f"  [주식] Before → 거래:{before_stock_metrics['count']}건, "
                   f"승률:{before_stock_metrics['win_rate']:.1f}%, "
@@ -115,7 +115,7 @@ class StrategyOptimizer:
             return
 
         try:
-            df_before_etf = self._run_etf_backtest(backtester, days_ago=20)
+            df_before_etf = self._run_etf_backtest(backtester, periods=2, interval_weeks=8)
             before_etf_metrics = self._extract_backtest_metrics(df_before_etf)
             print(f"  [ETF]  Before → 거래:{before_etf_metrics['count']}건, "
                   f"승률:{before_etf_metrics['win_rate']:.1f}%, "
@@ -151,7 +151,7 @@ class StrategyOptimizer:
                 try:
                     backtester.analyzer.config = {**current_config, **stock_changes}
                     backtester.data_cache.clear()
-                    df_after_stock = backtester.run_backtest(days_ago=20)
+                    df_after_stock = backtester.run_walkforward_backtest(periods=2, interval_weeks=8)
                     after_stock_metrics = self._extract_backtest_metrics(df_after_stock)
                     print(f"  [주식] After → 거래:{after_stock_metrics['count']}건, "
                           f"승률:{after_stock_metrics['win_rate']:.1f}%, "
@@ -195,7 +195,7 @@ class StrategyOptimizer:
                     try:
                         backtester.analyzer.config = {**current_config, **etf_changes}
                         backtester.data_cache.clear()
-                        df_after_etf = self._run_etf_backtest(backtester, days_ago=20)
+                        df_after_etf = self._run_etf_backtest(backtester, periods=2, interval_weeks=8)
                         after_etf_metrics = self._extract_backtest_metrics(df_after_etf)
                         print(f"  [ETF]  After → 거래:{after_etf_metrics['count']}건, "
                               f"승률:{after_etf_metrics['win_rate']:.1f}%, "
@@ -455,9 +455,10 @@ class StrategyOptimizer:
             print(f"  [agent_etf 오류] {e}")
         return None
 
-    def _run_etf_backtest(self, backtester, days_ago=20):
+    def _run_etf_backtest(self, backtester, days_ago=20, periods=1, interval_weeks=8):
         """
-        ETF 유니버스(KOSPI ETF + US ETF)만을 대상으로 단일 기간 백테스트를 수행한다.
+        ETF 유니버스(KOSPI ETF + US ETF)만을 대상으로 백테스트를 수행한다.
+        periods>1이면 워크포워드 방식으로 여러 시점에서 실행한다.
         backtester의 현재 analyzer.config를 그대로 사용한다.
         """
         from backtester import _fdr_read
@@ -467,38 +468,42 @@ class StrategyOptimizer:
         if ks11 is None or ks11.empty:
             raise RuntimeError("KS11 데이터 로드 실패")
 
-        offset = min(days_ago + 1, len(ks11) - 1)
-        target_date = ks11.index[-offset]
-
-        kospi_uptrend = backtester.analyzer._is_market_in_uptrend(
-            ks11, target_idx=len(ks11[ks11.index <= target_date]) - 1
-        )
-        try:
-            sp500 = _fdr_read(
-                'US500',
-                start=(target_date - _dt.timedelta(days=300)).strftime('%Y-%m-%d'),
-                end=target_date.strftime('%Y-%m-%d')
-            )
-            us_uptrend = backtester.analyzer._is_market_in_uptrend(sp500) if sp500 is not None and not sp500.empty else True
-        except Exception:
-            us_uptrend = True
+        # 테스트할 날짜 목록 생성 (periods>1이면 interval_weeks 간격으로 거슬러 올라감)
+        target_dates = []
+        for p in range(max(periods, 1)):
+            offset = min(days_ago + 1 + p * interval_weeks * 5, len(ks11) - 1)
+            target_dates.append(ks11.index[-offset])
 
         cfg = backtester.analyzer.config
         kospi_etf = [(code, code) for code in cfg.get('ETF_EXPERT_TICKERS', cfg.get('KOSPI_ETF_TICKERS', []))]
         us_etf = [(code, code) for code in cfg.get('US_ETF_TICKERS', [])]
 
-        results = []
-        if kospi_etf:
-            results.extend(backtester._backtest_universe(
-                kospi_etf, target_date, 'KOSPI_ETF', market_uptrend=kospi_uptrend
-            ))
-        if us_etf:
-            results.extend(backtester._backtest_universe(
-                us_etf, target_date, 'US_ETF', benchmark_symbol='IXIC', market_uptrend=us_uptrend
-            ))
+        all_results = []
+        for target_date in target_dates:
+            kospi_uptrend = backtester.analyzer._is_market_in_uptrend(
+                ks11, target_idx=len(ks11[ks11.index <= target_date]) - 1
+            )
+            try:
+                sp500 = _fdr_read(
+                    'US500',
+                    start=(target_date - _dt.timedelta(days=300)).strftime('%Y-%m-%d'),
+                    end=target_date.strftime('%Y-%m-%d')
+                )
+                us_uptrend = backtester.analyzer._is_market_in_uptrend(sp500) if sp500 is not None and not sp500.empty else True
+            except Exception:
+                us_uptrend = True
+
+            if kospi_etf:
+                all_results.extend(backtester._backtest_universe(
+                    kospi_etf, target_date, 'KOSPI_ETF', market_uptrend=kospi_uptrend
+                ))
+            if us_etf:
+                all_results.extend(backtester._backtest_universe(
+                    us_etf, target_date, 'US_ETF', benchmark_symbol='IXIC', market_uptrend=us_uptrend
+                ))
 
         import pandas as pd
-        return pd.DataFrame(results) if results else pd.DataFrame()
+        return pd.DataFrame(all_results) if all_results else pd.DataFrame()
 
     def _call_agent_backtest(self, api_key, method_name, proposal, before_metrics, after_metrics, etf_mode=False):
         """
