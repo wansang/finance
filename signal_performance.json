@@ -3,16 +3,16 @@
         "최근 급등 뒤 숨고르기 구간에 진입했습니다.": {
             "total_count": 39,
             "win_count": 25,
-            "total_return": 266.12066443673,
-            "avg_return": 6.823606780428975,
+            "total_return": 280.3319946981394,
+            "avg_return": 7.187999864054857,
             "win_rate": 64.1025641025641
         },
         "거래가 조용해져 다음 움직임을 준비하는 모습입니다.": {
             "total_count": 20,
-            "win_count": 10,
-            "total_return": 99.90463998854612,
-            "avg_return": 4.995231999427306,
-            "win_rate": 50.0
+            "win_count": 13,
+            "total_return": 109.24854227060716,
+            "avg_return": 5.462427113530358,
+            "win_rate": 65.0
         },
         "거래량 급증": {
             "total_count": 8,
@@ -24,8 +24,8 @@
         "바닥권 반등 신호(BB 하단)": {
             "total_count": 2,
             "win_count": 2,
-            "total_return": 9.966822475910497,
-            "avg_return": 4.983411237955249,
+            "total_return": 8.521731536352327,
+            "avg_return": 4.2608657681761635,
             "win_rate": 100.0
         },
         "거래가 조용해지며 다음 변동성을 준비하는 구간입니다.": {
@@ -38,8 +38,8 @@
         "과매도 반등 신호": {
             "total_count": 12,
             "win_count": 10,
-            "total_return": 90.35976330517255,
-            "avg_return": 7.529980275431046,
+            "total_return": 86.02449048649805,
+            "avg_return": 7.168707540541504,
             "win_rate": 83.33333333333334
         },
         "RSI 반전 신호(상승 가능성)": {
@@ -86,14 +86,14 @@
     "failure_patterns": {
         "high_volatility_stocks": {
             "description": "변동성이 높은 종목에서의 실패율",
-            "fail_count": 36,
-            "total_count": 36,
+            "fail_count": 47,
+            "total_count": 47,
             "fail_rate": 100.0
         },
         "low_volume_stocks": {
             "description": "거래량이 적은 종목에서의 실패율",
-            "fail_count": 16,
-            "total_count": 16,
+            "fail_count": 24,
+            "total_count": 24,
             "fail_rate": 100.0
         },
         "false_breakouts": {
@@ -103,5 +103,5 @@
             "fail_rate": 0.0
         }
     },
-    "last_updated": "2026-05-01 06:44:16"
+    "last_updated": "2026-05-02 01:51:37"
 }

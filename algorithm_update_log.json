@@ -540,5 +540,114 @@
       "시장 상황: BULL",
       "최고 성과 신호: 바닥권 반등 신호(BB 하단) (승률 100.0%)"
     ]
+  },
+  {
+    "timestamp": "2026-05-02T02:21:15.140593",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "detect_volume_spike: 단순 거래량 폭증은 단기 고점(climax)일 확률이 높으므로, 20일 신고가 돌파와 RSI 70 이하라는 조건을 추가하여 추세 시작점의 주도주만 포착하도록 개선합니다.",
+      "detect_divergence: RSI 다이버전스 발생 후에도 주가가 5일 이동평균선 아래에 있다면 하락 추세가 이어진 것이므로, 5일선 위로 안착하여 단기 추세가 반전된 경우에만 신호를 발생시킵니다."
+    ],
+    "kept": false,
+    "before": {
+      "total": 14,
+      "wins": 9,
+      "win_rate": 64.2857,
+      "avg_ret": 3.3229,
+      "sharpe": 1.2067,
+      "mdd": 17.9
+    },
+    "after": {
+      "total": 14,
+      "wins": 9,
+      "win_rate": 64.2857,
+      "avg_ret": 3.3229,
+      "sharpe": 1.2067,
+      "mdd": 17.9
+    }
+  },
+  {
+    "timestamp": "2026-05-02T02:33:25.994028",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "detect_volume_spike: 단순 거래량 가중치만으로는 가짜 돌파를 걸러내기 어려우므로, OBV 상승 여부를 통해 실제 매집세가 유입되었는지 확인하는 조건을 추가함.",
+      "calculate_holding_targets: 이전 사이클 피드백에 따라 고정 % 손절 대신 ATR(평균 실질 변동폭)의 2.5배를 적용하여 종목별 변동성에 맞춘 동적 손절가를 산출함."
+    ],
+    "kept": false,
+    "before": {
+      "total": 14,
+      "wins": 9,
+      "win_rate": 64.2857,
+      "avg_ret": 3.3229,
+      "sharpe": 1.2067,
+      "mdd": 17.9
+    },
+    "after": {
+      "total": 14,
+      "wins": 9,
+      "win_rate": 64.2857,
+      "avg_ret": 3.3229,
+      "sharpe": 1.2067,
+      "mdd": 17.9
+    }
+  },
+  {
+    "timestamp": "2026-05-02T02:45:07.174353",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "detect_volume_spike: 가짜 돌파를 방지하기 위해 Mansfield RS 개념을 준용하여 주가가 최근 60일 최고가권(박스권 상단)에 위치했을 때만 신호를 허용함.",
+      "calculate_entry_price: 이전 사이클 피드백에 따라 손절가 계산 시 ATR 2.2배 변동성을 고려한 4.8% 계수를 적용하여 통계적 유효성을 확보함.",
+      "detect_divergence: 0%의 승률을 보이는 RSI 반전 신호를 개선하기 위해 단기 하락 추세 저항선(SMA20)을 돌파하며 안착하는 시점으로 진입 조건을 엄격화함."
+    ],
+    "kept": false,
+    "before": {
+      "total": 14,
+      "wins": 9,
+      "win_rate": 64.2857,
+      "avg_ret": 3.3229,
+      "sharpe": 1.2067,
+      "mdd": 17.9
+    },
+    "after": {
+      "total": 3,
+      "wins": 0,
+      "win_rate": 0.0,
+      "avg_ret": -3.5881,
+      "sharpe": -4.2933,
+      "mdd": 10.4799
+    }
+  },
+  {
+    "title": "이번주 추천 종목 실적 기반 알고리즘 고도화 업데이트",
+    "timestamp": "2026-05-02 02:46:29",
+    "changes": {
+      "TIER1_WIN_RATE": {
+        "before": 54,
+        "after": 58
+      },
+      "US_TRAILING_STOP_PCT": {
+        "before": 0.0464,
+        "after": 0.0418
+      }
+    },
+    "before_metrics": {
+      "count": 66,
+      "avg_return": 6.197088619339963,
+      "win_rate": 63.63636363636363,
+      "max_return": 59.39530735016428,
+      "min_return": -24.772316314108604
+    },
+    "after_metrics": {
+      "count": 66,
+      "avg_return": 6.197088619339963,
+      "win_rate": 63.63636363636363,
+      "max_return": 59.39530735016428,
+      "min_return": -24.772316314108604
+    },
+    "notes": [
+      "실제 추천 종목 66개 성과 기반 고도화 최적화",
+      "시장 상황: BULL",
+      "최고 성과 신호: 바닥권 반등 신호(BB 하단) (승률 100.0%)"
+    ]
   }
 ]
