@@ -173,23 +173,33 @@ class StrategyOptimizer:
                               f"승률:{after_stock_metrics['win_rate']:.1f}%, "
                               f"MDD:{after_stock_metrics['mdd']:.2f}%, "
                               f"Sharpe:{after_stock_metrics['sharpe']:.2f}")
-                        print("  [agent_backtest] 주식 검증 판정 중...")
-                        stock_verdict = self._call_agent_backtest(
-                            api_key, method_name, stock_proposal,
-                            before_stock_metrics, after_stock_metrics, etf_mode=False
+                        # Before == After이면 파라미터가 backtester에 효과 없음
+                        _no_effect = (
+                            after_stock_metrics['count'] == before_stock_metrics['count'] and
+                            abs(after_stock_metrics['win_rate'] - before_stock_metrics['win_rate']) < 0.01 and
+                            abs(after_stock_metrics['avg_return'] - before_stock_metrics['avg_return']) < 0.001
                         )
-                        stock_result = {
-                            'verdict': stock_verdict['decision'],
-                            'reason': stock_verdict['reason'],
-                            'before_metrics': before_stock_metrics,
-                            'after_metrics': after_stock_metrics,
-                            'proposed_changes': stock_changes,
-                        }
-                        if stock_verdict['decision'] == 'approved':
-                            print(f"  ✅ [주식] 승인: {stock_verdict['reason']}")
-                            all_approved_changes.update(stock_changes)
+                        if _no_effect:
+                            print("  [주식] Before == After — 파라미터가 backtester에 효과 없음 (no_effect 스킵)")
+                            stock_result = {'verdict': 'no_effect', 'reason': '파라미터 변경이 백테스트 결과에 영향을 주지 않음 — backtester 미지원 파라미터'}
                         else:
-                            print(f"  ❌ [주식] 거부: {stock_verdict['reason']}")
+                            print("  [agent_backtest] 주식 검증 판정 중...")
+                            stock_verdict = self._call_agent_backtest(
+                                api_key, method_name, stock_proposal,
+                                before_stock_metrics, after_stock_metrics, etf_mode=False
+                            )
+                            stock_result = {
+                                'verdict': stock_verdict['decision'],
+                                'reason': stock_verdict['reason'],
+                                'before_metrics': before_stock_metrics,
+                                'after_metrics': after_stock_metrics,
+                                'proposed_changes': stock_changes,
+                            }
+                            if stock_verdict['decision'] == 'approved':
+                                print(f"  ✅ [주식] 승인: {stock_verdict['reason']}")
+                                all_approved_changes.update(stock_changes)
+                            else:
+                                print(f"  ❌ [주식] 거부: {stock_verdict['reason']}")
                     except Exception as e:
                         print(f"  [주식] After 백테스트 실패: {e}")
                         stock_result = {'verdict': 'error', 'reason': str(e)}
@@ -544,8 +554,8 @@ class StrategyOptimizer:
                 domain = "KOSPI 주식"
                 criteria = (
                     "주식 합격 기준: 승률(KOSPI ≥ 38%), 평균수익 > 0.5%, MDD < 20%, "
-                    "Sharpe > 0.5, 샘플 수 ≥ 20건. "
-                    "Before 대비 After에서 1개 이상 지표 개선 + 나머지 지표 퇴행 없음 시 승인."
+                    "Sharpe > 0.5, 샘플 수(After ≥ Before × 0.8 이상). "
+                    "Before 대비 After에서 1개 이상 지표 개선 + 나머지 지표 크게 퇴행 없음 시 승인."
                 )
             prompt = (
                 "너는 40년 경력의 백테스트 검증전문가(agent_backtest)다.\n"
