@@ -42,30 +42,222 @@ class StrategyOptimizer:
 
     def process_search_backlog(self):
         """
-        searchBacklog.json의 backlog를 불러와 agent_stock/agent_etf/agent_backtest에 검증 의뢰
-        (실제 검증/반영 로직은 후속 구현)
-        backlog 처리 후 searchBacklog_history.json에 append 백업
+        searchBacklog.json의 backlog를 agent_stock / agent_etf → backtester → agent_backtest
+        이중 검증 루프로 처리한다.
+
+        방법론별 흐름 (두 경로 독립 실행):
+          [주식 경로]
+          1a. agent_stock  : 방법론 → KOSPI 주식 파라미터 변경 제안 (US_*/ETF_* 키 제외)
+          2a. backtester   : Before/After KOSPI 백테스트
+          3a. agent_backtest: 주식 기준(MDD<20%, WR≥38%) 승인/거부
+
+          [ETF 경로]
+          1b. agent_etf    : 방법론 → ETF 전용 파라미터 변경 제안 (US_*, ETF_*, KOSPI_ETF_* 키)
+          2b. backtester   : Before/After ETF 유니버스 백테스트
+          3b. agent_backtest: ETF 기준(MDD<15%, KOSPI ETF WR≥38%, US ETF WR≥35%) 승인/거부
+
+          5. 두 경로 승인 변경사항 합산 → strategy_config.json 반영
+          6. algorithm_update_log.json 기록
+          7. 처리 항목 → searchBacklog_history.json 아카이브 (validation_result 포함)
+          8. 미처리 항목은 다음 실행까지 backlog 보존
+
+        설정:
+          BACKLOG_VALIDATE_PER_RUN (strategy_config.json): 1회 처리 항목 수 (기본 3)
         """
         backlog_file = 'searchBacklog.json'
         history_file = 'searchBacklog_history.json'
+
         if not os.path.exists(backlog_file):
-            print("[agent_search backlog] 파일 없음 — 스킵")
+            print("[backlog] 파일 없음 — 스킵")
             return
         try:
             with open(backlog_file, 'r', encoding='utf-8') as f:
                 backlog = json.load(f)
         except Exception:
-            print("[agent_search backlog] 파일 파싱 오류 — 스킵")
+            print("[backlog] 파일 파싱 오류 — 스킵")
             return
         if not backlog:
-            print("[agent_search backlog] 비어 있음 — 스킵")
+            print("[backlog] 비어 있음 — 스킵")
             return
-        print(f"[agent_search backlog] {len(backlog)}건의 신규 방법론 검증 시작 (agent_stock/agent_etf/agent_backtest 연동 필요)")
-        # TODO: 각 entry['method']를 agent_stock/agent_etf/agent_backtest에 전달하여 검증/반영
-        # (여기서는 단순 출력만)
-        for entry in backlog:
-            print(f"- {entry['searched_at']}: {entry['method'].get('방법론명', '')}")
-        # backlog 처리 후 history에 append
+
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            print("[backlog] GEMINI_API_KEY 없음 — 단순 아카이브만 수행")
+            self._archive_backlog(backlog, backlog_file, history_file, [])
+            return
+
+        max_per_run = self._safe_int(
+            self.base_config.get('BACKLOG_VALIDATE_PER_RUN', 3), 3
+        )
+        to_process = backlog[:max_per_run]
+        remaining = backlog[max_per_run:]
+
+        print(f"\n{'='*60}")
+        print(f"  [backlog 검증] {len(to_process)}건 처리 (전체 {len(backlog)}건, 잔여 {len(remaining)}건)")
+        print(f"{'='*60}")
+
+        from backtester import Backtester
+        backtester = Backtester()
+
+        # ── Before 백테스트 (KOSPI 주식 + ETF 각각) ───────────────────────
+        print("\n[1단계] Before 백테스트 실행 중 (주식 + ETF)...")
+        try:
+            df_before_stock = backtester.run_backtest(days_ago=20)
+            before_stock_metrics = self._extract_backtest_metrics(df_before_stock)
+            print(f"  [주식] Before → 거래:{before_stock_metrics['count']}건, "
+                  f"승률:{before_stock_metrics['win_rate']:.1f}%, "
+                  f"평균수익:{before_stock_metrics['avg_return']:+.2f}%, "
+                  f"MDD:{before_stock_metrics['mdd']:.2f}%, "
+                  f"Sharpe:{before_stock_metrics['sharpe']:.2f}")
+        except Exception as e:
+            print(f"  Before 주식 백테스트 실패: {e} — 단순 아카이브로 전환")
+            self._archive_backlog(backlog, backlog_file, history_file, [])
+            return
+
+        try:
+            df_before_etf = self._run_etf_backtest(backtester, days_ago=20)
+            before_etf_metrics = self._extract_backtest_metrics(df_before_etf)
+            print(f"  [ETF]  Before → 거래:{before_etf_metrics['count']}건, "
+                  f"승률:{before_etf_metrics['win_rate']:.1f}%, "
+                  f"평균수익:{before_etf_metrics['avg_return']:+.2f}%, "
+                  f"MDD:{before_etf_metrics['mdd']:.2f}%, "
+                  f"Sharpe:{before_etf_metrics['sharpe']:.2f}")
+        except Exception as e:
+            print(f"  Before ETF 백테스트 실패: {e} — ETF 경로 스킵")
+            before_etf_metrics = None
+
+        current_config = copy.deepcopy(self.base_config)
+        config_str = json.dumps(current_config, ensure_ascii=False, indent=2)
+
+        processed_entries = []
+        all_approved_changes = {}
+
+        # ── 방법론별 검증 루프 (주식 + ETF 이중 경로) ────────────────────
+        for i, entry in enumerate(to_process):
+            method = entry.get('method', {})
+            method_name = method.get('방법론명', f'방법론_{i+1}')
+            print(f"\n--- [{i+1}/{len(to_process)}] {method_name} ---")
+
+            stock_result = None
+            etf_result = None
+
+            # ── 주식 경로: agent_stock → KOSPI 백테스트 → agent_backtest ──
+            print("  [agent_stock] 주식 파라미터 변경 제안 생성 중...")
+            stock_proposal = self._call_agent_stock(api_key, method, config_str)
+            if stock_proposal and stock_proposal.get('param_changes'):
+                stock_changes = stock_proposal['param_changes']
+                print(f"  → 주식 제안: {stock_changes}")
+                original_config = copy.deepcopy(backtester.analyzer.config)
+                try:
+                    backtester.analyzer.config = {**current_config, **stock_changes}
+                    backtester.data_cache.clear()
+                    df_after_stock = backtester.run_backtest(days_ago=20)
+                    after_stock_metrics = self._extract_backtest_metrics(df_after_stock)
+                    print(f"  [주식] After → 거래:{after_stock_metrics['count']}건, "
+                          f"승률:{after_stock_metrics['win_rate']:.1f}%, "
+                          f"MDD:{after_stock_metrics['mdd']:.2f}%, "
+                          f"Sharpe:{after_stock_metrics['sharpe']:.2f}")
+                    print("  [agent_backtest] 주식 검증 판정 중...")
+                    stock_verdict = self._call_agent_backtest(
+                        api_key, method_name, stock_proposal,
+                        before_stock_metrics, after_stock_metrics, etf_mode=False
+                    )
+                    stock_result = {
+                        'verdict': stock_verdict['decision'],
+                        'reason': stock_verdict['reason'],
+                        'before_metrics': before_stock_metrics,
+                        'after_metrics': after_stock_metrics,
+                        'proposed_changes': stock_changes,
+                    }
+                    if stock_verdict['decision'] == 'approved':
+                        print(f"  ✅ [주식] 승인: {stock_verdict['reason']}")
+                        all_approved_changes.update(stock_changes)
+                    else:
+                        print(f"  ❌ [주식] 거부: {stock_verdict['reason']}")
+                except Exception as e:
+                    print(f"  [주식] After 백테스트 실패: {e}")
+                    stock_result = {'verdict': 'error', 'reason': str(e)}
+                finally:
+                    backtester.analyzer.config = original_config
+                    backtester.data_cache.clear()
+            else:
+                print("  [주식] → 파라미터 변경 없음 (구현 불가)")
+                stock_result = {'verdict': 'skipped', 'reason': 'KOSPI 주식 파라미터로 구현 불가'}
+
+            # ── ETF 경로: agent_etf → ETF 백테스트 → agent_backtest ───────
+            if before_etf_metrics is not None:
+                print("  [agent_etf] ETF 파라미터 변경 제안 생성 중...")
+                etf_proposal = self._call_agent_etf(api_key, method, config_str)
+                if etf_proposal and etf_proposal.get('param_changes'):
+                    etf_changes = etf_proposal['param_changes']
+                    print(f"  → ETF 제안: {etf_changes}")
+                    original_config = copy.deepcopy(backtester.analyzer.config)
+                    try:
+                        backtester.analyzer.config = {**current_config, **etf_changes}
+                        backtester.data_cache.clear()
+                        df_after_etf = self._run_etf_backtest(backtester, days_ago=20)
+                        after_etf_metrics = self._extract_backtest_metrics(df_after_etf)
+                        print(f"  [ETF]  After → 거래:{after_etf_metrics['count']}건, "
+                              f"승률:{after_etf_metrics['win_rate']:.1f}%, "
+                              f"MDD:{after_etf_metrics['mdd']:.2f}%, "
+                              f"Sharpe:{after_etf_metrics['sharpe']:.2f}")
+                        print("  [agent_backtest] ETF 검증 판정 중...")
+                        etf_verdict = self._call_agent_backtest(
+                            api_key, method_name, etf_proposal,
+                            before_etf_metrics, after_etf_metrics, etf_mode=True
+                        )
+                        etf_result = {
+                            'verdict': etf_verdict['decision'],
+                            'reason': etf_verdict['reason'],
+                            'before_metrics': before_etf_metrics,
+                            'after_metrics': after_etf_metrics,
+                            'proposed_changes': etf_changes,
+                        }
+                        if etf_verdict['decision'] == 'approved':
+                            print(f"  ✅ [ETF] 승인: {etf_verdict['reason']}")
+                            all_approved_changes.update(etf_changes)
+                        else:
+                            print(f"  ❌ [ETF] 거부: {etf_verdict['reason']}")
+                    except Exception as e:
+                        print(f"  [ETF] After 백테스트 실패: {e}")
+                        etf_result = {'verdict': 'error', 'reason': str(e)}
+                    finally:
+                        backtester.analyzer.config = original_config
+                        backtester.data_cache.clear()
+                else:
+                    print("  [ETF] → 파라미터 변경 없음 (ETF 파라미터로 구현 불가)")
+                    etf_result = {'verdict': 'skipped', 'reason': 'ETF 전용 파라미터로 구현 불가'}
+            else:
+                etf_result = {'verdict': 'skipped', 'reason': 'Before ETF 백테스트 실패로 ETF 경로 건너뜀'}
+
+            entry['validation_result'] = {
+                'stock': stock_result,
+                'etf': etf_result,
+                'validated_at': datetime.datetime.now().isoformat(),
+            }
+            processed_entries.append(entry)
+
+        # ── 승인된 변경사항 일괄 반영 ─────────────────────────────────────
+        if all_approved_changes:
+            print(f"\n[최종] 승인된 파라미터 {len(all_approved_changes)}건 strategy_config.json 반영")
+            new_config = {**current_config, **all_approved_changes}
+            self.save_config(new_config)
+            self.base_config = new_config
+            self.analyzer.config = new_config
+            self._log_backlog_update(all_approved_changes, before_stock_metrics, processed_entries)
+        else:
+            print("\n[최종] 승인된 변경사항 없음")
+
+        # ── 처리 항목 아카이브 + backlog 잔여분 보존 ─────────────────────
+        self._archive_backlog(remaining, backlog_file, history_file, processed_entries)
+        print(f"\n[backlog] {len(processed_entries)}건 처리 완료 → history 아카이브, 잔여 {len(remaining)}건")
+
+    # ─────────────────────────────────────────────────────────────────────
+    # backlog 헬퍼 메서드
+    # ─────────────────────────────────────────────────────────────────────
+
+    def _archive_backlog(self, remaining_backlog, backlog_file, history_file, processed_entries):
+        """처리된 항목을 history에 append하고, backlog는 잔여분만 남긴다."""
         history = []
         if os.path.exists(history_file):
             try:
@@ -73,13 +265,309 @@ class StrategyOptimizer:
                     history = json.load(f)
             except Exception:
                 history = []
-        history.extend(backlog)
+        history.extend(processed_entries)
         with open(history_file, 'w', encoding='utf-8') as f:
             json.dump(history, f, ensure_ascii=False, indent=2)
-        # backlog 소비 후 파일 비우기
         with open(backlog_file, 'w', encoding='utf-8') as f:
-            json.dump([], f, ensure_ascii=False, indent=2)
-        print("[agent_search backlog] backlog 처리 완료 및 초기화 (history에 백업)")
+            json.dump(remaining_backlog, f, ensure_ascii=False, indent=2)
+
+    def _extract_backtest_metrics(self, df):
+        """백테스트 DataFrame에서 핵심 지표를 추출한다."""
+        if df is None or df.empty:
+            return {'count': 0, 'win_rate': 0.0, 'avg_return': 0.0, 'mdd': 0.0, 'sharpe': 0.0}
+        total = len(df)
+        wins = (df['Return(%)'] > 0).sum()
+        avg_ret = float(df['Return(%)'].mean())
+        win_rate = float(wins / total * 100)
+        # MDD (복리 자본곡선 기반)
+        rets_seq = df.sort_values('BuyDate')['Return(%)'].tolist() if 'BuyDate' in df.columns else df['Return(%)'].tolist()
+        equity = 1.0; peak_eq = 1.0; mdd = 0.0
+        for r in rets_seq:
+            equity *= (1 + r / 100)
+            if equity > peak_eq:
+                peak_eq = equity
+            dd = (peak_eq - equity) / peak_eq * 100
+            if dd > mdd:
+                mdd = dd
+        # Sharpe (연율화)
+        std_ret = float(df['Return(%)'].std())
+        avg_hold = self.base_config.get('VALIDATE_MAX_HOLD_DAYS', 20)
+        annual_factor = (250 / max(avg_hold, 1)) ** 0.5
+        risk_free = 3.5 / (250 / max(avg_hold, 1))
+        sharpe = ((avg_ret - risk_free) / std_ret * annual_factor) if std_ret > 0 else 0.0
+        return {
+            'count': total,
+            'win_rate': win_rate,
+            'avg_return': avg_ret,
+            'mdd': round(mdd, 4),
+            'sharpe': round(sharpe, 4),
+        }
+
+    def _make_gemini_model(self, api_key):
+        """agent/agent_search.py와 동일한 방식으로 Gemini 모델을 생성한다."""
+        genai = None
+        lib = None
+        try:
+            import google.genai as _genai
+            if hasattr(_genai, 'GenerativeModel'):
+                genai = _genai; lib = 'genai'
+            else:
+                import google.generativeai as _genai2
+                if hasattr(_genai2, 'GenerativeModel'):
+                    genai = _genai2; lib = 'generativeai'
+        except ImportError:
+            try:
+                import google.generativeai as _genai2
+                if hasattr(_genai2, 'GenerativeModel'):
+                    genai = _genai2; lib = 'generativeai'
+            except ImportError:
+                pass
+        if genai is None:
+            raise RuntimeError("google-genai 또는 google-generativeai 패키지가 필요합니다.")
+        model_name = 'gemini-2.0-flash'
+        if lib == 'generativeai':
+            genai.configure(api_key=api_key)
+            return genai.GenerativeModel(model_name)
+        if lib == 'genai':
+            if hasattr(genai, 'GenerativeModel'):
+                return genai.GenerativeModel(model_name)
+            client = genai.Client(api_key=api_key)
+            return client.chats.create(model=model_name)
+        raise RuntimeError("지원되지 않는 AI 모델 인터페이스")
+
+    def _gemini_generate(self, model, prompt):
+        """모델에서 텍스트를 생성한다. generate_content / send_message 모두 지원."""
+        if hasattr(model, 'generate_content'):
+            return model.generate_content(prompt).text.strip()
+        if hasattr(model, 'send_message'):
+            resp = model.send_message(prompt)
+            return resp.text.strip() if hasattr(resp, 'text') else str(resp)
+        raise RuntimeError("AI 모델이 generate_content/send_message를 지원하지 않습니다.")
+
+    def _parse_json_from_text(self, text):
+        """AI 응답 텍스트에서 JSON 블록을 파싱한다."""
+        import re
+        for pattern in [r"```json\s*([\s\S]+?)```", r"```[\s\S]*?([\[{][\s\S]+?)```"]:
+            m = re.search(pattern, text)
+            if m:
+                try:
+                    return json.loads(m.group(1).strip())
+                except Exception:
+                    pass
+        try:
+            return json.loads(text)
+        except Exception:
+            return None
+
+    def _call_agent_stock(self, api_key, method, config_str):
+        """
+        agent_stock 역할 (Gemini):
+        방법론 아이디어 → KOSPI 주식 전용 파라미터 변경 제안 (US_*/ETF_* 키 제외).
+        반환: {"param_changes": {key: value, ...}, "reasoning": str}
+        파라미터 변경이 불가능하면 {"param_changes": {}} 반환.
+        """
+        try:
+            model = self._make_gemini_model(api_key)
+            prompt = (
+                "너는 40년 경력의 투자분석전문가(agent_stock)다.\n"
+                "아래 '신규 방법론 아이디어'를 분석하고, 이 방법론의 핵심 원칙을 "
+                "현재 strategy_config.json의 KOSPI 주식 파라미터 조정만으로 근사 구현할 수 있는지 판단하라.\n"
+                "단, 'US_', 'ETF_', 'KOSPI_ETF_' 로 시작하는 키는 절대 변경하지 말 것 — ETF 전문가 영역이다.\n\n"
+                f"[신규 방법론]\n{json.dumps(method, ensure_ascii=False, indent=2)}\n\n"
+                f"[현재 strategy_config.json]\n{config_str}\n\n"
+                "가능하다면 변경할 파라미터 키와 값을 JSON 형식으로 제안하라 (기존 키만 사용 가능).\n"
+                "불가능하면 param_changes를 빈 객체로 반환하라.\n"
+                "반드시 아래 형식으로만 응답하라:\n"
+                "```json\n"
+                "{\"param_changes\": {\"KEY\": value, ...}, \"reasoning\": \"변경 근거\"}\n"
+                "```"
+            )
+            text = self._gemini_generate(model, prompt)
+            result = self._parse_json_from_text(text)
+            if isinstance(result, dict):
+                # 안전: 주식 전문가가 ETF/US 키를 건드리지 못하도록 필터
+                forbidden = [k for k in result.get('param_changes', {})
+                             if str(k).startswith(('US_', 'ETF_', 'KOSPI_ETF_'))]
+                for k in forbidden:
+                    del result['param_changes'][k]
+                return result
+        except Exception as e:
+            print(f"  [agent_stock 오류] {e}")
+        return None
+
+    def _call_agent_etf(self, api_key, method, config_str):
+        """
+        agent_etf 역할 (Gemini):
+        방법론 아이디어 → ETF 전용 파라미터 변경 제안 (US_*, ETF_*, KOSPI_ETF_* 키만).
+        반환: {"param_changes": {key: value, ...}, "reasoning": str}
+        파라미터 변경이 불가능하면 {"param_changes": {}} 반환.
+        """
+        try:
+            model = self._make_gemini_model(api_key)
+            prompt = (
+                "너는 40년 경력의 ETF 투자 전문가(agent_etf)다.\n"
+                "아래 '신규 방법론 아이디어'를 분석하고, 이 방법론의 핵심 원칙을 "
+                "현재 strategy_config.json의 ETF 전용 파라미터 조정만으로 근사 구현할 수 있는지 판단하라.\n"
+                "변경 가능한 키는 'US_', 'ETF_', 'KOSPI_ETF_' 로 시작하는 숫자/불리언 파라미터만 해당한다.\n"
+                "티커 목록(리스트 값)은 변경하지 말 것.\n\n"
+                f"[신규 방법론]\n{json.dumps(method, ensure_ascii=False, indent=2)}\n\n"
+                f"[현재 strategy_config.json]\n{config_str}\n\n"
+                "가능하다면 변경할 파라미터 키와 값을 JSON 형식으로 제안하라 (기존 키만 사용 가능).\n"
+                "불가능하면 param_changes를 빈 객체로 반환하라.\n"
+                "반드시 아래 형식으로만 응답하라:\n"
+                "```json\n"
+                "{\"param_changes\": {\"KEY\": value, ...}, \"reasoning\": \"변경 근거\"}\n"
+                "```"
+            )
+            text = self._gemini_generate(model, prompt)
+            result = self._parse_json_from_text(text)
+            if isinstance(result, dict):
+                # 안전: ETF 전문가는 ETF/US 파라미터만 수정 가능, 리스트 값 제외
+                filtered = {
+                    k: v for k, v in result.get('param_changes', {}).items()
+                    if str(k).startswith(('US_', 'ETF_', 'KOSPI_ETF_'))
+                    and not isinstance(v, list)
+                }
+                result['param_changes'] = filtered
+                return result
+        except Exception as e:
+            print(f"  [agent_etf 오류] {e}")
+        return None
+
+    def _run_etf_backtest(self, backtester, days_ago=20):
+        """
+        ETF 유니버스(KOSPI ETF + US ETF)만을 대상으로 단일 기간 백테스트를 수행한다.
+        backtester의 현재 analyzer.config를 그대로 사용한다.
+        """
+        from backtester import _fdr_read
+        import datetime as _dt
+
+        ks11 = _fdr_read('KS11')
+        if ks11 is None or ks11.empty:
+            raise RuntimeError("KS11 데이터 로드 실패")
+
+        offset = min(days_ago + 1, len(ks11) - 1)
+        target_date = ks11.index[-offset]
+
+        kospi_uptrend = backtester.analyzer._is_market_in_uptrend(
+            ks11, target_idx=len(ks11[ks11.index <= target_date]) - 1
+        )
+        try:
+            sp500 = _fdr_read(
+                'US500',
+                start=(target_date - _dt.timedelta(days=300)).strftime('%Y-%m-%d'),
+                end=target_date.strftime('%Y-%m-%d')
+            )
+            us_uptrend = backtester.analyzer._is_market_in_uptrend(sp500) if sp500 is not None and not sp500.empty else True
+        except Exception:
+            us_uptrend = True
+
+        cfg = backtester.analyzer.config
+        kospi_etf = [(code, code) for code in cfg.get('ETF_EXPERT_TICKERS', cfg.get('KOSPI_ETF_TICKERS', []))]
+        us_etf = [(code, code) for code in cfg.get('US_ETF_TICKERS', [])]
+
+        results = []
+        if kospi_etf:
+            results.extend(backtester._backtest_universe(
+                kospi_etf, target_date, 'KOSPI_ETF', market_uptrend=kospi_uptrend
+            ))
+        if us_etf:
+            results.extend(backtester._backtest_universe(
+                us_etf, target_date, 'US_ETF', benchmark_symbol='IXIC', market_uptrend=us_uptrend
+            ))
+
+        import pandas as pd
+        return pd.DataFrame(results) if results else pd.DataFrame()
+
+    def _call_agent_backtest(self, api_key, method_name, proposal, before_metrics, after_metrics, etf_mode=False):
+        """
+        agent_backtest 역할 (Gemini):
+        Before/After 백테스트 지표를 비교하여 승인/거부 판정.
+        etf_mode=True 시 ETF 기준(MDD<15%, KOSPI ETF WR≥38%, US ETF WR≥35%) 적용.
+        반환: {"decision": "approved"|"rejected", "reason": str}
+        """
+        try:
+            model = self._make_gemini_model(api_key)
+            if etf_mode:
+                domain = "ETF"
+                criteria = (
+                    "ETF 합격 기준: 승률(KOSPI ETF ≥ 38%, US ETF ≥ 35%), 평균수익 > 0.5%, "
+                    "MDD < 15% (ETF 기준 강화), Sharpe > 0.5, 샘플 수 ≥ 10건(ETF 유니버스 특성상 완화). "
+                    "Before 대비 After에서 1개 이상 지표 개선 + 나머지 지표 퇴행 없음 시 승인."
+                )
+            else:
+                domain = "KOSPI 주식"
+                criteria = (
+                    "주식 합격 기준: 승률(KOSPI ≥ 38%), 평균수익 > 0.5%, MDD < 20%, "
+                    "Sharpe > 0.5, 샘플 수 ≥ 50건. "
+                    "Before 대비 After에서 1개 이상 지표 개선 + 나머지 지표 퇴행 없음 시 승인."
+                )
+            prompt = (
+                "너는 40년 경력의 백테스트 검증전문가(agent_backtest)다.\n"
+                f"아래 '{method_name}' 방법론 기반 {domain} 파라미터 변경 제안의 "
+                "Before/After 백테스트 결과를 비교하고 "
+                "승인(approved) 또는 거부(rejected) 판정을 내려라.\n\n"
+                f"[제안 파라미터 변경]\n{json.dumps(proposal.get('param_changes', {}), ensure_ascii=False, indent=2)}\n"
+                f"[변경 근거] {proposal.get('reasoning', '')}\n\n"
+                f"[Before 지표]\n{json.dumps(before_metrics, ensure_ascii=False, indent=2)}\n\n"
+                f"[After 지표]\n{json.dumps(after_metrics, ensure_ascii=False, indent=2)}\n\n"
+                f"[판정 기준]\n{criteria}\n\n"
+                "반드시 아래 형식으로만 응답하라:\n"
+                "```json\n"
+                "{\"decision\": \"approved\" 또는 \"rejected\", \"reason\": \"판정 근거 (수치 포함)\"}\n"
+                "```"
+            )
+            text = self._gemini_generate(model, prompt)
+            result = self._parse_json_from_text(text)
+            if isinstance(result, dict) and result.get('decision') in ('approved', 'rejected'):
+                return result
+        except Exception as e:
+            print(f"  [agent_backtest 오류] {e}")
+        return {'decision': 'rejected', 'reason': 'AI 판정 실패 — 안전상 거부'}
+
+    def _log_backlog_update(self, approved_changes, before_metrics, processed_entries):
+        """승인된 변경사항을 algorithm_update_log.json에 기록한다."""
+        log_file = 'algorithm_update_log.json'
+        approved_methods = [
+            e['method'].get('방법론명', '')
+            for e in processed_entries
+            if e.get('validation_result', {}).get('verdict') == 'approved'
+        ]
+        after_metrics_list = [
+            e['validation_result']['after_metrics']
+            for e in processed_entries
+            if e.get('validation_result', {}).get('verdict') == 'approved'
+        ]
+        avg_after = {}
+        if after_metrics_list:
+            for key in ('win_rate', 'avg_return', 'mdd', 'sharpe'):
+                vals = [m[key] for m in after_metrics_list if m.get(key) is not None]
+                avg_after[key] = round(sum(vals) / len(vals), 4) if vals else None
+
+        log_entry = {
+            'title': f"[backlog 검증] {', '.join(approved_methods)} 방법론 파라미터 반영",
+            'timestamp': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'changes': {
+                k: {'before': self.base_config.get(k), 'after': v}
+                for k, v in approved_changes.items()
+            },
+            'before_metrics': before_metrics,
+            'after_metrics': avg_after,
+            'notes': [f"backlog 방법론 검증: {m}" for m in approved_methods],
+        }
+
+        logs = []
+        if os.path.exists(log_file):
+            try:
+                with open(log_file, 'r', encoding='utf-8') as f:
+                    logs = json.load(f)
+                if not isinstance(logs, list):
+                    logs = [logs]
+            except Exception:
+                logs = []
+        logs.append(log_entry)
+        with open(log_file, 'w', encoding='utf-8') as f:
+            json.dump(logs, f, ensure_ascii=False, indent=2)
 
     @staticmethod
     def _safe_int(value, default):
