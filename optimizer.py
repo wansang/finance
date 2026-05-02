@@ -143,7 +143,7 @@ class StrategyOptimizer:
 
             # ── 주식 경로: agent_stock → KOSPI 백테스트 → agent_backtest ──
             print("  [agent_stock] 주식 파라미터 변경 제안 생성 중...")
-            stock_proposal = self._call_agent_stock(api_key, method, config_str)
+            stock_proposal = self._call_agent_stock(api_key, method, config_str, pre_changes=method.get('제안_파라미터_변경'))
             if stock_proposal and stock_proposal.get('param_changes'):
                 stock_changes = stock_proposal['param_changes']
                 print(f"  → 주식 제안: {stock_changes}")
@@ -187,7 +187,7 @@ class StrategyOptimizer:
             # ── ETF 경로: agent_etf → ETF 백테스트 → agent_backtest ───────
             if before_etf_metrics is not None:
                 print("  [agent_etf] ETF 파라미터 변경 제안 생성 중...")
-                etf_proposal = self._call_agent_etf(api_key, method, config_str)
+                etf_proposal = self._call_agent_etf(api_key, method, config_str, pre_changes=method.get('제안_파라미터_변경'))
                 if etf_proposal and etf_proposal.get('param_changes'):
                     etf_changes = etf_proposal['param_changes']
                     print(f"  → ETF 제안: {etf_changes}")
@@ -359,13 +359,23 @@ class StrategyOptimizer:
         except Exception:
             return None
 
-    def _call_agent_stock(self, api_key, method, config_str):
+    def _call_agent_stock(self, api_key, method, config_str, pre_changes=None):
         """
         agent_stock 역할 (Gemini):
         방법론 아이디어 → KOSPI 주식 전용 파라미터 변경 제안 (US_*/ETF_* 키 제외).
+        pre_changes: agent_search가 사전에 제안한 파라미터 변경값. 있으면 AI 호출 없이 바로 사용.
         반환: {"param_changes": {key: value, ...}, "reasoning": str}
         파라미터 변경이 불가능하면 {"param_changes": {}} 반환.
         """
+        # agent_search가 미리 제안한 파라미터가 있으면 AI 호출 없이 바로 사용
+        if pre_changes and isinstance(pre_changes, dict):
+            stock_changes = {
+                k: v for k, v in pre_changes.items()
+                if not str(k).startswith(('US_', 'ETF_', 'KOSPI_ETF_'))
+            }
+            if stock_changes:
+                print("  → 사전 제안 파라미터 사용 (AI 호출 생략)")
+                return {'param_changes': stock_changes, 'reasoning': method.get('핵심 아이디어', '')}
         try:
             model = self._make_gemini_model(api_key)
             prompt = (
@@ -395,13 +405,24 @@ class StrategyOptimizer:
             print(f"  [agent_stock 오류] {e}")
         return None
 
-    def _call_agent_etf(self, api_key, method, config_str):
+    def _call_agent_etf(self, api_key, method, config_str, pre_changes=None):
         """
         agent_etf 역할 (Gemini):
         방법론 아이디어 → ETF 전용 파라미터 변경 제안 (US_*, ETF_*, KOSPI_ETF_* 키만).
+        pre_changes: agent_search가 사전에 제안한 파라미터 변경값. 있으면 AI 호출 없이 바로 사용.
         반환: {"param_changes": {key: value, ...}, "reasoning": str}
         파라미터 변경이 불가능하면 {"param_changes": {}} 반환.
         """
+        # agent_search가 미리 제안한 ETF 파라미터가 있으면 AI 호출 없이 바로 사용
+        if pre_changes and isinstance(pre_changes, dict):
+            etf_changes = {
+                k: v for k, v in pre_changes.items()
+                if str(k).startswith(('US_', 'ETF_', 'KOSPI_ETF_'))
+                and not isinstance(v, list)
+            }
+            if etf_changes:
+                print("  → 사전 제안 파라미터 사용 (AI 호출 생략)")
+                return {'param_changes': etf_changes, 'reasoning': method.get('핵심 아이디어', '')}
         try:
             model = self._make_gemini_model(api_key)
             prompt = (

@@ -79,18 +79,49 @@ def run_agent_search():
         raise RuntimeError("GEMINI_API_KEY 환경변수가 필요합니다.")
     exclude_names = get_existing_method_names()
     exclude_str = ", ".join(exclude_names) if exclude_names else "(없음)"
+
+    # strategy_config.json에서 조정 가능한 숫자/불리언 파라미터 목록 동적 로드
+    import pathlib, json as _json
+    config_path = pathlib.Path(__file__).parent.parent / 'strategy_config.json'
+    try:
+        _cfg = _json.loads(config_path.read_text(encoding='utf-8'))
+        tunable_keys = [k for k, v in _cfg.items() if isinstance(v, (int, float, bool)) and not isinstance(v, list)]
+        tunable_str = ", ".join(tunable_keys)
+    except Exception:
+        tunable_str = "SMA50, SMA150, SMA200, RSI_LENGTH, BB_LENGTH, BB_STD, STOCH_RSI_LENGTH, TRAILING_STOP_PCT, PROFIT_TARGET_PCT, ATR_STOP_MULTIPLIER, ATR_TARGET_MULTIPLIER, VALIDATE_MAX_HOLD_DAYS, TIER1_WIN_RATE, TIER2_WIN_RATE"
+
     model_name = 'gemini-flash-latest'
     model = create_gemini_model(model_name, api_key)
     prompt = (
-        f"최신 투자 전략 20가지를 아래 형식의 JSON 리스트로 요약해줘. "
-        f"단, 우리 시스템에 이미 적용된 전략({exclude_str})은 모두 제외하고, "
-        f"아직 적용하지 않은 새로운 전략만 포함해줘. "
-        "각 전략은 반드시 고유해야 하며, 다음 key를 포함해야 해: "
-        "방법론명, 출처/근거, 핵심 아이디어, 현재 시스템과의 차이점, 예상 적용 시장, 기대 효과, 구현 난이도, 검증 요청 사항. "
-        "단, 반드시 '차트의 기술'(차트 패턴, 기술적 분석, 시각적 신호 등) 기반의 근거가 명확히 드러나는 전략만 포함하고, "
-        "차트적으로 우리 시스템에 실제 적용할 수 있는 전략만 제안해줘. "
-        "차트와 무관하거나, 차트 근거가 불명확한 전략은 모두 제외해줘. "
-        "예시: [{\"방법론명\":..., ...}, ...]"
+        "너는 40년 경력의 투자 방법 검색 전문가(agent_search)다.\n\n"
+        "【핵심 제약】\n"
+        "우리 시스템은 새로운 지표나 코드를 추가할 수 없다. "
+        "오직 아래 strategy_config.json 파라미터 값 조정만으로 전략을 변경할 수 있다.\n\n"
+        f"【조정 가능한 파라미터 목록】\n{tunable_str}\n\n"
+        "위 파라미터들의 의미:\n"
+        "- SMA50/150/200: 이동평균 기간\n"
+        "- RSI_LENGTH: RSI 계산 기간\n"
+        "- BB_LENGTH/BB_STD: 볼린저밴드 기간/표준편차 배수\n"
+        "- STOCH_RSI_LENGTH/STOCH_K/STOCH_D: 스토캐스틱RSI 파라미터\n"
+        "- TRAILING_STOP_PCT/TRAILING_STOP_ACTIVATE_PCT: 트레일링 스톱 비율\n"
+        "- PROFIT_TARGET_PCT/VALIDATE_MAX_HOLD_DAYS: 목표수익률/최대보유기간\n"
+        "- ATR_STOP_MULTIPLIER/ATR_TARGET_MULTIPLIER: ATR 기반 손절/목표 배수\n"
+        "- TIER1_WIN_RATE/TIER2_WIN_RATE: 매수 진입 기준 승률 임계값\n"
+        "- US_* 계열: 미국 시장 전용 동일 파라미터\n\n"
+        "【요청】\n"
+        f"이미 시도된 전략({exclude_str})을 제외하고, "
+        "위 파라미터 조정만으로 구현 가능한 투자 전략 20가지를 제안해줘.\n\n"
+        "각 전략은 반드시:\n"
+        "1. 어떤 파라미터를 어떤 값으로 바꿔야 하는지 구체적으로 명시할 것\n"
+        "2. 차트 기술(패턴, 기술적 지표, 시각적 신호) 기반 근거가 있을 것\n"
+        "3. 새로운 코드/지표 추가 없이 파라미터 조정만으로 적용 가능할 것\n\n"
+        "각 항목에 반드시 다음 key를 포함해줘: "
+        "방법론명, 출처/근거, 핵심 아이디어, 현재 시스템과의 차이점, 예상 적용 시장, 기대 효과, 구현 난이도, 검증 요청 사항, 제안_파라미터_변경.\n\n"
+        "'제안_파라미터_변경'은 반드시 {\"파라미터명\": 제안값, ...} 형태의 객체로, "
+        "조정 가능한 파라미터 목록에 있는 키만 사용할 것. "
+        "파라미터 변경이 없는 전략은 제외할 것.\n\n"
+        "예시: [{\"방법론명\": \"...\", ..., \"제안_파라미터_변경\": {\"RSI_LENGTH\": 10, \"TRAILING_STOP_PCT\": 0.04}}, ...]\n"
+        "반드시 JSON 리스트로만 응답하라."
     )
     # 모델 객체가 generate_content/send_message 중 지원하는 메서드로 분기
     if hasattr(model, 'generate_content'):
