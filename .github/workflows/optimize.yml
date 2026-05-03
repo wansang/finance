@@ -124,3 +124,48 @@ jobs:
           git pull --rebase origin main
           git push origin main
 
+  # ── 4단계: Auto Evolution / 성과 분석 (단일 잡, 배치 완료 후) ───────
+  evolve:
+    needs: merge
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: main  # merge 후 최신 strategy_config.json 사용
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run optimizer (Auto Evolution only, no batch)
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          OPTIMIZER_TIME_LIMIT_SECONDS: '7200'
+          OPTIMIZER_MAX_CANDIDATES: '80'
+          # BATCH_INDEX 미설정 → process_search_backlog 스킵, optimize() 만 실행
+        run: |
+          python3 -c "
+          from optimizer import StrategyOptimizer
+          opt = StrategyOptimizer()
+          opt.optimize()
+          "
+
+      - name: Commit evolve results
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add strategy_config.json signal_performance.json algorithm_update_log.json \
+                  analyzer.py searchBacklog.json
+          git diff --cached --quiet && echo "nothing to commit" && exit 0
+          git commit -m "Auto Evolution: algorithm update [skip ci]"
+          git pull --rebase origin main
+          git push origin main
+

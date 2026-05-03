@@ -2465,4 +2465,8 @@ ETF 보유 시 더 넓은 손절 기준이나 추세 기반 목표가 조정이 
 if __name__ == '__main__':
     optimizer = StrategyOptimizer()
     optimizer.process_search_backlog()
-    optimizer.optimize()
+    # 배치 모드(BATCH_INDEX 지정)에서는 backlog 처리만 수행하고 종료
+    # Auto Evolution / 성과 분석은 merge 잡 이후 별도 단계에서 실행
+    import os as _os
+    if _os.environ.get('BATCH_INDEX', '') == '':
+        optimizer.optimize()
