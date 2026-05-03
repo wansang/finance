@@ -940,5 +940,96 @@
       "RS_LOOKBACK_BEAR": 40
     },
     "batch_count": 9
+  },
+  {
+    "timestamp": "2026-05-03T07:31:04.019359",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "detect_volume_spike: 단기 급등의 끝물인 '클라이맥스' 구간을 피하기 위해 20일 이동평균선(BBM) 대비 가격 이격도를 12% 이내로 제한함.",
+      "detect_bb_squeeze: 변동성 수렴 자체는 중립 신호이므로, RSI가 50 이상인 상방 모멘텀 구간에서만 신호를 확정하여 승률을 보완함."
+    ],
+    "kept": true,
+    "before": {
+      "total": 47,
+      "wins": 25,
+      "win_rate": 53.1915,
+      "avg_ret": 0.1495,
+      "sharpe": -0.0852,
+      "mdd": 34.1293
+    },
+    "after": {
+      "total": 22,
+      "wins": 12,
+      "win_rate": 54.5455,
+      "avg_ret": 0.6724,
+      "sharpe": 0.2028,
+      "mdd": 17.665
+    }
+  },
+  {
+    "timestamp": "2026-05-03T07:48:16.997217",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "detect_volume_spike: 승률 25%의 저조한 성과를 개선하기 위해, 시장 지수 대비 수익률이 우수한(RS_Rating >= 1.0) 주도주에서 발생하는 돌파만 선별하도록 필터를 강화함.",
+      "calculate_entry_price: 피드백에 따라 지수 대비 상대 강도(RS)를 진입 조건에 전면 반영하여, 지지선 근처에서도 시장보다 강한 종목 위주로 진입하도록 로직을 수정함."
+    ],
+    "kept": false,
+    "before": {
+      "total": 22,
+      "wins": 12,
+      "win_rate": 54.5455,
+      "avg_ret": 0.6724,
+      "sharpe": 0.2028,
+      "mdd": 17.665
+    },
+    "after": {
+      "total": 22,
+      "wins": 12,
+      "win_rate": 54.5455,
+      "avg_ret": 0.6724,
+      "sharpe": 0.2028,
+      "mdd": 17.665
+    }
+  },
+  {
+    "title": "이번주 추천 종목 실적 기반 알고리즘 고도화 업데이트",
+    "timestamp": "2026-05-03 07:49:15",
+    "changes": {
+      "TREND_TEMPLATE_PEAK_FACTOR": {
+        "before": 0.2,
+        "after": 0.208
+      },
+      "TIER1_WIN_RATE": {
+        "before": 0.65,
+        "after": 26
+      },
+      "VALIDATE_MAX_HOLD_DAYS": {
+        "before": 2,
+        "after": 5
+      },
+      "US_TRAILING_STOP_PCT": {
+        "before": 0.0391,
+        "after": 0.0375
+      }
+    },
+    "before_metrics": {
+      "count": 66,
+      "avg_return": 0.36135759014782637,
+      "win_rate": 68.18181818181817,
+      "max_return": 24.467356181150553,
+      "min_return": -10.480157068062828
+    },
+    "after_metrics": {
+      "count": 66,
+      "avg_return": 0.36135759014782637,
+      "win_rate": 68.18181818181817,
+      "max_return": 24.467356181150553,
+      "min_return": -10.480157068062828
+    },
+    "notes": [
+      "실제 추천 종목 66개 성과 기반 고도화 최적화",
+      "시장 상황: BULL",
+      "최고 성과 신호: 바닥권 반등 신호(BB 하단) (승률 100.0%)"
+    ]
   }
 ]

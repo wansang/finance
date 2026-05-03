@@ -1458,7 +1458,8 @@ class StockAnalyzer:
         current_bbw = df_target['BBW'].iloc[-1]
         bbw_history = df_target['BBW'].tail(30)
         
-        if current_bbw <= bbw_history.quantile(0.1):
+        # 변동성 수렴 구간에서 RSI가 50 이상으로 상방 모멘텀이 확인될 때만 진입
+        if current_bbw <= bbw_history.quantile(0.1) and df_target['RSI'].iloc[-1] > 50:
             return True
         return False
 
@@ -1472,7 +1473,8 @@ class StockAnalyzer:
         candle_body_ratio = (last['Close'] - last['Open']) / (last['High'] - last['Low'] + 1e-9)
         # 거래량 임계치 상향 및 20일 전고점 돌파(VBO) 조건 결합
         is_vbo = last['Close'] >= df_target['High'].tail(21).iloc[:-1].max()
-        if last['Volume'] > last['VOL_AVG'] * 3.5 and is_vbo and candle_body_ratio > 0.7:
+        # 이동평균선(BBM) 대비 이격도가 너무 크면 Climax일 확률이 높으므로 12% 이내로 제한
+        if last['Volume'] > last['VOL_AVG'] * 3.5 and is_vbo and candle_body_ratio > 0.7 and last['Close'] < last['BBM'] * 1.12:
             return True
         return False
 
