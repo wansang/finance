@@ -908,5 +908,37 @@
       "TRAILING_STOP_PCT": 0.05
     },
     "batch_count": 7
+  },
+  {
+    "updated_at": "2026-05-03T07:08:40.776098",
+    "source": "merge_batches",
+    "approved_changes": {
+      "RSI_LENGTH": 7,
+      "VALIDATE_MAX_HOLD_DAYS": 2,
+      "PROFIT_TARGET_PCT": 0.03,
+      "VALIDATE_STOP_LOSS_PCT": -0.02,
+      "STOCH_RSI_LENGTH": 20,
+      "STOCH_K": 5,
+      "STOCH_D": 5,
+      "TIER2_WIN_RATE": 0.6,
+      "MAX_POSITIONS": 10,
+      "MAX_SECTOR_POSITIONS": 1,
+      "TIER1_MIN_RS": 90,
+      "TRAILING_STOP_ACTIVATE_PCT": 0.04,
+      "TRAILING_STOP_PCT": 0.02,
+      "TIER1_WIN_RATE": 0.65,
+      "MARKET_FILTER_ENABLED": 1,
+      "BACKTEST_REQUIRE_US_MARKET_POSITIVE": 1,
+      "WEAK_SIGNAL_WIN_RATE_THRESHOLD": 0.6,
+      "MAX_HARD_STOP_PCT": 0.04,
+      "MFI_LENGTH": 7,
+      "VOL_AVG_WINDOW": 14,
+      "TRANSACTION_COST_BUY_PCT": 0.0,
+      "TRANSACTION_COST_SELL_PCT": 0.0001,
+      "BACKTEST_SAMPLE_SIZE": 200,
+      "RS_MIN_BEAR_DEFENSE": 15,
+      "RS_LOOKBACK_BEAR": 40
+    },
+    "batch_count": 9
   }
 ]
