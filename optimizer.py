@@ -283,12 +283,16 @@ class StrategyOptimizer:
 
         # ── 승인된 변경사항 일괄 반영 ─────────────────────────────────────
         if all_approved_changes:
-            print(f"\n[최종] 승인된 파라미터 {len(all_approved_changes)}건 strategy_config.json 반영")
-            new_config = {**current_config, **all_approved_changes}
-            self.save_config(new_config)
-            self.base_config = new_config
-            self.analyzer.config = new_config
-            self._log_backlog_update(all_approved_changes, before_stock_metrics, processed_entries)
+            if batch_index >= 0 and batch_total > 0:
+                # 배치 모드: 공유 파일 쓰기 금지 → merge 단계에서 처리
+                print(f"\n[최종] 승인된 파라미터 {len(all_approved_changes)}건 → 배치 결과 파일에 저장 (merge에서 반영)")
+            else:
+                print(f"\n[최종] 승인된 파라미터 {len(all_approved_changes)}건 strategy_config.json 반영")
+                new_config = {**current_config, **all_approved_changes}
+                self.save_config(new_config)
+                self.base_config = new_config
+                self.analyzer.config = new_config
+                self._log_backlog_update(all_approved_changes, before_stock_metrics, processed_entries)
         else:
             print("\n[최종] 승인된 변경사항 없음")
 
