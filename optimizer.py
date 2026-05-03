@@ -89,12 +89,27 @@ class StrategyOptimizer:
         max_per_run = self._safe_int(
             self.base_config.get('BACKLOG_VALIDATE_PER_RUN', 3), 3
         )
-        to_process = backlog[:max_per_run]
-        remaining = backlog[max_per_run:]
 
-        print(f"\n{'='*60}")
-        print(f"  [backlog 검증] {len(to_process)}건 처리 (전체 {len(backlog)}건, 잔여 {len(remaining)}건)")
-        print(f"{'='*60}")
+        # ── 병렬 배치 모드: BATCH_INDEX / BATCH_TOTAL 환경변수로 슬라이스 선택 ──
+        batch_index = self._safe_int(os.environ.get('BATCH_INDEX', ''), -1)
+        batch_total = self._safe_int(os.environ.get('BATCH_TOTAL', ''), -1)
+        if batch_index >= 0 and batch_total > 0:
+            # 배치 모드: 전체 backlog를 batch_total 등분 후 batch_index번째 슬라이스 처리
+            chunk_size = max_per_run
+            start = batch_index * chunk_size
+            end   = start + chunk_size
+            to_process = backlog[start:end]
+            remaining  = [e for i, e in enumerate(backlog) if i < start or i >= end]
+            print(f"\n{'='*60}")
+            print(f"  [backlog 배치검증] batch {batch_index+1}/{batch_total} — "
+                  f"{len(to_process)}건 처리 (전체 {len(backlog)}건)")
+            print(f"{'='*60}")
+        else:
+            to_process = backlog[:max_per_run]
+            remaining  = backlog[max_per_run:]
+            print(f"\n{'='*60}")
+            print(f"  [backlog 검증] {len(to_process)}건 처리 (전체 {len(backlog)}건, 잔여 {len(remaining)}건)")
+            print(f"{'='*60}")
 
         from backtester import Backtester
         backtester = Backtester()
@@ -278,8 +293,19 @@ class StrategyOptimizer:
             print("\n[최종] 승인된 변경사항 없음")
 
         # ── 처리 항목 아카이브 + backlog 잔여분 보존 ─────────────────────
-        self._archive_backlog(remaining, backlog_file, history_file, processed_entries)
-        print(f"\n[backlog] {len(processed_entries)}건 처리 완료 → history 아카이브, 잔여 {len(remaining)}건")
+        if batch_index >= 0 and batch_total > 0:
+            # 배치 모드: 결과를 독립 파일에 저장 (merge job이 나중에 합산)
+            batch_history_file = f'searchBacklog_history_batch_{batch_index}.json'
+            batch_changes_file = f'approved_changes_batch_{batch_index}.json'
+            with open(batch_history_file, 'w', encoding='utf-8') as f:
+                json.dump(processed_entries, f, ensure_ascii=False, indent=2)
+            with open(batch_changes_file, 'w', encoding='utf-8') as f:
+                json.dump(all_approved_changes, f, ensure_ascii=False, indent=2)
+            print(f"\n[backlog] batch {batch_index}: {len(processed_entries)}건 → "
+                  f"{batch_history_file}, {batch_changes_file}")
+        else:
+            self._archive_backlog(remaining, backlog_file, history_file, processed_entries)
+            print(f"\n[backlog] {len(processed_entries)}건 처리 완료 → history 아카이브, 잔여 {len(remaining)}건")
 
     # ─────────────────────────────────────────────────────────────────────
     # backlog 헬퍼 메서드

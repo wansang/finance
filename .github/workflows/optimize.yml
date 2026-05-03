@@ -4,38 +4,118 @@ on:
   workflow_dispatch:
 
 jobs:
-  optimize:
+  # ── 1단계: backlog 크기 확인 → 배치 수 결정 ──────────────────────────
+  prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    permissions:
+      contents: read
+    outputs:
+      batch_matrix: ${{ steps.calc.outputs.batch_matrix }}
+      batch_total:  ${{ steps.calc.outputs.batch_total }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Calculate batch count
+        id: calc
+        run: |
+          python3 - <<'EOF'
+          import json, os, math
+
+          try:
+              backlog = json.load(open('searchBacklog.json'))
+          except Exception:
+              backlog = []
+
+          try:
+              cfg = json.load(open('strategy_config.json'))
+              per_run = int(cfg.get('BACKLOG_VALIDATE_PER_RUN', 5))
+          except Exception:
+              per_run = 5
+
+          n = len(backlog)
+          total = max(1, math.ceil(n / per_run)) if n > 0 else 1
+          # GitHub Actions matrix 최대 256개, 실용적 상한 10개
+          total = min(total, 10)
+          matrix = json.dumps(list(range(total)))
+          print(f"backlog={n}건, per_run={per_run}, batch_total={total}")
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+              fh.write(f"batch_matrix={matrix}\n")
+              fh.write(f"batch_total={total}\n")
+          EOF
+
+  # ── 2단계: 배치별 병렬 최적화 ──────────────────────────────────────
+  optimize:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
     permissions:
       contents: write
+    strategy:
+      matrix:
+        batch: ${{ fromJson(needs.prepare.outputs.batch_matrix) }}
+      fail-fast: false
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
+        run: pip install -r requirements.txt
 
-      - name: Run optimizer
+      - name: Run optimizer (batch ${{ matrix.batch }})
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           OPTIMIZER_TIME_LIMIT_SECONDS: '1800'
           OPTIMIZER_MAX_CANDIDATES: '80'
-        run: |
-          python optimizer.py
+          BATCH_INDEX: ${{ matrix.batch }}
+          BATCH_TOTAL: ${{ needs.prepare.outputs.batch_total }}
+        run: python optimizer.py
 
-      - name: Commit optimized strategy config
+      - name: Upload batch results
+        uses: actions/upload-artifact@v4
+        with:
+          name: batch-${{ matrix.batch }}
+          path: |
+            searchBacklog_history_batch_${{ matrix.batch }}.json
+            approved_changes_batch_${{ matrix.batch }}.json
+          if-no-files-found: ignore
+          retention-days: 1
+
+  # ── 3단계: 결과 합산 → strategy_config.json 반영 ───────────────────
+  merge:
+    needs: optimize
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Download all batch artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: batch-*
+          merge-multiple: true
+
+      - name: Merge batch results
+        run: python merge_batches.py
+
+      - name: Commit merged results
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: "Auto-optimized strategy config [skip ci]"
-          file_pattern: 'strategy_config.json signal_performance.json analyzer.py algorithm_update_log.json searchBacklog.json searchBacklog_history.json'
+          file_pattern: 'strategy_config.json signal_performance.json algorithm_update_log.json searchBacklog.json searchBacklog_history.json'
           branch: main
           push_options: '--force'
+
