@@ -111,11 +111,16 @@ jobs:
       - name: Merge batch results
         run: python merge_batches.py
 
-      - name: Commit merged results
-        uses: stefanzweifel/git-auto-commit-action@v4
-        with:
-          commit_message: "Auto-optimized strategy config [skip ci]"
-          file_pattern: 'strategy_config.json signal_performance.json algorithm_update_log.json searchBacklog.json searchBacklog_history.json'
-          branch: main
-          push_options: '--force'
+      - name: Commit and push (rebase to avoid overwriting concurrent changes)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add strategy_config.json signal_performance.json algorithm_update_log.json \
+                  searchBacklog.json searchBacklog_history.json
+          # 변경사항이 없으면 commit 스킵
+          git diff --cached --quiet && echo "nothing to commit" && exit 0
+          git commit -m "Auto-optimized strategy config [skip ci]"
+          # agent_search 등 동시 push 가 있으면 rebase 후 재push
+          git pull --rebase origin main
+          git push origin main
 
