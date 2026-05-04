@@ -437,6 +437,16 @@ class StrategyOptimizer:
                 return {'param_changes': stock_changes, 'reasoning': method.get('핵심 아이디어', '')}
         try:
             model = self._make_gemini_model(api_key)
+            param_unit_constraints = (
+                "\n[파라미터 단위 제약 — 반드시 준수]\n"
+                "- TIER1_WIN_RATE, TIER2_WIN_RATE, WEAK_SIGNAL_WIN_RATE_THRESHOLD : 정수 %, 범위 20~80 "
+                "(예: 48, 50, 45). 절대 소수(0.6 등) 사용 금지.\n"
+                "- TIER1_MIN_RS, RS_MIN_BEAR_DEFENSE : 소수, 범위 -0.5~0.5 "
+                "(예: 0.03, -0.02). 절대 정수(90 등) 사용 금지.\n"
+                "- TRAILING_STOP_PCT, TRAILING_STOP_ACTIVATE_PCT, PROFIT_TARGET_PCT : 소수, 범위 0.01~0.30 "
+                "(예: 0.02). 절대 정수(%) 사용 금지.\n"
+                "- VALIDATE_MAX_HOLD_DAYS : 정수, 범위 1~60.\n"
+            )
             prompt = (
                 "너는 40년 경력의 투자분석전문가(agent_stock)다.\n"
                 "아래 '신규 방법론 아이디어'를 분석하고, 이 방법론의 핵심 원칙을 "
@@ -444,6 +454,7 @@ class StrategyOptimizer:
                 "단, 'US_', 'ETF_', 'KOSPI_ETF_' 로 시작하는 키는 절대 변경하지 말 것 — ETF 전문가 영역이다.\n\n"
                 f"[신규 방법론]\n{json.dumps(method, ensure_ascii=False, indent=2)}\n\n"
                 f"[현재 strategy_config.json]\n{config_str}\n\n"
+                + param_unit_constraints +
                 "가능하다면 변경할 파라미터 키와 값을 JSON 형식으로 제안하라 (기존 키만 사용 가능).\n"
                 "불가능하면 param_changes를 빈 객체로 반환하라.\n"
                 "반드시 아래 형식으로만 응답하라:\n"
@@ -492,6 +503,10 @@ class StrategyOptimizer:
                 "티커 목록(리스트 값)은 변경하지 말 것.\n\n"
                 f"[신규 방법론]\n{json.dumps(method, ensure_ascii=False, indent=2)}\n\n"
                 f"[현재 strategy_config.json]\n{config_str}\n\n"
+                "[파라미터 단위 제약 — 반드시 준수]\n"
+                "- *_WIN_RATE 류: 정수 %, 범위 20~80 (예: 45). 소수(0.6 등) 사용 금지.\n"
+                "- TRAILING_STOP_PCT, PROFIT_TARGET_PCT 류: 소수, 범위 0.01~0.30 (예: 0.02).\n"
+                "- VALIDATE_MAX_HOLD_DAYS 류: 정수, 범위 1~60.\n\n"
                 "가능하다면 변경할 파라미터 키와 값을 JSON 형식으로 제안하라 (기존 키만 사용 가능).\n"
                 "불가능하면 param_changes를 빈 객체로 반환하라.\n"
                 "반드시 아래 형식으로만 응답하라:\n"
