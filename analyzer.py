@@ -1190,6 +1190,112 @@ class StockAnalyzer:
             f"/ 목표 {target_text}({entry_info['target_basis']})"
         )
 
+    def ask_entry_timing_opinions(self, entry_stocks, market_context=""):
+        """
+        지금진입가능 종목들에 대해 Gemini 1회 호출로 종목별 타이밍 의견 반환.
+
+        entry_stocks: [
+            {
+                'name': str, 'code': str, 'current_price': float,
+                'entry': float, 'stop_loss': float, 'target': float,
+                'signals': str,           # 발화된 신호 텍스트
+                'rsi': float|None,
+                'volume_ratio': float|None,  # 현재거래량 / 평균거래량
+                'near_52w_high': bool,
+            }, ...
+        ]
+        market_context: 시장 분위기 요약 (선택)
+
+        반환: {'종목명': '타이밍 의견 텍스트', ...}  — 실패 시 {}
+        """
+        if not self.model or not entry_stocks:
+            return {}
+
+        etf_codes = set(
+            str(x).strip() for x in (
+                self.config.get('ETF_EXPERT_TICKERS', []) +
+                self.config.get('KOSPI_ETF_TICKERS', [])
+            ) if str(x).strip()
+        )
+        _ETF_NAME_KEYWORDS = ('TIGER', 'KODEX', 'KBSTAR', 'HANARO', 'KOSEF', 'ACE', 'SOL ', 'KINDEX', 'ARIRANG', 'TIMEFOLIO', 'PLUS ')
+
+        def _check_is_etf(code, name):
+            if str(code).strip() in etf_codes:
+                return True
+            return any(kw in name.upper() for kw in _ETF_NAME_KEYWORDS)
+
+        stocks_text = ""
+        for s in entry_stocks:
+            ep = self.format_price(s['entry'], s['code'])
+            sp = self.format_price(s['stop_loss'], s['code'])
+            tp = self.format_price(s['target'], s['code'])
+            cp = self.format_price(s['current_price'], s['code'])
+            rsi_txt = f"RSI {s['rsi']:.0f}" if s.get('rsi') else ""
+            vol_txt = f"거래량비율 {s['volume_ratio']:.1f}배" if s.get('volume_ratio') else ""
+            high_txt = "52주신고가 근접/돌파" if s.get('near_52w_high') else ""
+            indicators = " / ".join(filter(None, [rsi_txt, vol_txt, high_txt]))
+            is_etf_item = s.get('is_etf') if 'is_etf' in s else _check_is_etf(s['code'], s['name'])
+            type_label = "ETF" if is_etf_item else "주식"
+            stocks_text += (
+                f"\n[{s['name']}({s['code']}) | 유형:{type_label}] 현재가:{cp} | 신호:{s['signals']}"
+                f" | {indicators}"
+                f"\n  → 진입가:{ep} / 손절:{sp} / 목표:{tp}\n"
+            )
+
+        market_txt = f"\n[현재 시장 상황]\n{market_context}\n" if market_context else ""
+        prompt = f"""당신은 40년 경력의 주식·ETF 투자 전문가입니다.
+{market_txt}
+아래 종목들은 현재 기술적 매수 신호가 발생했고, 현재가가 알고리즘 산출 진입가 근처에 있어 즉시 진입 가능 상태입니다.
+진입가/손절/목표는 BB하단·SMA50 지지선 기반으로 이미 계산되어 있습니다.
+{stocks_text}
+각 종목에 대해 유형에 맞는 전문가 의견을 1~2문장 작성해주세요.
+- 유형이 "주식"인 종목 → stock_expert 필드에 차트·기술분석 관점 의견 (거래량 지속, 저항선 등 확인 사항 포함)
+- 유형이 "ETF"인 종목 → etf_expert 필드에 섹터 흐름·모멘텀 고려 의견 (분할/일괄 매수 방향 포함)
+- 해당 없는 필드는 빈 문자열("")로 남겨주세요.
+
+반드시 아래 JSON 형식으로만 응답하세요:
+{{
+  "opinions": [
+    {{
+      "name": "종목명",
+      "stock_expert": "주식 종목일 때만 의견, ETF면 빈 문자열",
+      "etf_expert": "ETF 종목일 때만 의견, 주식이면 빈 문자열"
+    }}
+  ]
+}}"""
+
+        import time
+        for attempt in range(2):
+            try:
+                if self.genai_library == 'genai' and self.model is not None:
+                    response = self.model.send_message(prompt)
+                elif self.genai_library == 'generativeai' and self.model is not None:
+                    response = self.model.generate_content(prompt)
+                else:
+                    return {}
+                text = self._normalize_ai_response(response)
+                if not text:
+                    return {}
+                import re, json as _json
+                m = re.search(r'\{[\s\S]*\}', text)
+                if not m:
+                    return {}
+                data = _json.loads(m.group())
+                return {
+                    item['name']: {
+                        'stock_expert': item.get('stock_expert', ''),
+                        'etf_expert': item.get('etf_expert', ''),
+                    }
+                    for item in data.get('opinions', [])
+                    if item.get('name')
+                }
+            except Exception as e:
+                if '429' in str(e) and attempt == 0:
+                    time.sleep(30)
+                    continue
+                return {}
+        return {}
+
     def get_indicators(self, df, kospi_index=None):
         """기술적 지표 계산 (SMA, RSI, MACD, BB, StochRSI, MFI)"""
         df = df.copy()

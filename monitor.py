@@ -184,6 +184,18 @@ class MarketMonitor:
                     )
                     if is_enterable:
                         entry_now_data.append(f"{line}  [AI추천]")
+                        entry_stocks_detail.append({
+                            'name': name, 'code': code,
+                            'current_price': current_price,
+                            'entry': entry_info['entry'],
+                            'stop_loss': entry_info['stop_loss'],
+                            'target': entry_info['target'],
+                            'signals': sig_text,
+                            'rsi': float(df.iloc[-1]['RSI']) if 'RSI' in df.columns else None,
+                            'volume_ratio': float(df.iloc[-1]['Volume'] / df.iloc[-1]['VOL_AVG']) if 'VOL_AVG' in df.columns else None,
+                            'near_52w_high': bool(high_52w and current_price >= high_52w * 0.98),
+                            'is_etf': info.get('sector') == 'ETF',
+                        })
                     else:
                         ai_watch_data.append(line)
                 else:
@@ -194,6 +206,18 @@ class MarketMonitor:
                     )
                     if is_enterable:
                         entry_now_data.append(line)
+                        entry_stocks_detail.append({
+                            'name': name, 'code': code,
+                            'current_price': current_price,
+                            'entry': entry_info['entry'],
+                            'stop_loss': entry_info['stop_loss'],
+                            'target': entry_info['target'],
+                            'signals': sig_text,
+                            'rsi': float(df.iloc[-1]['RSI']) if 'RSI' in df.columns else None,
+                            'volume_ratio': float(df.iloc[-1]['Volume'] / df.iloc[-1]['VOL_AVG']) if 'VOL_AVG' in df.columns else None,
+                            'near_52w_high': bool(high_52w and current_price >= high_52w * 0.98),
+                            'is_etf': False,  # 일반 관심종목 (주식)
+                        })
                     else:
                         watch_data.append(line)
             except Exception:
@@ -202,7 +226,34 @@ class MarketMonitor:
                 else:
                     watch_data.append(f"- {code}: 분석 오류")
 
-        # 4. AI 리포트 생성
+        # 4. 지금진입가능 종목 타이밍 의견 (Gemini 1회 호출)
+        if entry_stocks_detail:
+            print(f"[Monitor] 진입가능 {len(entry_stocks_detail)}개 종목 타이밍 의견 요청 중...")
+            timing_opinions = self.analyzer.ask_entry_timing_opinions(
+                entry_stocks_detail, market_context=sentiment_msg.strip()
+            )
+            if timing_opinions:
+                annotated = []
+                for line in entry_now_data:
+                    matched_opinion = None
+                    for name_key, opinion in timing_opinions.items():
+                        if name_key in line:
+                            matched_opinion = opinion
+                            break
+                    if matched_opinion:
+                        stock_op = matched_opinion.get('stock_expert', '').strip()
+                        etf_op = matched_opinion.get('etf_expert', '').strip()
+                        op_text = ""
+                        if stock_op:
+                            op_text += f"\n  📊 [주식전문가] {stock_op}"
+                        if etf_op:
+                            op_text += f"\n  🌐 [ETF전문가] {etf_op}"
+                        annotated.append(line + op_text)
+                    else:
+                        annotated.append(line)
+                entry_now_data = annotated
+
+        # 5. AI 리포트 생성
         market_section = sentiment_msg.strip()
         holding_section = "\n\n".join(holding_data) if holding_data else "없음"
         watch_section = "\n\n".join(watch_data) if watch_data else "없음"
