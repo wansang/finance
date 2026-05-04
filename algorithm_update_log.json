@@ -1031,5 +1031,178 @@
       "시장 상황: BULL",
       "최고 성과 신호: 바닥권 반등 신호(BB 하단) (승률 100.0%)"
     ]
+  },
+  {
+    "title": "[시스템 가드] 파라미터 오염 방지 — PARAM_BOUNDS + 프롬프트 단위 제약 추가",
+    "timestamp": "2026-05-04 23:39:32",
+    "changes": {
+      "TIER1_WIN_RATE": {
+        "before": 26,
+        "after": 48,
+        "note": "Auto Evolution 오염값 복원 (원본 24eef3a)"
+      },
+      "TIER2_WIN_RATE": {
+        "before": 0.6,
+        "after": 50,
+        "note": "단위 혼동 오염 복원: 0.6(비율) → 50(%)"
+      },
+      "TIER1_MIN_RS": {
+        "before": 90,
+        "after": 0.03,
+        "note": "단위 혼동 오염 복원: 90(점수) → 0.03(소수)"
+      },
+      "WEAK_SIGNAL_WIN_RATE_THRESHOLD": {
+        "before": 0.6,
+        "after": 45,
+        "note": "단위 혼동 오염 복원: 0.6 → 45(%)"
+      }
+    },
+    "guard_added": {
+      "PARAM_BOUNDS": "save_config() 호출 시마다 범위 초과값을 기존값으로 자동 차단 (optimizer.py line ~680)",
+      "agent_stock_prompt": "WIN_RATE 정수% 20~80, MIN_RS 소수 -0.5~0.5 등 단위 제약 명시",
+      "agent_etf_prompt": "WIN_RATE 정수% 20~80, STOP_PCT 소수 0.01~0.30 등 단위 제약 명시",
+      "forbidden_functions": "calculate_entry_price, calculate_holding_targets — 자동 패치 금지",
+      "EXPERT_AB_MIN_IMPROVEMENT": 2.0
+    },
+    "root_cause": "a57f502(Auto-optimized) 커밋에서 Gemini가 TIER1_MIN_RS를 RS 퍼센트 점수(0~100)로 오해 → 90 입력. WIN_RATE를 비율(0~1)로 오해 → 0.6 입력. b9029e6(Auto Evolution) 커밋에서 이미 오염된 값 위에 재변경 발생.",
+    "prevention_layers": [
+      "1. 프롬프트 레벨: Gemini에 파라미터별 단위/범위 명시 (입력 차단)",
+      "2. 저장 레벨: save_config()에서 PARAM_BOUNDS 검증 후 차단 (출력 차단)",
+      "3. 알고리즘 함수 보호: calculate_entry_price 등 자동 패치 금지 목록 관리",
+      "4. 최소 개선 임계값: EXPERT_AB_MIN_IMPROVEMENT=2.0 미만 변경 채택 금지"
+    ],
+    "notes": [
+      "수동 복원 + 코드 가드 추가 — 자동 최적화 대상 아님",
+      "커밋: c5db8eb, 6e8013e, 1eed779"
+    ]
+  },
+  {
+    "title": "[시스템 가드] 파라미터 오염 방지 — PARAM_BOUNDS + 프롬프트 단위 제약 추가",
+    "timestamp": "2026-05-04 23:40:00",
+    "changes": {
+      "TIER1_WIN_RATE": {
+        "before": 26,
+        "after": 48,
+        "note": "Auto Evolution 오염값 복원"
+      },
+      "TIER2_WIN_RATE": {
+        "before": 0.6,
+        "after": 50,
+        "note": "단위 혼동 복원: 0.6(비율) → 50(%)"
+      },
+      "TIER1_MIN_RS": {
+        "before": 90,
+        "after": 0.03,
+        "note": "단위 혼동 복원: 90(점수) → 0.03(소수)"
+      },
+      "WEAK_SIGNAL_WIN_RATE_THRESHOLD": {
+        "before": 0.6,
+        "after": 45,
+        "note": "단위 혼동 복원: 0.6 → 45(%)"
+      }
+    },
+    "guard_added": {
+      "PARAM_BOUNDS": "save_config()에서 범위 초과값 자동 차단",
+      "agent_stock_prompt": "WIN_RATE 정수% 20~80, MIN_RS 소수 -0.5~0.5 명시",
+      "agent_etf_prompt": "WIN_RATE 정수% 20~80, STOP_PCT 소수 0.01~0.30 명시",
+      "forbidden_functions": "calculate_entry_price, calculate_holding_targets 자동 패치 금지",
+      "EXPERT_AB_MIN_IMPROVEMENT": 2.0
+    },
+    "root_cause": "a57f502 커밋에서 Gemini가 TIER1_MIN_RS를 RS 점수(0~100)로, WIN_RATE를 비율(0~1)로 오해하여 90, 0.6 입력. b9029e6에서 재오염.",
+    "prevention_layers": [
+      "1. 프롬프트 레벨: Gemini에 파라미터별 단위/범위 명시 (입력 차단)",
+      "2. 저장 레벨: save_config()에서 PARAM_BOUNDS 검증 후 차단 (출력 차단)",
+      "3. 알고리즘 함수 보호: calculate_entry_price 등 자동 패치 금지 목록 관리",
+      "4. 최소 개선 임계값: EXPERT_AB_MIN_IMPROVEMENT=2.0 미만 변경 채택 금지"
+    ],
+    "notes": [
+      "수동 복원 + 코드 가드 추가. 자동 최적화 대상 아님.",
+      "커밋: c5db8eb(복원), 6e8013e(PARAM_BOUNDS), 1eed779(프롬프트 제약)"
+    ]
+  },
+  {
+    "title": "[시스템 가드] 파라미터 오염 방지",
+    "timestamp": "2026-05-04 23:40:15",
+    "changes": {
+      "TIER1_WIN_RATE": {
+        "before": 26,
+        "after": 48
+      },
+      "TIER2_WIN_RATE": {
+        "before": 0.6,
+        "after": 50
+      },
+      "TIER1_MIN_RS": {
+        "before": 90,
+        "after": 0.03
+      },
+      "WEAK_SIGNAL_WIN_RATE_THRESHOLD": {
+        "before": 0.6,
+        "after": 45
+      }
+    },
+    "guard_added": {
+      "PARAM_BOUNDS": "save_config()에서 범위 초과값 자동 차단",
+      "agent_stock_prompt": "WIN_RATE 정수% 20~80, MIN_RS 소수 -0.5~0.5 명시",
+      "agent_etf_prompt": "WIN_RATE 정수% 20~80, STOP_PCT 소수 0.01~0.30 명시",
+      "forbidden_functions": "calculate_entry_price, calculate_holding_targets 자동 패치 금지",
+      "EXPERT_AB_MIN_IMPROVEMENT": 2.0
+    },
+    "root_cause": "a57f502 커밋에서 Gemini 단위 혼동(MIN_RS: 소수→90, WIN_RATE: %→0.6). b9029e6에서 재오염.",
+    "prevention_layers": [
+      "1. 프롬프트: Gemini에 파라미터 단위/범위 명시",
+      "2. 저장: save_config()에서 PARAM_BOUNDS 검증",
+      "3. 함수 보호: calculate_entry_price 자동 패치 금지",
+      "4. 최소 개선 임계값: EXPERT_AB_MIN_IMPROVEMENT=2.0"
+    ],
+    "notes": [
+      "수동 복원+가드 추가. 자동 최적화 대상 아님.",
+      "커밋: c5db8eb, 6e8013e, 1eed779"
+    ]
+  },
+  {
+    "title": "[시스템 가드] 파라미터 오염 방지 — PARAM_BOUNDS + 프롬프트 단위 제약",
+    "timestamp": "2026-05-04 23:41:33",
+    "changes": {
+      "TIER1_WIN_RATE": {
+        "before": 26,
+        "after": 48,
+        "note": "오염값 복원. 단위: 정수 %"
+      },
+      "TIER2_WIN_RATE": {
+        "before": 0.6,
+        "after": 50,
+        "note": "오염값 복원. 비율(0.6) → %(50)"
+      },
+      "TIER1_MIN_RS": {
+        "before": 90,
+        "after": 0.03,
+        "note": "오염값 복원. 점수(90) → 소수(0.03)"
+      },
+      "WEAK_SIGNAL_WIN_RATE_THRESHOLD": {
+        "before": 0.6,
+        "after": 45,
+        "note": "오염값 복원. 비율(0.6) → %(45)"
+      }
+    },
+    "guard_added": {
+      "PARAM_BOUNDS_in_save_config": "save_config() 내부에서 PARAM_BOUNDS 검증 실행 — 범위 초과 시 기존값 유지 + 경고 출력. TIER1_WIN_RATE [20,80], TIER2_WIN_RATE [10,70], TIER1_MIN_RS [-0.5,0.5], TRAILING_STOP_PCT [0.01,0.30] 등 (optimizer.py PARAM_BOUNDS 클래스 변수 참조).",
+      "agent_stock_prompt_unit_constraint": "_call_agent_stock 프롬프트에 [파라미터 단위 제약] 섹션 추가. WIN_RATE류 = 정수 %, 범위 20~80. MIN_RS류 = 소수, 범위 -0.5~0.5. 소수(0.6) 또는 정수(90) 단위 혼동 원천 차단.",
+      "agent_etf_prompt_unit_constraint": "_call_agent_etf 프롬프트에 동일한 단위 제약 추가. WIN_RATE류 = 정수 %, STOP_PCT류 = 소수 0.01~0.30.",
+      "forbidden_auto_patch": "calculate_entry_price, calculate_holding_targets — _parse_expert_a_patches allowed 목록에서 제거. 자동 패치 금지. 변경 시 수동 검토 + 최소 3사이클 전문가 승인 필수.",
+      "EXPERT_AB_MIN_IMPROVEMENT": "expert_ab_cycle에서 score_diff >= 2.0 미만 변경 채택 금지. 노이즈성 미세 변경 방지."
+    },
+    "root_cause": "a57f502(Auto-optimized) 커밋: Gemini가 TIER1_MIN_RS를 RS Rating 점수(0~100)로 오해 → 90 입력. TIER2_WIN_RATE·WEAK_SIGNAL_WIN_RATE_THRESHOLD를 비율(0~1)로 오해 → 0.6 입력. b9029e6(Auto Evolution) 커밋: 이미 오염된 상태에서 TIER1_WIN_RATE 추가 변경(0.65→26). 프롬프트에 단위 명세가 없어 Gemini가 자유롭게 해석한 것이 근본 원인.",
+    "prevention_layers": [
+      "레이어 1 (입력 차단): _call_agent_stock/_call_agent_etf 프롬프트에 단위/범위 명시 → Gemini 오해 방지",
+      "레이어 2 (출력 차단): save_config()에서 PARAM_BOUNDS로 범위 초과 차단 → 잘못된 값 저장 불가",
+      "레이어 3 (함수 보호): calculate_entry_price 등 핵심 함수 자동 패치 금지",
+      "레이어 4 (변경 임계값): EXPERT_AB_MIN_IMPROVEMENT=2.0 — 미세 변동 무시"
+    ],
+    "notes": [
+      "수동 복원 + 코드 가드 추가. 자동 최적화 대상 아님.",
+      "복원 커밋: c5db8eb | PARAM_BOUNDS 커밋: 6e8013e | 프롬프트 제약 커밋: 1eed779",
+      "원본 올바른 값은 24eef3a(RS 임계값 강화) 커밋에서 사람이 직접 설정한 값과 동일하게 복원됨."
+    ]
   }
 ]

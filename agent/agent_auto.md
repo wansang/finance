@@ -128,3 +128,37 @@ agent_backtest 최종 승인 후 strategy_config.json 반영
     ↓
 월요일 장 시작 전 최종 상태 확인
 ```
+
+---
+
+## 파라미터 오염 방지 가드 (2026-05-04 추가)
+
+> **배경**: Auto Evolution이 TIER1_MIN_RS=90(소수 단위인데 정수로 오해), WIN_RATE=0.6(%인데 비율로 오해)을 strategy_config.json에 저장하여 전 종목 필터링 실패 및 추천 종목 0건 사태 발생.
+
+### 현재 적용된 방어 레이어
+
+| 레이어 | 위치 | 내용 |
+|--------|------|------|
+| **입력 차단** | `_call_agent_stock` / `_call_agent_etf` 프롬프트 | Gemini에 파라미터별 단위·범위 명시 |
+| **출력 차단** | `save_config()` → `_sanitize_config()` | `PARAM_BOUNDS` 범위 초과 시 기존값 유지 + 경고 |
+| **함수 보호** | `_parse_expert_a_patches()` | `calculate_entry_price`, `calculate_holding_targets` 자동 패치 금지 |
+| **변경 임계값** | `expert_ab_cycle()` | `EXPERT_AB_MIN_IMPROVEMENT=2.0` 미만 변경 채택 금지 |
+
+### PARAM_BOUNDS — 허용 범위
+
+| 파라미터 | 단위 | 허용 범위 | 틀린 예 (차단됨) |
+|---------|------|----------|----------------|
+| `TIER1_WIN_RATE` | 정수 % | 20 ~ 80 | 0.6, 0.65 |
+| `TIER2_WIN_RATE` | 정수 % | 10 ~ 70 | 0.6 |
+| `WEAK_SIGNAL_WIN_RATE_THRESHOLD` | 정수 % | 20 ~ 80 | 0.6 |
+| `TIER1_MIN_RS` | 소수 | -0.5 ~ 0.5 | 90 |
+| `RS_MIN_BEAR_DEFENSE` | 소수 | -0.5 ~ 0.5 | 90 |
+| `TRAILING_STOP_PCT` | 소수 | 0.01 ~ 0.30 | 5 (%) |
+| `VALIDATE_MAX_HOLD_DAYS` | 정수 일 | 1 ~ 60 | — |
+
+### 자동화 전문가 주의사항
+
+- **WIN_RATE 파라미터는 항상 정수 %**: `win_rate = ... * 100` 코드 기준. 비율(0~1) 입력 금지.
+- **RS_LINE은 소수**: RS_LINE은 종목 가격변화율 기반 소수값(-0.1~0.1 일반적). RS Rating 점수(0~100)와 다름.
+- **핵심 함수 수정 금지**: `calculate_entry_price`, `calculate_holding_targets`는 agent_stock/agent_backtest 최소 3사이클 검증 후에만 변경 가능.
+- **strategy_config.json 변경 후 반드시 범위 확인**: `TIER1_MIN_RS`가 소수인지, WIN_RATE가 % 정수인지 검토.
