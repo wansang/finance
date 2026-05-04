@@ -1662,6 +1662,7 @@ class StrategyOptimizer:
 
     def _apply_ai_patches(self, patches):
         """AI 패치를 analyzer.py에 적용, 적용된 patch 목록 반환"""
+        import ast as _ast_apply
         code = self._read_analyzer()
         applied = []
         for p in patches:
@@ -1671,6 +1672,12 @@ class StrategyOptimizer:
             applied.append(p)
             print(f"  ✎ 적용: {p['function']} — {p['reason']}")
         if applied:
+            # 최종 전체 파일 문법 검증 — 패치 간 상호작용으로 인한 오류 방지
+            try:
+                _ast_apply.parse(code)
+            except SyntaxError as e:
+                print(f"  ⚠️  최종 문법 검증 실패 ({e}) — 패치 전체 취소, 원복")
+                return []
             self._write_analyzer(code)
         return applied
 
@@ -2024,12 +2031,10 @@ class StrategyOptimizer:
 }}
 
 [제약 조건]
-- 수정 가능 함수: detect_volume_spike, is_taj_mahal_signal, detect_stoch_mfi_rebound, detect_divergence, detect_bb_squeeze, detect_macd_golden_cross, calculate_entry_price, calculate_holding_targets
-- calculate_entry_price 수정 시: 진입가 산출 로직(entry 계산, basis 문자열, stop_loss/target 계산)만 수정 가능. 반환값 키(entry, basis, stop_loss, target, target_basis) 유지 필수
-- calculate_holding_targets 수정 시: 보유종목 손절가(stop_loss, stop_basis)·목표가(target, target_basis) 계산 로직만 수정 가능. 반환값 키(stop_loss, stop_basis, target, target_basis) 유지 필수
-- 변경은 최소화 (조건 1-2개 추가/강화 수준), 기존 반환값 타입(bool 또는 dict) 유지
-- 성과가 좋은 신호(승률 60% 이상)는 수정하지 말 것
+- 수정 가능 함수: detect_volume_spike, is_taj_mahal_signal, detect_stoch_mfi_rebound, detect_divergence, detect_bb_squeeze, detect_macd_golden_cross
+- 변경은 최소화 (조건 1-2개 추가/강화 수준), 기존 반환값 타입(bool) 유지
 - old_code는 반드시 위 함수 코드에서 그대로 찾을 수 있는 문자열
+- 성과가 좋은 신호(승률 60% 이상)는 수정하지 말 것
 - ⚠️ 경고: 신호 조건을 너무 강화하면 952개 종목 분석 시 추천 종목이 0건이 됩니다.
   detect_volume_spike: VOL_AVG 배수는 5.0 초과 금지, VBO 단독 필수 조건 금지
   detect_bb_squeeze: RSI 조건 추가 금지 (BBW 수렴만으로 충분)
