@@ -166,7 +166,7 @@ class MarketMonitor:
                 at_entry = (
                     entry_info is not None and
                     entry_info.get('entry') is not None and
-                    current_price <= entry_info['entry'] * 1.01
+                    current_price <= entry_info['entry']
                 )
                 is_enterable = has_signal or at_entry
 

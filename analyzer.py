@@ -1128,14 +1128,11 @@ class StockAnalyzer:
         sma50 = float(last['SMA50']) if 'SMA50' in last.index and pd.notna(last['SMA50']) else None
         sma200 = float(last['SMA200']) if 'SMA200' in last.index and pd.notna(last['SMA200']) else None
 
-        # 진입가 결정 (Relative Strength 및 Volatility Breakout 반영)
-        is_vbo = close >= df['High'].tail(20).iloc[:-1].max()
-        # RS_Rating이 1.0 이상인 시장 주도주가 전고점을 돌파할 때 최우선 진입
-        if last.get('RS_Rating', 1.0) >= 1.0 and is_vbo:
-            entry = close
-            basis = "주도주 상대강도(RS) 및 변동성 돌파(VBO)"
-        elif bbl and sma50 and close > bbl:
-            # BB 하단과 SMA50 중 높은 값 → 강한 지지선
+        # 진입가 결정 — agent_stock / agent_etf 전문가 원칙 준수
+        # 1순위(주식): BB하단 + SMA50 중 높은 값 / 1순위(ETF): SMA50
+        # 2순위: SMA50 / 3순위: 현재가 −1.5% 조정 대기
+        # ※ VBO(전고점 돌파) 당일 즉시 현재가 진입은 제거 — 지지선 없는 추격매수 방지
+        if bbl and sma50 and close > bbl:
             entry = max(bbl, sma50) if not is_etf else sma50
             basis = "BB하단·SMA50 지지선"
         elif sma50 and close > sma50:
