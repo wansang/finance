@@ -661,7 +661,42 @@ class StrategyOptimizer:
         except (TypeError, ValueError):
             return default
 
+    # 파라미터 허용 범위 (AI 또는 자동 최적화가 단위 혼동으로 잘못된 값을 넣지 못하도록 가드)
+    PARAM_BOUNDS = {
+        # 승률 기준: 0~100 % 단위
+        'TIER1_WIN_RATE':        (20,  80),
+        'TIER2_WIN_RATE':        (10,  70),
+        'US_TIER1_WIN_RATE':     (20,  80),
+        'US_TIER2_WIN_RATE':     (10,  70),
+        'WEAK_SIGNAL_WIN_RATE_THRESHOLD': (20, 80),
+        # RS_LINE은 소수 (-1.0 ~ 1.0) 범위
+        'TIER1_MIN_RS':          (-0.5, 0.5),
+        'RS_MIN_BEAR_DEFENSE':   (-0.5, 0.5),
+        # 손절/수익 비율: 소수 (0.01 ~ 0.3)
+        'TRAILING_STOP_PCT':     (0.01, 0.30),
+        'TRAILING_STOP_ACTIVATE_PCT': (0.01, 0.30),
+        'PROFIT_TARGET_PCT':     (0.01, 0.50),
+        # 보유 일수
+        'VALIDATE_MAX_HOLD_DAYS': (1, 60),
+        'US_VALIDATE_MAX_HOLD_DAYS': (1, 60),
+    }
+
+    def _sanitize_config(self, config):
+        """파라미터 범위 검증 — 허용 범위 밖이면 기존값 유지하고 경고 출력"""
+        for key, (lo, hi) in self.PARAM_BOUNDS.items():
+            if key not in config:
+                continue
+            val = config[key]
+            if not isinstance(val, (int, float)):
+                continue
+            if not (lo <= val <= hi):
+                original = self.base_config.get(key, val)
+                print(f"  ⚠️  {key}={val} 범위 초과 [{lo}, {hi}] → 기존값 {original} 유지")
+                config[key] = original
+        return config
+
     def save_config(self, config):
+        config = self._sanitize_config(config)
         with open(self.config_file, 'w', encoding='utf-8') as f:
             json.dump(config, f, ensure_ascii=False, indent=4)
 
