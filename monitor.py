@@ -164,13 +164,12 @@ class MarketMonitor:
                 entry_info = self.analyzer.calculate_entry_price(df, code)
                 entry_suffix = (f" | {self.analyzer.format_entry_info(entry_info, code)}") if entry_info else ""
 
-                # 진입 가능 판단: 신호 발생 AND 현재가가 진입가 대비 5% 이내
-                # (현재가가 진입가보다 훨씬 높으면 신호가 있어도 "대기" 섹션으로 분류)
-                ENTRY_TOLERANCE = 0.05
+                # 진입 가능 판단: 신호 발생 AND 현재가 ≤ 진입가
+                # (현재가가 진입가보다 높으면 이미 매수 적기를 지난 것 → "대기" 섹션으로 분류)
                 at_or_near_entry = (
                     entry_info is not None and
                     entry_info.get('entry') is not None and
-                    current_price <= entry_info['entry'] * (1 + ENTRY_TOLERANCE)
+                    current_price <= entry_info['entry']
                 )
                 is_enterable = has_signal and at_or_near_entry
 
