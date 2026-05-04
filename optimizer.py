@@ -694,13 +694,12 @@ class StrategyOptimizer:
         # RS_LINE은 소수 (-1.0 ~ 1.0) 범위 (정수 90 등 입력 차단)
         'TIER1_MIN_RS':          (-0.5, 0.5),
         'RS_MIN_BEAR_DEFENSE':   (-0.5, 0.5),
-        # KOSPI 손절/수익/트레일링: 소수 (0.01 ~ 0.3)
-        'TRAILING_STOP_PCT':     (0.01, 0.30),
+        # KOSPI 손절/수익/트레일링: 소수
+        # TRAILING_STOP_PCT: (0.02,0.15) — 아래 '트레일링 스톱' 섹션에서 정의 (하한 0.02 강제)
         'TRAILING_STOP_ACTIVATE_PCT': (0.01, 0.30),
-        'PROFIT_TARGET_PCT':     (0.01, 0.50),
+        # PROFIT_TARGET_PCT: (0.03,0.50) — 아래 '수익 목표' 섹션에서 정의 (하한 0.03 강제)
         # US 손절/수익: 소수 — 정수(%) 입력 시 손절 작동 불능
-        'US_TRAILING_STOP_PCT':  (0.01, 0.30),
-        'US_PROFIT_TARGET_PCT':  (0.01, 0.50),
+        # US_TRAILING_STOP_PCT, US_PROFIT_TARGET_PCT — 아래 섹션에서 정의
         # 백테스트 손절 기준: 음수 소수 (예: -0.05). 정수(-5 등) 입력 시 손절 미발동
         'VALIDATE_STOP_LOSS_PCT':    (-0.30, -0.005),
         'US_VALIDATE_STOP_LOSS_PCT': (-0.30, -0.005),
@@ -2229,26 +2228,34 @@ ETF 보유 시 더 넓은 손절 기준이나 추세 기반 목표가 조정이 
                                 etf_suggestions = "\n".join(etf_lines)
                                 print(f"  agent_etf 파라미터 제안:")
                                 print(etf_suggestions)
-                            # calculate_entry_price 패치 제안 추출
-                            ep_patch = etf_data.get('entry_price_patch', {})
-                            if ep_patch and ep_patch.get('old_code') and ep_patch.get('new_code'):
+                            # calculate_entry_price / calculate_holding_targets 패치 제안 추출
+                            # old_code 존재 확인 + 문법 검증 필수 (핵심 전략 함수 오염 방지)
+                            import ast as _ast_etf
+                            _cur_code = self._read_analyzer()
+                            for _etf_key, _etf_func, _etf_default in [
+                                ('entry_price_patch', 'calculate_entry_price', 'agent_etf: ETF 진입가 로직 개선'),
+                                ('holding_targets_patch', 'calculate_holding_targets', 'agent_etf: ETF 보유 손절·목표 로직 개선'),
+                            ]:
+                                _p = etf_data.get(_etf_key, {})
+                                if not (_p and _p.get('old_code') and _p.get('new_code')):
+                                    continue
+                                _old, _new = _p['old_code'], _p['new_code']
+                                if _old not in _cur_code:
+                                    print(f"  agent_etf {_etf_func} old_code 불일치 — 스킵")
+                                    continue
+                                try:
+                                    _ast_etf.parse(_cur_code.replace(_old, _new, 1))
+                                except SyntaxError as _se:
+                                    print(f"  agent_etf {_etf_func} 문법 오류 ({_se}) — 스킵")
+                                    continue
                                 proposed_patches.append({
-                                    'function': 'calculate_entry_price',
-                                    'reason': ep_patch.get('reason', 'agent_etf: ETF 진입가 로직 개선'),
-                                    'old_code': ep_patch['old_code'],
-                                    'new_code': ep_patch['new_code'],
+                                    'function': _etf_func,
+                                    'reason': _p.get('reason', _etf_default),
+                                    'old_code': _old,
+                                    'new_code': _new,
                                 })
-                                print(f"  agent_etf calculate_entry_price 패치 제안 수신: {ep_patch.get('reason','')}")
-                            # calculate_holding_targets 패치 제안 추출
-                            ht_patch = etf_data.get('holding_targets_patch', {})
-                            if ht_patch and ht_patch.get('old_code') and ht_patch.get('new_code'):
-                                proposed_patches.append({
-                                    'function': 'calculate_holding_targets',
-                                    'reason': ht_patch.get('reason', 'agent_etf: ETF 보유 손절·목표 로직 개선'),
-                                    'old_code': ht_patch['old_code'],
-                                    'new_code': ht_patch['new_code'],
-                                })
-                                print(f"  agent_etf calculate_holding_targets 패치 제안 수신: {ht_patch.get('reason','')}")
+                                print(f"  agent_etf {_etf_func} 패치 제안 수신: {_p.get('reason','')}")
+                                _cur_code = _cur_code.replace(_old, _new, 1)  # 다음 패치 체크용 갱신
                         except Exception:
                             pass
 
@@ -2316,8 +2323,21 @@ ETF 보유 시 더 넓은 손절 기준이나 추세 기반 목표가 조정이 
             patch_desc = [f"{p['function']}: {p['reason']}" for p in applied_patches]
             print(f"  패치 {len(applied_patches)}건 적용 완료")
 
-            # After 백테스트
+            # ── 🛡️ Smoke Test: 신호 발화 수 급감 방지 ────────────────────────
             import sys
+            for _mod in ['analyzer']:
+                if _mod in sys.modules:
+                    del sys.modules[_mod]
+            print(f"  [Smoke Test] 패치 후 신호 발화 수 확인 중 (50종목 샘플)...")
+            smoke_count = self._smoke_test_signal_count(n=50)
+            print(f"  Smoke Test: 신호 발화 종목 수 = {smoke_count}개 / 50개 샘플")
+            SMOKE_MIN_SIGNALS = 5
+            if smoke_count != -1 and smoke_count < SMOKE_MIN_SIGNALS:
+                print(f"  🚨 Smoke Test 실패! 신호 발화 종목 {smoke_count}개 < 최소 기준 {SMOKE_MIN_SIGNALS}개 → 자동 롤백")
+                self._restore_analyzer()
+                continue
+
+            # After 백테스트
             for _mod in ['analyzer', 'backtester']:
                 if _mod in sys.modules:
                     del sys.modules[_mod]
@@ -2336,13 +2356,18 @@ ETF 보유 시 더 넓은 손절 기준이나 추세 기반 목표가 조정이 
             # 채택/롤백 결정
             before_score = self._score_backtest(before_stats)
             after_score = self._score_backtest(after_stats)
-            kept = after_score > before_score
-            print(f"\n  [agent_backtest] 점수: Before {before_score:.2f} → After {after_score:.2f}")
+            min_improvement = self.base_config.get('EXPERT_AB_MIN_IMPROVEMENT', 2.0)
+            score_diff = after_score - before_score
+            kept = score_diff >= min_improvement
+            print(f"\n  [agent_backtest] 점수: Before {before_score:.2f} → After {after_score:.2f} (diff={score_diff:+.2f}, 기준 {min_improvement:.1f})")
             if kept:
-                print(f"  ✅ 사이클 {cycle} 채택 — 개선 확인")
+                print(f"  ✅ 사이클 {cycle} 채택 — 개선 확인 (+{score_diff:.2f}점)")
                 best_cycle_kept = True
             else:
-                print(f"  ❌ 사이클 {cycle} 롤백 — 성과 미향상")
+                if score_diff > 0:
+                    print(f"  ⚠️  사이클 {cycle} 롤백 — 소폭 향상 (+{score_diff:.2f}점)이나 기준({min_improvement:.1f}점) 미달")
+                else:
+                    print(f"  ❌ 사이클 {cycle} 롤백 — 성과 미향상 ({score_diff:+.2f}점)")
                 self._restore_analyzer()
 
             # agent_backtest AI 피드백 생성 (다음 사이클에 반영)
