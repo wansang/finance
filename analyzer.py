@@ -1460,8 +1460,7 @@ class StockAnalyzer:
         current_bbw = df_target['BBW'].iloc[-1]
         bbw_history = df_target['BBW'].tail(30)
         
-        # 변동성 수렴 구간에서 RSI가 50 이상으로 상방 모멘텀이 확인될 때만 진입
-        if current_bbw <= bbw_history.quantile(0.1) and df_target['RSI'].iloc[-1] > 50:
+        if current_bbw <= bbw_history.quantile(0.1):
             return True
         return False
 
@@ -1473,10 +1472,7 @@ class StockAnalyzer:
         last = df_target.iloc[-1]
         # 중기 상승 추세(SMA50) 위에서 캔들 몸통이 60% 이상인 강한 양봉일 때만 신뢰 (Mansfield RS 전략 반영)
         candle_body_ratio = (last['Close'] - last['Open']) / (last['High'] - last['Low'] + 1e-9)
-        # 거래량 임계치 상향 및 20일 전고점 돌파(VBO) 조건 결합
-        is_vbo = last['Close'] >= df_target['High'].tail(21).iloc[:-1].max()
-        # 이동평균선(BBM) 대비 이격도가 너무 크면 Climax일 확률이 높으므로 12% 이내로 제한
-        if last['Volume'] > last['VOL_AVG'] * 3.5 and is_vbo and candle_body_ratio > 0.7 and last['Close'] < last['BBM'] * 1.12:
+        if last['Volume'] > last['VOL_AVG'] * 2.5 and last['Close'] > last.get('SMA200', 0) and last['Close'] > last['Open']:
             return True
         return False
 
@@ -1523,37 +1519,36 @@ class StockAnalyzer:
     def check_signals(self, df, idx=-1):
         """다양한 기술적 지표들을 종합하여 매수 신호 확인"""
         reasons = []
-        last = df.iloc[idx] if idx != -1 else df.iloc[-1]
 
-        # 1. RS(상대강도) 필터: 50일/20일 모두 양수만 진입
-        if 'RS_LINE' in last and 'RS_LINE_BEAR' in last:
-            if (last['RS_LINE'] is not None and last['RS_LINE'] < 0) or (last['RS_LINE_BEAR'] is not None and last['RS_LINE_BEAR'] < 0):
-                return []
-
-        # 2. 추세(Trend Template) 필수
-        if not self.is_trend_template(df, idx):
-            return []
-
-        # 3. 신호 중첩(2개 이상)만 진입
-        signal_count = 0
+        # 1. RSI 다이버전스
         if self.detect_divergence(df, idx):
-            reasons.append("RSI 반전 신호(상승 가능성)"); signal_count += 1
+            reasons.append("RSI 반전 신호(상승 가능성)")
+
+        # 2. Wedge/Flag 패턴
         patterns = self.detect_patterns(df, idx)
         if patterns:
-            reasons.append(patterns); signal_count += 1
-        if self.is_taj_mahal_signal(df, idx):
-            reasons.append("바닥권 반등 신호(BB 하단)"); signal_count += 1
-        if self.detect_bb_squeeze(df, idx):
-            reasons.append("거래가 조용해지며 다음 변동성을 준비하는 구간입니다."); signal_count += 1
-        if self.detect_volume_spike(df, idx):
-            reasons.append("거래량 급증"); signal_count += 1
-        if self.detect_stoch_mfi_rebound(df, idx):
-            reasons.append("과매도 반등 신호"); signal_count += 1
-        if self.detect_macd_golden_cross(df, idx):
-            reasons.append("MACD 골든크로스"); signal_count += 1
+            reasons.append(patterns)
 
-        if signal_count < 2:
-            return []
+        # 3. 타지마할 밴드 (BB 하단 지지 + RSI 반등)
+        if self.is_taj_mahal_signal(df, idx):
+            reasons.append("바닥권 반등 신호(BB 하단)")
+
+        # 4. 볼린저 밴드 스퀴즈 (변동성 수렴)
+        if self.detect_bb_squeeze(df, idx):
+            reasons.append("거래가 조용해지며 다음 변동성을 준비하는 구간입니다.")
+
+        # 5. 거래량 급증
+        if self.detect_volume_spike(df, idx):
+            reasons.append("거래량 급증")
+
+        # 6. Stochastic RSI & MFI 과매도 반등
+        if self.detect_stoch_mfi_rebound(df, idx):
+            reasons.append("과매도 반등 신호")
+
+        # 7. MACD 골든크로스 (추세 반전 확인)
+        if self.detect_macd_golden_cross(df, idx):
+            reasons.append("MACD 골든크로스")
+
         return reasons
 
     def check_trailing_stop(self, df, buy_date, threshold=0.03):
