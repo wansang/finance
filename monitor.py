@@ -162,6 +162,14 @@ class MarketMonitor:
                 entry_info = self.analyzer.calculate_entry_price(df, code)
                 entry_suffix = (f" | {self.analyzer.format_entry_info(entry_info, code)}") if entry_info else ""
 
+                # 진입가 ≤ 현재가인 경우도 진입 가능으로 판단 (기술 신호 없어도)
+                at_entry = (
+                    entry_info is not None and
+                    entry_info.get('entry') is not None and
+                    current_price <= entry_info['entry'] * 1.01
+                )
+                is_enterable = has_signal or at_entry
+
                 if is_ai_recommended:
                     # Tier 1 지표 추가 계산 (승률 / 평균수익률)
                     win_rate, avg_ret = self.analyzer.validate_strategy(df, len(df) - 1)
@@ -174,7 +182,7 @@ class MarketMonitor:
                         name, price_text, change_text, high_text, volume_text, detail,
                         high_52w_text=high_52w_text
                     )
-                    if has_signal:
+                    if is_enterable:
                         entry_now_data.append(f"{line}  [AI추천]")
                     else:
                         ai_watch_data.append(line)
@@ -184,7 +192,7 @@ class MarketMonitor:
                         f"신호: {sig_text}{near_high_label}{entry_suffix}",
                         high_52w_text=high_52w_text
                     )
-                    if has_signal:
+                    if is_enterable:
                         entry_now_data.append(line)
                     else:
                         watch_data.append(line)
