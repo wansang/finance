@@ -1506,10 +1506,11 @@ class StrategyOptimizer:
             except Exception:
                 return []
 
+        # calculate_entry_price / calculate_holding_targets 는 핵심 전략 함수 —
+        # 자동 패치 금지. 변경 시 수동 검토 + 최소 3사이클 전문가 승인 필수.
         allowed = {
             'detect_volume_spike', 'is_taj_mahal_signal', 'detect_stoch_mfi_rebound',
             'detect_divergence', 'detect_bb_squeeze', 'detect_macd_golden_cross',
-            'calculate_entry_price', 'calculate_holding_targets',
         }
         valid = []
         current_code = self._read_analyzer()
@@ -1751,11 +1752,18 @@ class StrategyOptimizer:
         after_score = self._score_backtest(after_stats)
         print(f"\n[Expert B] 종합 점수: Before {before_score:.2f}  →  After {after_score:.2f}")
 
-        kept = after_score > before_score
+        # 최소 개선 임계값 — 통계 노이즈로 인한 우발적 채택 방지
+        # strategy_config.json에서 조정 가능 (기본: 2.0점)
+        min_improvement = self.base_config.get('EXPERT_AB_MIN_IMPROVEMENT', 2.0)
+        score_diff = after_score - before_score
+        kept = score_diff >= min_improvement
         if kept:
-            print("  ✅ 성과 향상 확인 — Expert A 개선안 채택")
+            print(f"  ✅ 성과 향상 확인 (+{score_diff:.2f}점 ≥ 기준 {min_improvement:.1f}점) — Expert A 개선안 채택")
         else:
-            print("  ❌ 성과 미향상 또는 하락 — Expert A 개선안 롤백")
+            if score_diff > 0:
+                print(f"  ⚠️ 소폭 향상 (+{score_diff:.2f}점) 이나 기준 미달 ({min_improvement:.1f}점) — 롤백")
+            else:
+                print(f"  ❌ 성과 미향상 또는 하락 ({score_diff:+.2f}점) — Expert A 개선안 롤백")
             self._restore_analyzer()
 
         # Expert B AI 총평 (로그용, 결정에는 영향 없음)
