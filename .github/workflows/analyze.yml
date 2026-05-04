@@ -30,10 +30,12 @@ jobs:
           # Start the automated analysis
           python main.py
 
+      - name: Pull latest before commit
+        run: git pull --rebase origin main
+
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v4
         with:
           commit_message: "Automated update of analysis results [skip ci]"
           file_pattern: 'holdings.json recommendations.csv watchlist.json'
           branch: main
-          push_options: '--force'
