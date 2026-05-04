@@ -2202,6 +2202,13 @@ class StockAnalyzer:
         print(f"\n[ETF Expert] 한국 ETF {len(etf_tickers)}개 분석 시작...")
         kospi_index = fdr.DataReader('KS11', start=(datetime.datetime.now() - datetime.timedelta(days=365)).strftime('%Y-%m-%d'))
 
+        # ETF 이름 조회
+        try:
+            etf_listing = fdr.StockListing('ETF/KR')
+            etf_name_map = dict(zip(etf_listing['Symbol'].astype(str), etf_listing['Name']))
+        except Exception:
+            etf_name_map = {}
+
         candidates = []
         for code in etf_tickers:
             try:
@@ -2219,6 +2226,7 @@ class StockAnalyzer:
                 prev_close = float(df.iloc[target_idx - 1]['Close']) if target_idx > 0 else float(last['Close'])
                 candidates.append({
                     'code': code,
+                    'name': etf_name_map.get(str(code).strip(), code),
                     'reasons': ", ".join(reasons),
                     'win_rate': win_rate,
                     'avg_ret': avg_ret,
@@ -2242,7 +2250,7 @@ class StockAnalyzer:
         etf_comment = ""
         if self.ai_enabled:
             cand_text = "\n".join(
-                f"- {c['code']}: 신호={c['reasons']}, 승률={c['win_rate']:.1f}%, 평균수익={c['avg_ret']:+.2f}%"
+                f"- {c['name']}({c['code']}): 신호={c['reasons']}, 승률={c['win_rate']:.1f}%, 평균수익={c['avg_ret']:+.2f}%"
                 for c in top_candidates
             )
             prompt = f"""당신은 40년간 한국 ETF 시장에서 활동한 ETF 투자 전문가입니다.
@@ -2283,8 +2291,9 @@ class StockAnalyzer:
             price_text = self.format_price(current_price, r['code']) if current_price is not None else '가격 정보 없음'
             entry_info = self.calculate_entry_price(r.get('_df'), r['code'], is_etf=True)
             entry_text = f" | {self.format_entry_info(entry_info, r['code'])}" if entry_info else ""
+            display_name = f"{r['name']}({r['code']})" if r['name'] != r['code'] else r['code']
             formatted.append(
-                f"• <b>{r['code']}</b>: 현재가 {price_text} - {html.escape(r['reasons'])}\n  └ {entry_text}"
+                f"• <b>{html.escape(display_name)}</b>: 현재가 {price_text} - {html.escape(r['reasons'])}\n  └ {entry_text}"
             )
         if etf_comment:
             formatted.append("")
