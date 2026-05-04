@@ -724,9 +724,15 @@ class StrategyOptimizer:
         # 최대 포지션 수
         'MAX_POSITIONS':         (1,   50),
         'MAX_SECTOR_POSITIONS':  (1,   10),
-        # 보유 일수
-        'VALIDATE_MAX_HOLD_DAYS': (1, 60),
-        'US_VALIDATE_MAX_HOLD_DAYS': (1, 60),
+        # 보유 일수 — 너무 짧으면(1~3일) win_rate 계산에 거래가 거의 없어 추천 0건
+        'VALIDATE_MAX_HOLD_DAYS': (5, 60),
+        'US_VALIDATE_MAX_HOLD_DAYS': (5, 60),
+        # 수익 목표: 너무 낮으면 트레일링스톱보다 먼저 청산 → win_rate 왜곡
+        'PROFIT_TARGET_PCT':     (0.03, 0.50),
+        'US_PROFIT_TARGET_PCT':  (0.03, 0.50),
+        # 트레일링 스톱: 너무 타이트하면 정상 추세에서도 손절 → win_rate 급락
+        'TRAILING_STOP_PCT':     (0.02, 0.15),
+        'US_TRAILING_STOP_PCT':  (0.02, 0.15),
     }
 
     def _sanitize_config(self, config):
@@ -1387,7 +1393,42 @@ class StrategyOptimizer:
             shutil.copy(self.ANALYZER_BACKUP, self.ANALYZER_FILE)
             print("  [rollback] analyzer.py 원복 완료")
 
-    # --- 패치 정의 (사전 검증된 안전한 코드 변경) ---
+    def _smoke_test_signal_count(self, sample_codes=None, n=50):
+        """패치 후 신호 발화 수가 급격히 줄지 않았는지 확인 (추천 종목 고갈 방지)
+        
+        Returns: int — 샘플 종목 중 신호 1개 이상 발화한 종목 수
+        """
+        import sys
+        for _mod in ['analyzer']:
+            if _mod in sys.modules:
+                del sys.modules[_mod]
+        try:
+            import FinanceDataReader as fdr
+            import datetime
+            from analyzer import StockAnalyzer
+            a = StockAnalyzer()
+            kospi = fdr.DataReader('KS11', start=(datetime.datetime.now() - datetime.timedelta(days=400)).strftime('%Y-%m-%d'))
+            if sample_codes is None:
+                stocks = fdr.StockListing('KOSPI')
+                sample_codes = list(stocks['Code'].sample(min(n, len(stocks)), random_state=42))
+            count = 0
+            for code in sample_codes:
+                try:
+                    df = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=400)).strftime('%Y-%m-%d'))
+                    if len(df) < 200:
+                        continue
+                    df = a.get_indicators(df, kospi)
+                    signals = a.check_signals(df, -1)
+                    if signals:
+                        count += 1
+                except Exception:
+                    continue
+            return count
+        except Exception as e:
+            print(f"  [Smoke Test] 오류: {e}")
+            return -1  # 오류 시 -1 반환 → 롤백하지 않음
+
+
 
     def _patch_volume_spike_bullish(self, code):
         """거래량 급증 신호에 양봉 확인 조건 추가 (패닉 매도 거래량 제외)"""
@@ -1709,7 +1750,12 @@ class StrategyOptimizer:
 - 변경은 최소화 (조건 1-2개 추가/강화 수준)
 - 기존 함수 시그니처와 반환값 타입(bool) 유지
 - old_code는 반드시 위 함수 코드에서 그대로 찾을 수 있는 문자열
-- 성과가 좋은 신호(승률 60% 이상)는 수정하지 말 것"""
+- 성과가 좋은 신호(승률 60% 이상)는 수정하지 말 것
+- ⚠️ 경고: 신호 조건을 너무 강화하면 952개 종목 분석 시 추천 종목이 0건이 됩니다.
+  조건 추가 시 반드시 '대부분의 정상 상승 종목이 통과할 수 있는가'를 먼저 검토하세요.
+  detect_volume_spike: VOL_AVG 배수는 5.0 초과 금지, VBO 단독 필수 조건 금지
+  detect_bb_squeeze: RSI 조건 추가 금지 (BBW 수렴만으로 충분)
+  check_signals 함수는 수정 금지 (신호 수집만 담당, 필터는 tier 분류에서 처리)"""
 
             print("\n[Expert A] Gemini AI에 코드 개선 요청 중...")
             ai_text = self._call_ai_fresh(prompt_a)
@@ -1818,6 +1864,23 @@ class StrategyOptimizer:
         for _mod in ['analyzer', 'backtester']:
             if _mod in sys.modules:
                 del sys.modules[_mod]
+
+        # ── 🛡️ Smoke Test: 신호 발화 수 급감 방지 ────────────────────────
+        # 신호 조건이 너무 강화되면 추천 종목 수가 0이 될 수 있음 — 패치 전/후 비교
+        print(f"\n[Expert B] Smoke Test — 패치 후 신호 발화 수 확인 중 (50종목 샘플)...")
+        before_signal_count = self._smoke_test_signal_count(n=50)
+        # Before smoke test는 패치 적용 전에 별도로 측정해야 하므로,
+        # 여기선 After만 측정 후 최소 임계값(5종목)으로 절대 기준 체크
+        after_signal_count = before_signal_count  # 아래서 After로 덮어씀
+        after_signal_count = self._smoke_test_signal_count(n=50)
+        print(f"  Smoke Test: 신호 발화 종목 수 = {after_signal_count}개 / 50개 샘플")
+        SMOKE_MIN_SIGNALS = 5  # 50종목 중 최소 5개는 신호가 있어야 함
+        if after_signal_count != -1 and after_signal_count < SMOKE_MIN_SIGNALS:
+            print(f"  🚨 Smoke Test 실패! 신호 발화 종목 {after_signal_count}개 < 최소 기준 {SMOKE_MIN_SIGNALS}개")
+            print(f"  → 패치 후 추천 종목 고갈 위험 — 자동 롤백")
+            self._restore_analyzer()
+            return
+
         print(f"\n[Expert B] After 백테스트 실행 중 (패치 적용 후)...")
         after_stats = self.run_quick_backtest_stats(sample_size=sample_size, periods=periods)
         if not after_stats:
@@ -1967,7 +2030,11 @@ class StrategyOptimizer:
 - calculate_holding_targets 수정 시: 보유종목 손절가(stop_loss, stop_basis)·목표가(target, target_basis) 계산 로직만 수정 가능. 반환값 키(stop_loss, stop_basis, target, target_basis) 유지 필수
 - 변경은 최소화 (조건 1-2개 추가/강화 수준), 기존 반환값 타입(bool 또는 dict) 유지
 - 성과가 좋은 신호(승률 60% 이상)는 수정하지 말 것
-- old_code는 반드시 위 함수 코드에서 그대로 찾을 수 있는 문자열"""
+- old_code는 반드시 위 함수 코드에서 그대로 찾을 수 있는 문자열
+- ⚠️ 경고: 신호 조건을 너무 강화하면 952개 종목 분석 시 추천 종목이 0건이 됩니다.
+  detect_volume_spike: VOL_AVG 배수는 5.0 초과 금지, VBO 단독 필수 조건 금지
+  detect_bb_squeeze: RSI 조건 추가 금지 (BBW 수렴만으로 충분)
+  check_signals 함수는 수정 금지 (신호 수집만 담당, 필터는 tier 분류에서 처리)"""
 
     def _prompt_agent_etf(self, sig_summary, search_proposals, feedback, cycle):
         """agent_etf: ETF 전략 분석 및 strategy_config 파라미터 개선 제안"""
