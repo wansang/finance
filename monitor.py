@@ -116,9 +116,11 @@ class MarketMonitor:
                 holding_data.append(f"- {code}: 분석 오류")
 
         # 3. 관심 종목 데이터 수집 (일반 관심종목 / AI 추천 관심종목 / 지금진입가능 분리)
+        # 3. 관심 종목 데이터 수집 (일반 관심종목 / AI 추천 관심종목 / 지금진입가능 분리)
         watch_data = []
         ai_watch_data = []
         entry_now_data = []  # 매수 신호가 포착된 관심종목 (즉시 진입 가능)
+        entry_stocks_detail = []  # 타이밍 의견 요청용 상세 데이터
         for code, info in watchlist.items():
             try:
                 name = info.get('name', code)
