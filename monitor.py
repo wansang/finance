@@ -161,7 +161,8 @@ class MarketMonitor:
                         near_high_label = " 📈 52주 신고가 근접"
 
                 # 진입가 계산 (신호 유무 상관없이 항상 계산)
-                entry_info = self.analyzer.calculate_entry_price(df, code)
+                is_etf_item = info.get('sector') == 'ETF'
+                entry_info = self.analyzer.calculate_entry_price(df, code, is_etf=is_etf_item)
                 entry_suffix = (f" | {self.analyzer.format_entry_info(entry_info, code)}") if entry_info else ""
 
                 # 진입 가능 판단: 신호 발생 AND 현재가 ≤ 진입가
