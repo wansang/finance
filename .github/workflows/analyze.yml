@@ -21,6 +21,9 @@ jobs:
         run: |
           pip install -r requirements.txt
 
+      - name: Pull latest before run
+        run: git pull --rebase origin main
+
       - name: Run analyzer
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
@@ -29,9 +32,6 @@ jobs:
         run: |
           # Start the automated analysis
           python main.py
-
-      - name: Pull latest before commit
-        run: git pull --rebase origin main
 
       - name: Commit and push changes
         uses: stefanzweifel/git-auto-commit-action@v4
