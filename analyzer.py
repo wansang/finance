@@ -1720,10 +1720,15 @@ class StockAnalyzer:
             name = stock['Name']
             try:
                 df = fdr.DataReader(code, start=(datetime.datetime.now() - datetime.timedelta(days=400)).strftime('%Y-%m-%d'))
-                df_target = df[df.index <= target_date]
-                if len(df_target) < 1: continue
-                target_idx = len(df_target) - 1
-                
+                if len(df) < 200: continue
+
+                df = self.get_indicators(df, kospi_index)
+                target_idx = len(df) - 1
+                if target_date:
+                    df_target = df[df.index <= target_date]
+                    if len(df_target) < 1: continue
+                    target_idx = len(df_target) - 1
+
                 reasons = self.check_signals(df, target_idx)
                 if not reasons: continue
 
@@ -1734,6 +1739,32 @@ class StockAnalyzer:
                 is_above_200 = last['Close'] > last['SMA200']
                 rs_score = last['RS_LINE'] if 'RS_LINE' in last else 0
                 rs_bear = last['RS_LINE_BEAR'] if 'RS_LINE_BEAR' in last and pd.notna(last.get('RS_LINE_BEAR')) else 0
+                avg_vol = float(df['Volume'].tail(20).mean()) if 'Volume' in df.columns else 0
+
+                safe_name = html.escape(name)
+                safe_reasons = html.escape(", ".join(reasons))
+                sector = str(stock.get('Sector', '') or '기타').strip()
+                prev_close = float(df.iloc[target_idx - 1]['Close']) if target_idx > 0 else float(last['Close'])
+                stock_data = {
+                    'name': safe_name,
+                    'code': code,
+                    'reasons': safe_reasons,
+                    'win_rate': win_rate,
+                    'avg_ret': avg_ret,
+                    'rs_score': rs_score,
+                    'last': float(last['Close']),
+                    'prev_close': prev_close,
+                    'avg_vol': avg_vol,
+                    'sector': sector,
+                    '_df': df,
+                }
+
+                # Tier Classification
+                # Tier 1 고품질 필터: 신호 2개 이상 + 양수 RS + 최소 거래량
+                min_signals = self.config.get('TIER1_MIN_SIGNALS', 2)
+                min_rs = self.config.get('TIER1_MIN_RS', 0.03)
+                min_vol = self.config.get('MIN_AVG_VOLUME', 50000)
+                min_bear_defense = self.config.get('RS_MIN_BEAR_DEFENSE', -0.02)
 
                 # 강력 콤비 신호: RSI 다이버전스 + 타지마할 동시 발생 시 신호 개수 패널티 면제
                 has_divergence = "RSI 반전 신호(상승 가능성)" in reasons
@@ -1749,7 +1780,7 @@ class StockAnalyzer:
                     (avg_vol >= min_vol or min_vol <= 0) and
                     bear_rs_ok
                 )
-                
+
                 # 시장 필터: 하락장에서는 RSI 다이버전스 또는 BB 하단 중 하나 이상 필요
                 market_ok = kospi_uptrend or not market_filter or has_either_signal
 
