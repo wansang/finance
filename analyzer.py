@@ -864,7 +864,7 @@ class StockAnalyzer:
         except Exception as e:
             return f"⚠️ 시장 분석 오류: {e}", False
 
-    def build_local_report(self, market_data, holding_data, watch_data, report_mode="monitor", ai_watch_data=None):
+    def build_local_report(self, market_data, holding_data, watch_data, report_mode="monitor", ai_watch_data=None, entry_now_data=None):
         """AI 미사용 시에도 읽기 쉬운 로컬 요약 리포트를 생성"""
         header = "🤖 자동 기술적 분석 리포트 (로컬 요약)"
         if report_mode == "monitor":
@@ -877,6 +877,8 @@ class StockAnalyzer:
         sections = [header, title, "[시장 요약]", market_data.strip()]
         if holding_data:
             sections.extend(["[보유 종목]", holding_data.strip()])
+        if report_mode == "monitor" and entry_now_data and entry_now_data.strip() != "없음":
+            sections.extend(["🚨 [지금진입가능관심주]", entry_now_data.strip()])
         if watch_data:
             sections.extend([f"[{watch_label}]", watch_data.strip()])
         if report_mode == "monitor" and ai_watch_data and ai_watch_data.strip() != "없음":
@@ -941,35 +943,38 @@ class StockAnalyzer:
                 return text.strip()
         return None
 
-    def ask_ai_report(self, market_data, holding_data, watch_data, report_mode="monitor", ai_watch_data=None):
+    def ask_ai_report(self, market_data, holding_data, watch_data, report_mode="monitor", ai_watch_data=None, entry_now_data=None):
         """Gemini AI를 사용하여 주식 전문가 스타일의 한글 리포트 생성"""
         if not self.model:
-            return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data)
+            return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data, entry_now_data)
 
         if report_mode == "monitor":
             ai_watch_section_text = ai_watch_data if ai_watch_data else "없음"
+            entry_now_section_text = entry_now_data if entry_now_data else "없음"
             prompt = f"""
 주식 투자 전문가로서 아래 데이터를 바탕으로 30분 단위 실시간 모니터링 리포트를 작성해줘.
 
 [데이터 정보]
 1. 시장 상황: {market_data}
 2. 보유 종목 상태: {holding_data}
-3. 관심 종목 상태: {watch_data}
-4. AI 추천 관심종목 상태: {ai_watch_section_text}
+3. 지금 진입 가능 관심종목 (매수 신호 포착): {entry_now_section_text}
+4. 관심 종목 상태 (신호 없음, 대기 중): {watch_data}
+5. AI 추천 관심종목 상태 (신호 없음, 대기 중): {ai_watch_section_text}
 
 [작성 가이드라인]
 - **어투**: 신뢰감 있고 친숙한 한국어 존댓말로 작성해줘.
 - **언어 제약**: 영어 표현과 전문 용어를 쓰지 말고, 쉬운 한국어로 풀어 설명해줘.
-- **중요**: 보유 종목, 관심 종목, AI 추천 관심종목 정보를 명확히 구분해서 작성해줘. 각 섹션은 분리되어 있어야 하며, 제목을 지나치게 생략하지 말고 구분이 쉽게 유지되도록 해줘.
+- **중요**: 보유 종목, 지금진입가능관심주, 관심 종목, AI 추천 관심종목 섹션을 명확히 구분해서 작성해줘. 각 섹션은 분리되어 있어야 하며, 제목을 지나치게 생략하지 말고 구분이 쉽게 유지되도록 해줘.
 - **핵심 요구**: 각 종목에 대한 설명에 반드시 입력된 `현재가`, `등락가`, `등락율`, `당일최고가`, `52주신고가`, `거래량` 수치를 포함해줘. `당일최고가`는 오늘 장중 기록한 최고가이고, `52주신고가`는 최근 1년간의 최고가야. 이 두 가지를 혼동하지 말고 각각 명확히 구분해서 표시해줘. 전달된 숫자를 변경하지 말고, 가능한 한 그대로 반영해서 작성해줘. 데이터가 없으면 생략해도 되지만, 있으면 반드시 넣어줘.
 - **신고가 해석**: 데이터에 '52주 신고가 돌파' 또는 '52주 신고가 근접' 표시가 있는 종목은 반드시 이를 언급하고, 신고가 돌파/근접이 갖는 의미(추가 상승 모멘텀 가능성, 또는 차익실현 압력 등)를 한 문장으로 설명해줘.
 - **추가 요구**: 시장에서 특정 업종/그룹(예: 반도체, 전기차/테슬라, 방산, 2차전지/배터리, 유가/원자재)이 함께 움직이고 있다면 그 배경을 함께 설명해줘.
 - **구조**:
   1. 현재 시장의 분위기를 한 문단으로 정리해줘.
   2. [보유 종목] 섹션을 만들어서, 각 종목에 대해 왜 매도/보유 판단을 했는지 설명해줘.
-  3. [관심 종목] 섹션을 만들어서, 각 종목에 대해 왜 기다려야 하는지 또는 주의할 점을 설명해줘.
-  4. [AI 추천 관심종목] 섹션을 만들어서, AI가 선별한 1티어 종목들의 현재 상태를 설명해줘. 승률과 평균수익률 데이터를 반드시 언급하고, 현재 매수 신호 여부와 주의할 점을 설명해줘.
-- **진입가 안내**: 관심 종목과 AI 추천 관심종목 데이터에 `진입가`, `손절`, `목표` 가격이 포함되어 있으면 반드시 언급하고, 각 가격의 의미(어디서 사야 하는지, 어디서 손절해야 하는지, 목표 수익은 어느 수준인지)를 쉬운 말로 설명해줘.
+  3. 🚨 [지금진입가능관심주] 섹션을 만들어서, 현재 매수 신호가 포착된 종목들을 강조해줘. 어떤 신호가 발생했는지, 진입가/손절/목표가를 명확히 언급하고, 지금 당장 행동해야 할 이유를 설명해줘. 데이터가 '없음'이면 이 섹션은 "현재 진입 가능한 관심종목이 없습니다."라고 짧게 작성해줘.
+  4. [관심 종목] 섹션을 만들어서, 신호가 없는 대기 중인 종목들에 대해 왜 기다려야 하는지 또는 주의할 점을 설명해줘.
+  5. [AI 추천 관심종목] 섹션을 만들어서, AI가 선별한 1티어 종목들의 현재 상태를 설명해줘. 승률과 평균수익률 데이터를 반드시 언급하고, 현재 매수 신호 여부와 주의할 점을 설명해줘.
+- **진입가 안내**: 지금진입가능관심주 및 관심 종목 데이터에 `진입가`, `손절`, `목표` 가격이 포함되어 있으면 반드시 언급하고, 각 가격의 의미(어디서 사야 하는지, 어디서 손절해야 하는지, 목표 수익은 어느 수준인지)를 쉬운 말로 설명해줘.
 - **표현 금지**: '트레일링 스톱', '깃발형 패턴', '에너지 응축', '변동성 수렴' 등의 전문 용어를 쓰지 말고, '고점 대비 하락 기준', '급등 후 숨고르기', '거래가 조용해진 구간' 같은 쉬운 설명으로 바꿔줘.
 - **문장 구성**: 각 설명은 새 문단으로 구분하고, 항목 사이에는 빈 줄을 넣어줘.
 - **가장 중요한 것**: 왜 그런 판단을 했는지 이유를 분명하게 설명해줘.
@@ -1011,7 +1016,7 @@ class StockAnalyzer:
                     normalized = self._normalize_ai_response(response)
                     if normalized:
                         return normalized
-                    return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data)
+                    return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data, entry_now_data)
                 elif self.genai_library == 'generativeai' and self.model is not None:
                     if not hasattr(self.model, 'generate_content') and hasattr(genai, 'GenerativeModel'):
                         self.model = genai.GenerativeModel(self.model_name)
@@ -1026,14 +1031,14 @@ class StockAnalyzer:
                     normalized = self._normalize_ai_response(response)
                     if normalized:
                         return normalized
-                    return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data)
+                    return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data, entry_now_data)
                 elif hasattr(genai, 'generate_text'):
                     model_name = self.model_name or 'gemini-2.1'
                     response = genai.generate_text(model=model_name, prompt=prompt)
                     normalized = self._normalize_ai_response(response)
                     if normalized:
                         return normalized
-                    return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data)
+                    return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data, entry_now_data)
                 else:
                     raise RuntimeError('지원되지 않는 AI 모델 인터페이스입니다.')
             except Exception as e:
@@ -1044,7 +1049,7 @@ class StockAnalyzer:
                     time.sleep(wait_sec)
                     continue
                 print(f"AI 호출 중 오류 발생: {e}")
-                return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data)
+                return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data, entry_now_data)
 
     def calculate_holding_targets(self, df, code, buy_date=None):
         """

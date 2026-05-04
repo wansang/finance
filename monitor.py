@@ -115,9 +115,10 @@ class MarketMonitor:
             except Exception:
                 holding_data.append(f"- {code}: 분석 오류")
 
-        # 3. 관심 종목 데이터 수집 (일반 관심종목 / AI 추천 관심종목 분리)
+        # 3. 관심 종목 데이터 수집 (일반 관심종목 / AI 추천 관심종목 / 지금진입가능 분리)
         watch_data = []
         ai_watch_data = []
+        entry_now_data = []  # 매수 신호가 포착된 관심종목 (즉시 진입 가능)
         for code, info in watchlist.items():
             try:
                 name = info.get('name', code)
@@ -143,7 +144,8 @@ class MarketMonitor:
                 volume_text = self.analyzer.format_volume(volume, code)
 
                 reasons = self.analyzer.check_signals(df, -1)
-                if reasons:
+                has_signal = bool(reasons)
+                if has_signal:
                     sig_text = " / ".join(reasons)
                 else:
                     sig_text = "현재 매수 신호는 없습니다."
@@ -168,29 +170,24 @@ class MarketMonitor:
                         f"신호: {sig_text}, 승률: {win_rate:.1f}%, "
                         f"평균수익률: {avg_ret:+.2f}%, 추가일: {add_date}{near_high_label}{entry_suffix}"
                     )
-                    ai_watch_data.append(
-                        self._format_monitor_line(
-                            name,
-                            price_text,
-                            change_text,
-                            high_text,
-                            volume_text,
-                            detail,
-                            high_52w_text=high_52w_text
-                        )
+                    line = self._format_monitor_line(
+                        name, price_text, change_text, high_text, volume_text, detail,
+                        high_52w_text=high_52w_text
                     )
+                    if has_signal:
+                        entry_now_data.append(f"{line}  [AI추천]")
+                    else:
+                        ai_watch_data.append(line)
                 else:
-                    watch_data.append(
-                        self._format_monitor_line(
-                            name,
-                            price_text,
-                            change_text,
-                            high_text,
-                            volume_text,
-                            f"신호: {sig_text}{near_high_label}{entry_suffix}",
-                            high_52w_text=high_52w_text
-                        )
+                    line = self._format_monitor_line(
+                        name, price_text, change_text, high_text, volume_text,
+                        f"신호: {sig_text}{near_high_label}{entry_suffix}",
+                        high_52w_text=high_52w_text
                     )
+                    if has_signal:
+                        entry_now_data.append(line)
+                    else:
+                        watch_data.append(line)
             except Exception:
                 if info.get('source') == 'auto_recommendation':
                     ai_watch_data.append(f"- {code}: 분석 오류")
@@ -202,13 +199,15 @@ class MarketMonitor:
         holding_section = "\n\n".join(holding_data) if holding_data else "없음"
         watch_section = "\n\n".join(watch_data) if watch_data else "없음"
         ai_watch_section = "\n\n".join(ai_watch_data) if ai_watch_data else "없음"
+        entry_now_section = "\n\n".join(entry_now_data) if entry_now_data else "없음"
 
         final_report = self.analyzer.ask_ai_report(
             market_data=market_section,
             holding_data=holding_section,
             watch_data=watch_section,
             report_mode="monitor",
-            ai_watch_data=ai_watch_section
+            ai_watch_data=ai_watch_section,
+            entry_now_data=entry_now_section
         )
         
         final_report = "🕒 <b>[실시간 모니터링 알림]</b>\n\n" + final_report.strip()
