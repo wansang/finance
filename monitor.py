@@ -172,6 +172,7 @@ class MarketMonitor:
                     current_price <= entry_info['entry']
                 )
                 is_enterable = has_signal and at_or_near_entry
+                print(f"[Monitor] {name}: current={current_price}, entry={entry_info['entry'] if entry_info else 'N/A'}, has_signal={has_signal}, is_enterable={is_enterable}")
 
                 if is_ai_recommended:
                     # Tier 1 지표 추가 계산 (승률 / 평균수익률)
