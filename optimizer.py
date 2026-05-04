@@ -439,13 +439,17 @@ class StrategyOptimizer:
             model = self._make_gemini_model(api_key)
             param_unit_constraints = (
                 "\n[파라미터 단위 제약 — 반드시 준수]\n"
-                "- TIER1_WIN_RATE, TIER2_WIN_RATE, WEAK_SIGNAL_WIN_RATE_THRESHOLD : 정수 %, 범위 20~80 "
-                "(예: 48, 50, 45). 절대 소수(0.6 등) 사용 금지.\n"
-                "- TIER1_MIN_RS, RS_MIN_BEAR_DEFENSE : 소수, 범위 -0.5~0.5 "
-                "(예: 0.03, -0.02). 절대 정수(90 등) 사용 금지.\n"
-                "- TRAILING_STOP_PCT, TRAILING_STOP_ACTIVATE_PCT, PROFIT_TARGET_PCT : 소수, 범위 0.01~0.30 "
-                "(예: 0.02). 절대 정수(%) 사용 금지.\n"
-                "- VALIDATE_MAX_HOLD_DAYS : 정수, 범위 1~60.\n"
+                "- *_WIN_RATE, WEAK_SIGNAL_WIN_RATE_THRESHOLD : 정수 %, 범위 20~80 (예: 48). 소수(0.6) 금지.\n"
+                "- TIER1_MIN_RS, RS_MIN_BEAR_DEFENSE : 소수, 범위 -0.5~0.5 (예: 0.03). 정수(90) 금지.\n"
+                "- TRAILING_STOP_PCT, TRAILING_STOP_ACTIVATE_PCT, PROFIT_TARGET_PCT : 소수 0.01~0.30 (예: 0.02). 정수(%) 금지.\n"
+                "- VALIDATE_STOP_LOSS_PCT, DAILY_LOSS_KILL_PCT : 음수 소수, 범위 -0.30~-0.005 (예: -0.03). 정수(-3) 금지.\n"
+                "- MAX_HARD_STOP_PCT : 소수 0.01~0.20 (예: 0.04). 정수(%) 금지.\n"
+                "- ATR_STOP_MULTIPLIER, ATR_TARGET_MULTIPLIER : 소수 배율, 범위 0.5~10.0 (예: 1.5, 3.5).\n"
+                "- MAX_ATR_RATIO : 소수 0.01~0.30 (예: 0.06).\n"
+                "- SMA50 : 정수 10~100 (기본 50). SMA200 : 정수 150~250 (기본 200).\n"
+                "- MIN_AVG_VOLUME : 정수 거래량, 범위 1000~5000000 (예: 50000).\n"
+                "- MAX_POSITIONS, MAX_SECTOR_POSITIONS : 정수 1~50 (예: 10, 1).\n"
+                "- VALIDATE_MAX_HOLD_DAYS : 정수 1~60.\n"
             )
             prompt = (
                 "너는 40년 경력의 투자분석전문가(agent_stock)다.\n"
@@ -504,9 +508,12 @@ class StrategyOptimizer:
                 f"[신규 방법론]\n{json.dumps(method, ensure_ascii=False, indent=2)}\n\n"
                 f"[현재 strategy_config.json]\n{config_str}\n\n"
                 "[파라미터 단위 제약 — 반드시 준수]\n"
-                "- *_WIN_RATE 류: 정수 %, 범위 20~80 (예: 45). 소수(0.6 등) 사용 금지.\n"
-                "- TRAILING_STOP_PCT, PROFIT_TARGET_PCT 류: 소수, 범위 0.01~0.30 (예: 0.02).\n"
-                "- VALIDATE_MAX_HOLD_DAYS 류: 정수, 범위 1~60.\n\n"
+                "- *_WIN_RATE 류: 정수 %, 범위 20~80 (예: 45). 소수(0.6) 금지.\n"
+                "- US_TRAILING_STOP_PCT, US_PROFIT_TARGET_PCT : 소수 0.01~0.30/0.50 (예: 0.0375). 정수(%) 금지.\n"
+                "- US_VALIDATE_STOP_LOSS_PCT : 음수 소수 -0.30~-0.005 (예: -0.07). 정수(-7) 금지.\n"
+                "- US_MAX_HARD_STOP_PCT : 소수 0.01~0.20 (예: 0.05). 정수(%) 금지.\n"
+                "- US_ATR_STOP_MULTIPLIER, US_ATR_TARGET_MULTIPLIER : 소수 배율 0.5~10.0 (예: 2.5, 4.0).\n"
+                "- US_VALIDATE_MAX_HOLD_DAYS : 정수 1~60.\n\n"
                 "가능하다면 변경할 파라미터 키와 값을 JSON 형식으로 제안하라 (기존 키만 사용 가능).\n"
                 "불가능하면 param_changes를 빈 객체로 반환하라.\n"
                 "반드시 아래 형식으로만 응답하라:\n"
@@ -678,19 +685,45 @@ class StrategyOptimizer:
 
     # 파라미터 허용 범위 (AI 또는 자동 최적화가 단위 혼동으로 잘못된 값을 넣지 못하도록 가드)
     PARAM_BOUNDS = {
-        # 승률 기준: 0~100 % 단위
+        # 승률 기준: 0~100 % 단위 (소수 0.6 또는 정수 90 입력 차단)
         'TIER1_WIN_RATE':        (20,  80),
         'TIER2_WIN_RATE':        (10,  70),
         'US_TIER1_WIN_RATE':     (20,  80),
         'US_TIER2_WIN_RATE':     (10,  70),
         'WEAK_SIGNAL_WIN_RATE_THRESHOLD': (20, 80),
-        # RS_LINE은 소수 (-1.0 ~ 1.0) 범위
+        # RS_LINE은 소수 (-1.0 ~ 1.0) 범위 (정수 90 등 입력 차단)
         'TIER1_MIN_RS':          (-0.5, 0.5),
         'RS_MIN_BEAR_DEFENSE':   (-0.5, 0.5),
-        # 손절/수익 비율: 소수 (0.01 ~ 0.3)
+        # KOSPI 손절/수익/트레일링: 소수 (0.01 ~ 0.3)
         'TRAILING_STOP_PCT':     (0.01, 0.30),
         'TRAILING_STOP_ACTIVATE_PCT': (0.01, 0.30),
         'PROFIT_TARGET_PCT':     (0.01, 0.50),
+        # US 손절/수익: 소수 — 정수(%) 입력 시 손절 작동 불능
+        'US_TRAILING_STOP_PCT':  (0.01, 0.30),
+        'US_PROFIT_TARGET_PCT':  (0.01, 0.50),
+        # 백테스트 손절 기준: 음수 소수 (예: -0.05). 정수(-5 등) 입력 시 손절 미발동
+        'VALIDATE_STOP_LOSS_PCT':    (-0.30, -0.005),
+        'US_VALIDATE_STOP_LOSS_PCT': (-0.30, -0.005),
+        # 일일 손실 킬스위치: 음수 소수 (예: -0.03). 정수 입력 시 킬스위치 미발동
+        'DAILY_LOSS_KILL_PCT':   (-0.20, -0.005),
+        # 하드 스톱: 소수 (예: 0.04). 정수(%) 입력 시 스톱 미작동
+        'MAX_HARD_STOP_PCT':     (0.01, 0.20),
+        'US_MAX_HARD_STOP_PCT':  (0.01, 0.20),
+        # ATR 멀티플라이어: 작은 양수 실수 (예: 1.5~4.0)
+        'ATR_STOP_MULTIPLIER':   (0.5,  6.0),
+        'ATR_TARGET_MULTIPLIER': (1.0, 10.0),
+        'US_ATR_STOP_MULTIPLIER':   (0.5,  6.0),
+        'US_ATR_TARGET_MULTIPLIER': (1.0, 10.0),
+        'MAX_ATR_RATIO':         (0.01, 0.30),
+        # SMA 기간: 정수 일수 — SMA50=500 입력 시 트렌드 템플릿 붕괴
+        'SMA50':                 (10,  100),
+        'SMA150':                (100, 200),
+        'SMA200':                (150, 250),
+        # 최소 거래량: 과도한 값 시 전 종목 필터링
+        'MIN_AVG_VOLUME':        (1000, 5000000),
+        # 최대 포지션 수
+        'MAX_POSITIONS':         (1,   50),
+        'MAX_SECTOR_POSITIONS':  (1,   10),
         # 보유 일수
         'VALIDATE_MAX_HOLD_DAYS': (1, 60),
         'US_VALIDATE_MAX_HOLD_DAYS': (1, 60),
