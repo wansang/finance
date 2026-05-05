@@ -35,8 +35,8 @@ jobs:
               per_run = int(cfg.get('BACKLOG_VALIDATE_PER_RUN', 10))
           except Exception:
               per_run = 10
-          # 배칭 붕괴 방지: per_run 상한 5 (전략 1개 ≈ 20분, 5개=100분 < 300분 제한)
-          per_run = min(per_run, 5)
+          # 배칭 붕괴 방지: per_run 상한 15
+          per_run = min(per_run, 15)
 
           n = len(backlog)
           total = max(1, math.ceil(n / per_run)) if n > 0 else 1

@@ -214,5 +214,5 @@
         "EQIX",
         "SPG"
     ],
-    "BACKLOG_VALIDATE_PER_RUN": 10
+    "BACKLOG_VALIDATE_PER_RUN": 5
 }
