@@ -40,8 +40,8 @@ jobs:
 
           n = len(backlog)
           total = max(1, math.ceil(n / per_run)) if n > 0 else 1
-          # GitHub Actions matrix 최대 256개, 실용적 상한 10개
-          total = min(total, 10)
+          # GitHub Actions matrix 최대 256개 제한
+          total = min(total, 256)
           matrix = json.dumps(list(range(total)))
           print(f"backlog={n}건, per_run={per_run}, batch_total={total}")
           with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
