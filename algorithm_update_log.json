@@ -1204,5 +1204,16 @@
       "복원 커밋: c5db8eb | PARAM_BOUNDS 커밋: 6e8013e | 프롬프트 제약 커밋: 1eed779",
       "원본 올바른 값은 24eef3a(RS 임계값 강화) 커밋에서 사람이 직접 설정한 값과 동일하게 복원됨."
     ]
+  },
+  {
+    "updated_at": "2026-05-05T07:24:59.866976",
+    "source": "merge_batches",
+    "approved_changes": {
+      "VALIDATE_MAX_HOLD_DAYS": 10,
+      "PROFIT_TARGET_PCT": 0.07,
+      "VALIDATE_STOP_LOSS_PCT": -0.04,
+      "MAX_HARD_STOP_PCT": 0.04
+    },
+    "batch_count": 18
   }
 ]
