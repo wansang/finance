@@ -35,8 +35,8 @@ jobs:
               per_run = int(cfg.get('BACKLOG_VALIDATE_PER_RUN', 10))
           except Exception:
               per_run = 10
-          # 배칭 붕괴 방지: per_run 상한 15
-          per_run = min(per_run, 15)
+          # 배칭 붕괴 방지: per_run 상한 4 (전략 1개당 ~20분, 4개=80분 < 300분 제한)
+          per_run = min(per_run, 4)
 
           n = len(backlog)
           total = max(1, math.ceil(n / per_run)) if n > 0 else 1
@@ -53,7 +53,7 @@ jobs:
   optimize:
     needs: prepare
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 300
     permissions:
       contents: write
     strategy:
