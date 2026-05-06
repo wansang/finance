@@ -1,8 +1,9 @@
 import logging
 import json
 import os
-import subprocess
+import base64
 import datetime
+import requests
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler
 from analyzer import StockAnalyzer
@@ -22,56 +23,44 @@ class StockBot:
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
 
     def _git_push(self, files: list, message: str):
-        """변경된 파일을 GitHub에 push한다."""
+        """GitHub Contents API로 파일을 직접 업데이트한다."""
         if not self.github_pat:
-            logging.warning("GITHUB_PAT 미설정 — git push 건너뜀")
+            logging.warning("GITHUB_PAT 미설정 — GitHub 업데이트 건너뜀")
             return
-        try:
-            repo_url_with_pat = None
-            result = subprocess.run(
-                ['git', 'remote', 'get-url', 'origin'],
-                cwd=self.base_dir, capture_output=True, text=True
-            )
-            remote_url = result.stdout.strip()
-            # https://github.com/... → https://<PAT>@github.com/...
-            if remote_url.startswith('https://'):
-                repo_url_with_pat = remote_url.replace(
-                    'https://', f'https://{self.github_pat}@', 1
-                )
-                subprocess.run(
-                    ['git', 'remote', 'set-url', 'origin', repo_url_with_pat],
-                    cwd=self.base_dir, check=True
-                )
-            subprocess.run(
-                ['git', 'add'] + files,
-                cwd=self.base_dir, check=True
-            )
-            subprocess.run(
-                ['git', 'config', 'user.email', 'bot@finance'],
-                cwd=self.base_dir, check=True
-            )
-            subprocess.run(
-                ['git', 'config', 'user.name', 'StockBot'],
-                cwd=self.base_dir, check=True
-            )
-            diff = subprocess.run(
-                ['git', 'diff', '--cached', '--quiet'],
-                cwd=self.base_dir
-            )
-            if diff.returncode == 0:
-                logging.info("git push: 변경사항 없음, 건너뜀")
-                return
-            subprocess.run(
-                ['git', 'commit', '-m', message],
-                cwd=self.base_dir, check=True
-            )
-            subprocess.run(
-                ['git', 'push', 'origin', 'main'],
-                cwd=self.base_dir, check=True
-            )
-            logging.info(f"git push 완료: {message}")
-        except subprocess.CalledProcessError as e:
-            logging.error(f"git push 실패: {e}")
+        repo = os.environ.get('GITHUB_REPO', 'wansang/finance')
+        headers = {
+            'Authorization': f'Bearer {self.github_pat}',
+            'Accept': 'application/vnd.github+json',
+        }
+        for filename in files:
+            filepath = os.path.join(self.base_dir, filename)
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                encoded = base64.b64encode(content.encode('utf-8')).decode('ascii')
+
+                # 현재 SHA 조회 (업데이트 시 필요)
+                get_url = f'https://api.github.com/repos/{repo}/contents/{filename}'
+                resp = requests.get(get_url, headers=headers, timeout=10)
+                if resp.status_code == 200:
+                    sha = resp.json().get('sha')
+                elif resp.status_code == 404:
+                    sha = None
+                else:
+                    logging.error(f"GitHub API SHA 조회 실패 ({filename}): {resp.status_code} {resp.text}")
+                    continue
+
+                payload = {'message': message, 'content': encoded, 'branch': 'main'}
+                if sha:
+                    payload['sha'] = sha
+
+                put_resp = requests.put(get_url, headers=headers, json=payload, timeout=10)
+                if put_resp.status_code in (200, 201):
+                    logging.info(f"GitHub 업데이트 완료: {filename}")
+                else:
+                    logging.error(f"GitHub 업데이트 실패 ({filename}): {put_resp.status_code} {put_resp.text}")
+            except Exception as e:
+                logging.error(f"GitHub 업데이트 오류 ({filename}): {e}")
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(
