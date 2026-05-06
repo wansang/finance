@@ -206,6 +206,7 @@ class StrategyOptimizer:
                             stock_result = {
                                 'verdict': stock_verdict['decision'],
                                 'reason': stock_verdict['reason'],
+                                'reasoning': stock_proposal.get('reasoning', ''),
                                 'before_metrics': before_stock_metrics,
                                 'after_metrics': after_stock_metrics,
                                 'proposed_changes': stock_changes,
@@ -253,6 +254,7 @@ class StrategyOptimizer:
                         etf_result = {
                             'verdict': etf_verdict['decision'],
                             'reason': etf_verdict['reason'],
+                            'reasoning': etf_proposal.get('reasoning', ''),
                             'before_metrics': before_etf_metrics,
                             'after_metrics': after_etf_metrics,
                             'proposed_changes': etf_changes,
@@ -310,6 +312,29 @@ class StrategyOptimizer:
         else:
             self._archive_backlog(remaining, backlog_file, history_file, processed_entries)
             print(f"\n[backlog] {len(processed_entries)}건 처리 완료 → history 아카이브, 잔여 {len(remaining)}건")
+
+        # ── backlog 요약 저장 (optimize() 최종 리포트에서 합산 전송) ──────
+        if not (batch_index >= 0 and batch_total > 0):
+            approved_entries = [
+                e for e in processed_entries
+                if e.get('stock_result', {}).get('verdict') == 'approved'
+                or e.get('etf_result', {}).get('verdict') == 'approved'
+            ]
+            rejected_entries = [
+                e for e in processed_entries
+                if e.get('stock_result', {}).get('verdict') not in ('approved', None)
+                and e.get('etf_result', {}).get('verdict') not in ('approved', None)
+                and e.get('stock_result', {}).get('verdict') not in ('sparse_market', 'no_effect', 'skipped', 'error', None)
+            ]
+            self._backlog_summary = {
+                'total_validated': len(processed_entries),
+                'total_backlog': len(backlog),
+                'remaining': len(remaining),
+                'approved_count': len(approved_entries),
+                'rejected_count': len(rejected_entries),
+                'approved_changes': all_approved_changes,
+                'entries': processed_entries,
+            }
 
     # ─────────────────────────────────────────────────────────────────────
     # backlog 헬퍼 메서드
@@ -2616,19 +2641,49 @@ ETF 보유 시 더 넓은 손절 기준이나 추세 기반 목표가 조정이 
 
             notes = [
                 f"실제 추천 종목 {len(current_results)}개 성과 기반 고도화 최적화",
-                f"시장 상황: {market_condition.upper()}"
+                f"시장 상황: {market_condition.upper()}",
+                f"분석 기준 — 승률 {win_rate:.1f}%, 평균수익 {avg_ret:+.2f}%, MDD {before_metrics.get('min_return', 0):.2f}%",
             ]
             if avg_ret < 0:
-                notes.append(f"현재 전략 평균 수익률이 {avg_ret:.2f}%로 손실 구간")
+                notes.append(f"현재 전략 평균 수익률이 {avg_ret:.2f}%로 손실 구간 → 손절/트레일링 파라미터 강화 방향으로 조정")
             if win_rate < 50:
-                notes.append(f"실제 승률 {win_rate:.1f}%로 50% 미만 - 전략 재점검 필요")
-            
+                notes.append(f"실제 승률 {win_rate:.1f}%로 50% 미만 → 진입 조건 강화(WIN_RATE 상향) 방향으로 조정")
+
+            # 파라미터별 변경 근거
+            for param, change in changes.items():
+                old_v = change['before']
+                new_v = change['after']
+                try:
+                    diff = float(new_v) - float(old_v)
+                except (TypeError, ValueError):
+                    diff = None
+                if 'WIN_RATE' in param:
+                    direction = '상향(진입 조건 강화)' if diff and diff > 0 else '하향(신호 민감도 완화)'
+                    notes.append(f"{param}: {old_v}→{new_v} — 승률 부족으로 {direction}")
+                elif 'TRAILING_STOP' in param:
+                    direction = '확대(추세 추종 강화)' if diff and diff > 0 else '축소(조기 수익 실현)'
+                    notes.append(f"{param}: {old_v}→{new_v} — 수익률 패턴 기반 트레일링 스톱 {direction}")
+                elif 'PROFIT_TARGET' in param:
+                    direction = '상향(목표 수익 확대)' if diff and diff > 0 else '하향(빠른 수익 실현)'
+                    notes.append(f"{param}: {old_v}→{new_v} — {direction}")
+                elif 'STOP_LOSS' in param or 'HARD_STOP' in param:
+                    notes.append(f"{param}: {old_v}→{new_v} — MDD 제어 및 손실 제한 조정")
+                elif 'HOLD_DAYS' in param:
+                    direction = '연장(추세 지속 기대)' if diff and diff > 0 else '단축(단기 변동성 대응)'
+                    notes.append(f"{param}: {old_v}→{new_v} — 보유기간 {direction}")
+                else:
+                    notes.append(f"{param}: {old_v}→{new_v} — 성과 데이터 기반 점진적 조정")
+
             # 신호별 성과 요약
             if signal_perf.get('signals'):
-                top_signals = sorted(signal_perf['signals'].items(), 
+                top_signals = sorted(signal_perf['signals'].items(),
                                     key=lambda x: x[1]['win_rate'], reverse=True)[:3]
                 if top_signals:
                     notes.append(f"최고 성과 신호: {top_signals[0][0][:30]} (승률 {top_signals[0][1]['win_rate']:.1f}%)")
+                    bottom_signals = sorted(signal_perf['signals'].items(),
+                                           key=lambda x: x[1]['win_rate'])[:1]
+                    if bottom_signals and bottom_signals[0][1]['win_rate'] < 40:
+                        notes.append(f"저성과 신호: {bottom_signals[0][0][:30]} (승률 {bottom_signals[0][1]['win_rate']:.1f}%) — 해당 신호 가중치 축소 고려")
 
             report = AlgorithmUpdateReport(
                 title='이번주 추천 종목 실적 기반 알고리즘 고도화 업데이트',
@@ -2636,6 +2691,7 @@ ETF 보유 시 더 넓은 손절 기준이나 추세 기반 목표가 조정이 
                 after_metrics=after_metrics,
                 changes=changes,
                 notes=notes,
+                backlog_summary=getattr(self, '_backlog_summary', None),
             )
             report.save_markdown()
             report.save_log()
