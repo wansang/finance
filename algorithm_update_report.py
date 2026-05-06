@@ -148,12 +148,12 @@ class AlgorithmUpdateReport:
                 lines.append("[✅ 채택된 방법론 및 이유]")
                 for e in approved_entries:
                     name = e.get('method', {}).get('방법론명', '(이름 없음)')
-                    idea = e.get('method', {}).get('핵심 아이디어', '')
+                    idea = e.get('method', {}).get('핵심 아이디어', '')[:100]
                     for path, key in [('stock_result', '주식'), ('etf_result', 'ETF')]:
                         r = e.get(path, {})
                         if r.get('verdict') == 'approved':
-                            reason = r.get('reason', '사유 없음')
-                            reasoning = r.get('reasoning', '')
+                            reason = r.get('reason', '사유 없음')[:150]
+                            reasoning = r.get('reasoning', '')[:150]
                             bm = r.get('before_metrics', {})
                             am = r.get('after_metrics', {})
                             lines.append(f"  • [{key}] {name}")
@@ -186,7 +186,7 @@ class AlgorithmUpdateReport:
                     for path, key in [('stock_result', '주식'), ('etf_result', 'ETF')]:
                         r = e.get(path, {})
                         if r.get('verdict') == 'rejected':
-                            reason = r.get('reason', '사유 없음')
+                            reason = r.get('reason', '사유 없음')[:150]
                             lines.append(f"  • [{key}] {name}: {reason}")
 
         # ── 2. 파라미터 변경 및 개선 근거 ─────────────────────────────
