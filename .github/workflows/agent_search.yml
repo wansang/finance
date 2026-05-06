@@ -7,7 +7,30 @@ on:
   workflow_dispatch:
 
 jobs:
+  check_optimize:
+    runs-on: ubuntu-latest
+    outputs:
+      optimize_running: ${{ steps.check.outputs.optimize_running }}
+    steps:
+      - name: Check if optimize workflow is running
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RUNNING=$(gh api \
+            "repos/${{ github.repository }}/actions/workflows/optimize.yml/runs?status=in_progress&per_page=1" \
+            --jq '.total_count')
+          if [ "$RUNNING" -gt 0 ]; then
+            echo "optimize_running=true" >> "$GITHUB_OUTPUT"
+            echo "⚠️ Optimize workflow is currently running — skipping agent_search to avoid merge conflicts."
+          else
+            echo "optimize_running=false" >> "$GITHUB_OUTPUT"
+            echo "✅ Optimize workflow is not running — proceeding with agent_search."
+          fi
+
   agent_search:
+    needs: check_optimize
+    if: needs.check_optimize.outputs.optimize_running != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
