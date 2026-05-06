@@ -1,6 +1,7 @@
 import logging
 import json
 import os
+import subprocess
 import datetime
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler
@@ -17,6 +18,60 @@ class StockBot:
         self.analyzer = StockAnalyzer()
         self.token = os.environ.get('TELEGRAM_TOKEN')
         self.chat_id = os.environ.get('TELEGRAM_CHAT_ID')
+        self.github_pat = os.environ.get('GITHUB_PAT')
+        self.base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    def _git_push(self, files: list, message: str):
+        """변경된 파일을 GitHub에 push한다."""
+        if not self.github_pat:
+            logging.warning("GITHUB_PAT 미설정 — git push 건너뜀")
+            return
+        try:
+            repo_url_with_pat = None
+            result = subprocess.run(
+                ['git', 'remote', 'get-url', 'origin'],
+                cwd=self.base_dir, capture_output=True, text=True
+            )
+            remote_url = result.stdout.strip()
+            # https://github.com/... → https://<PAT>@github.com/...
+            if remote_url.startswith('https://'):
+                repo_url_with_pat = remote_url.replace(
+                    'https://', f'https://{self.github_pat}@', 1
+                )
+                subprocess.run(
+                    ['git', 'remote', 'set-url', 'origin', repo_url_with_pat],
+                    cwd=self.base_dir, check=True
+                )
+            subprocess.run(
+                ['git', 'add'] + files,
+                cwd=self.base_dir, check=True
+            )
+            subprocess.run(
+                ['git', 'config', 'user.email', 'bot@finance'],
+                cwd=self.base_dir, check=True
+            )
+            subprocess.run(
+                ['git', 'config', 'user.name', 'StockBot'],
+                cwd=self.base_dir, check=True
+            )
+            diff = subprocess.run(
+                ['git', 'diff', '--cached', '--quiet'],
+                cwd=self.base_dir
+            )
+            if diff.returncode == 0:
+                logging.info("git push: 변경사항 없음, 건너뜀")
+                return
+            subprocess.run(
+                ['git', 'commit', '-m', message],
+                cwd=self.base_dir, check=True
+            )
+            subprocess.run(
+                ['git', 'push', 'origin', 'main'],
+                cwd=self.base_dir, check=True
+            )
+            logging.info(f"git push 완료: {message}")
+        except subprocess.CalledProcessError as e:
+            logging.error(f"git push 실패: {e}")
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(
@@ -70,6 +125,7 @@ class StockBot:
                 "buy_price": int(price.replace(',', ''))
             }
             self.analyzer.save_holdings(holdings)
+            self._git_push(['holdings.json'], f'bot: /buy {code} {stock_name} 추가 [skip ci]')
 
             await update.message.reply_text(f"✅ {stock_name}({code}) 종목이 포트폴리오에 추가되었습니다. (매수가: {price})")
         except Exception as e:
@@ -87,6 +143,7 @@ class StockBot:
             if code in holdings:
                 del holdings[code]
                 self.analyzer.save_holdings(holdings)
+                self._git_push(['holdings.json'], f'bot: /sell {code} 삭제 [skip ci]')
                 await update.message.reply_text(f"🗑 {code} 종목이 포트폴리오에서 삭제되었습니다.")
             else:
                 await update.message.reply_text("품목을 찾을 수 없습니다.")
@@ -132,8 +189,9 @@ class StockBot:
                 "source": "manual"
             }
             self.analyzer.save_watchlist(watchlist)
-            
-            await update.message.reply_text(f"⭐ {code} 종목이 관심주 목록에 추가되었습니다.")
+            self._git_push(['watchlist.json'], f'bot: /watch {code} 추가 [skip ci]')
+
+            await update.message.reply_text(f"⭐ 종목이 관심주 목록에 추가되었습니다.")
         except Exception as e:
             await update.message.reply_text(f"❌ 오류 발생: {e}")
 
@@ -149,6 +207,7 @@ class StockBot:
             if code in watchlist:
                 del watchlist[code]
                 self.analyzer.save_watchlist(watchlist)
+                self._git_push(['watchlist.json'], f'bot: /unwatch {code} 삭제 [skip ci]')
                 await update.message.reply_text(f"🗑 {code} 종목이 관심주 목록에서 삭제되었습니다.")
             else:
                 await update.message.reply_text(f"❌ {code} 종목을 관심주 목록에서 찾을 수 없습니다.")
