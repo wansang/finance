@@ -1334,5 +1334,124 @@
       "MAX_HARD_STOP_PCT": 0.05
     },
     "batch_count": 13
+  },
+  {
+    "timestamp": "2026-05-07T01:30:43.749321",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "detect_volume_spike: 단기/장기 이평선 지지 및 캔들 몸통 비중 조건을 추가하여 하락 추세 중 가짜 돌파와 피뢰침형 캔들을 필터링함."
+    ],
+    "kept": false,
+    "before": {
+      "total": 201,
+      "wins": 109,
+      "win_rate": 54.2289,
+      "avg_ret": 1.0724,
+      "sharpe": 0.4012,
+      "mdd": 56.785
+    },
+    "after": {
+      "total": 194,
+      "wins": 104,
+      "win_rate": 53.6082,
+      "avg_ret": 1.0586,
+      "sharpe": 0.3862,
+      "mdd": 64.8514
+    }
+  },
+  {
+    "timestamp": "2026-05-07T02:06:29.858019",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "detect_volume_spike: 하락 추세 중 발생하는 일시적 거래량 분출(Trap)을 방지하기 위해 중기 추세(SMA50) 및 RSI 과매수 필터를 추가하고, 캔들 몸통 비중을 확인하여 돌파의 질을 강화합니다."
+    ],
+    "kept": false,
+    "before": {
+      "total": 201,
+      "wins": 109,
+      "win_rate": 54.2289,
+      "avg_ret": 1.0724,
+      "sharpe": 0.4012,
+      "mdd": 56.785
+    },
+    "after": {
+      "total": 193,
+      "wins": 103,
+      "win_rate": 53.3679,
+      "avg_ret": 1.0639,
+      "sharpe": 0.3863,
+      "mdd": 61.9777
+    }
+  },
+  {
+    "timestamp": "2026-05-07T02:42:28.536318",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "detect_volume_spike: 승률 25%의 저조한 성과를 내는 가짜 돌파를 필터링하기 위해 거래량 기준을 3.0배로 강화하고, 종가 위치(Price Position) 조건을 추가하여 매수세의 질을 평가합니다."
+    ],
+    "kept": false,
+    "before": {
+      "total": 201,
+      "wins": 109,
+      "win_rate": 54.2289,
+      "avg_ret": 1.0724,
+      "sharpe": 0.4012,
+      "mdd": 56.785
+    },
+    "after": {
+      "total": 196,
+      "wins": 105,
+      "win_rate": 53.5714,
+      "avg_ret": 1.0073,
+      "sharpe": 0.3609,
+      "mdd": 67.8333
+    }
+  },
+  {
+    "title": "이번주 추천 종목 실적 기반 알고리즘 고도화 업데이트",
+    "timestamp": "2026-05-07 02:43:50",
+    "changes": {
+      "TREND_TEMPLATE_PEAK_FACTOR": {
+        "before": 0.216,
+        "after": 0.224
+      },
+      "TIER1_WIN_RATE": {
+        "before": 54,
+        "after": 55
+      },
+      "VALIDATE_MAX_HOLD_DAYS": {
+        "before": 4,
+        "after": 6
+      },
+      "US_TRAILING_STOP_PCT": {
+        "before": 0.0365,
+        "after": 0.0359
+      }
+    },
+    "before_metrics": {
+      "count": 66,
+      "avg_return": 3.1776520452902894,
+      "win_rate": 71.21212121212122,
+      "max_return": 60.20429620563036,
+      "min_return": -21.548608825729236
+    },
+    "after_metrics": {
+      "count": 66,
+      "avg_return": 3.175470619804328,
+      "win_rate": 71.21212121212122,
+      "max_return": 60.20429620563036,
+      "min_return": -21.548608825729236
+    },
+    "notes": [
+      "실제 추천 종목 66개 성과 기반 고도화 최적화",
+      "시장 상황: BULL",
+      "분석 기준 — 승률 71.2%, 평균수익 +3.18%, MDD -21.55%",
+      "TREND_TEMPLATE_PEAK_FACTOR: 0.216→0.224 — 성과 데이터 기반 점진적 조정",
+      "TIER1_WIN_RATE: 54→55 — 승률 부족으로 상향(진입 조건 강화)",
+      "VALIDATE_MAX_HOLD_DAYS: 4→6 — 보유기간 연장(추세 지속 기대)",
+      "US_TRAILING_STOP_PCT: 0.0365→0.0359 — 수익률 패턴 기반 트레일링 스톱 축소(조기 수익 실현)",
+      "최고 성과 신호: 바닥권 반등 신호(BB 하단) (승률 100.0%)",
+      "저성과 신호: 거래량 급증 (승률 25.0%) — 해당 신호 가중치 축소 고려"
+    ]
   }
 ]
