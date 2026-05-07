@@ -1453,5 +1453,13 @@
       "최고 성과 신호: 바닥권 반등 신호(BB 하단) (승률 100.0%)",
       "저성과 신호: 거래량 급증 (승률 25.0%) — 해당 신호 가중치 축소 고려"
     ]
+  },
+  {
+    "updated_at": "2026-05-07T13:19:06.565633",
+    "source": "merge_batches",
+    "approved_changes": {
+      "TRAILING_STOP_PCT": 0.04
+    },
+    "batch_count": 3
   }
 ]
