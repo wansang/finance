@@ -1324,5 +1324,15 @@
       "시장 상황: BULL",
       "최고 성과 신호: 바닥권 반등 신호(BB 하단) (승률 100.0%)"
     ]
+  },
+  {
+    "updated_at": "2026-05-07T00:34:36.673019",
+    "source": "merge_batches",
+    "approved_changes": {
+      "VALIDATE_MAX_HOLD_DAYS": 4,
+      "VALIDATE_STOP_LOSS_PCT": -0.05,
+      "MAX_HARD_STOP_PCT": 0.05
+    },
+    "batch_count": 13
   }
 ]
