@@ -1586,8 +1586,9 @@ class StockAnalyzer:
         
         last = df_target.iloc[-1]
         # 중기 상승 추세(SMA50) 위에서 캔들 몸통이 60% 이상인 강한 양봉일 때만 신뢰 (Mansfield RS 전략 반영)
-        candle_body_ratio = (last['Close'] - last['Open']) / (last['High'] - last['Low'] + 1e-9)
-        if last['Volume'] > last['VOL_AVG'] * 2.5 and last['Close'] > last.get('SMA200', 0) and last['Close'] > last['Open']:
+        # 종가가 캔들 상단 25% 이내(꼬리 제한)이며 SMA50 위에서 거래량이 3배 이상 터진 주도주형 수급 필터
+        candle_loc = (last['Close'] - last['Low']) / (last['High'] - last['Low'] + 1e-9)
+        if last['Volume'] > last['VOL_AVG'] * 3.0 and last['Close'] > last.get('SMA50', 0) and candle_loc > 0.75:
             return True
         return False
 
