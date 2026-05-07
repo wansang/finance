@@ -1063,7 +1063,7 @@ class StockAnalyzer:
         last = df.iloc[-1]
         close = float(last['Close'])
 
-        trailing_stop_pct = self.config.get('TRAILING_STOP_PCT', 3.82) / 100
+        trailing_stop_pct = self.config.get('TRAILING_STOP_PCT', 0.0382)
 
         # 매수일 이후 최고가 계산
         max_price = close

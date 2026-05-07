@@ -317,14 +317,13 @@ class StrategyOptimizer:
         if not (batch_index >= 0 and batch_total > 0):
             approved_entries = [
                 e for e in processed_entries
-                if e.get('stock_result', {}).get('verdict') == 'approved'
-                or e.get('etf_result', {}).get('verdict') == 'approved'
+                if e.get('validation_result', {}).get('stock', {}).get('verdict') == 'approved'
+                or e.get('validation_result', {}).get('etf', {}).get('verdict') == 'approved'
             ]
             rejected_entries = [
                 e for e in processed_entries
-                if e.get('stock_result', {}).get('verdict') not in ('approved', None)
-                and e.get('etf_result', {}).get('verdict') not in ('approved', None)
-                and e.get('stock_result', {}).get('verdict') not in ('sparse_market', 'no_effect', 'skipped', 'error', None)
+                if e.get('validation_result', {}).get('stock', {}).get('verdict') not in ('approved', None, 'sparse_market', 'no_effect', 'skipped', 'error')
+                or e.get('validation_result', {}).get('etf', {}).get('verdict') not in ('approved', None, 'sparse_market', 'no_effect', 'skipped', 'error')
             ]
             self._backlog_summary = {
                 'total_validated': len(processed_entries),
@@ -2625,18 +2624,18 @@ ETF 보유 시 더 넓은 손절 기준이나 추세 기반 목표가 조정이 
             print(f"\n[최종 결과] {len(changes)}개 파라미터 업데이트")
             self.save_config(gradual_config)
 
-            # after metrics: 변경된 trailing stop으로 재계산
-            final_results = self.fetch_actual_performance(recs, gradual_config['TRAILING_STOP_PCT'])
-            final_returns = [r['return_pct'] for r in final_results] if final_results else returns
+            # after metrics: 최적 trailing stop 탐색에서 이미 계산된 best_results 사용
+            # (gradual stop으로 재계산하면 best_stop == current_stop 일 때 before==after 동일)
+            final_returns = [r['return_pct'] for r in best_results] if best_results else returns
             after_metrics = {
-                'count': len(final_results),
-                'avg_return': sum(final_returns) / len(final_returns) if final_results else 0,
+                'count': len(best_results) if best_results else len(current_results),
+                'avg_return': sum(final_returns) / len(final_returns) if final_returns else 0,
                 'win_rate': (
-                    len([r for r in final_returns if r > 0]) / len(final_results) * 100
-                    if final_results else 0
+                    len([r for r in final_returns if r > 0]) / len(best_results) * 100
+                    if best_results else 0
                 ),
-                'max_return': max(final_returns) if final_results else 0,
-                'min_return': min(final_returns) if final_results else 0,
+                'max_return': max(final_returns) if final_returns else 0,
+                'min_return': min(final_returns) if final_returns else 0,
             }
 
             notes = [
