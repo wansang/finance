@@ -61,5 +61,10 @@
         "name": "KODEX 코스닥150레버리지",
         "add_date": "2026-05-06",
         "source": "manual"
+    },
+    "088280": {
+        "name": "088280",
+        "add_date": "2026-05-08",
+        "source": "manual"
     }
 }
