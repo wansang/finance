@@ -114,7 +114,17 @@ class StockBot:
                 "buy_price": int(price.replace(',', ''))
             }
             self.analyzer.save_holdings(holdings)
-            self._git_push(['holdings.json'], f'bot: /buy {code} {stock_name} 추가 [skip ci]')
+
+            # watchlist에서 해당 종목 제거 (관심종목 또는 AI관심종목 모두)
+            files_to_push = ['holdings.json']
+            watchlist = self.analyzer.load_watchlist()
+            if code in watchlist:
+                del watchlist[code]
+                self.analyzer.save_watchlist(watchlist)
+                files_to_push.append('watchlist.json')
+                await update.message.reply_text(f"🗑 {stock_name}({code})이(가) 관심종목에서 삭제되었습니다.")
+
+            self._git_push(files_to_push, f'bot: /buy {code} {stock_name} 추가 [skip ci]')
 
             await update.message.reply_text(f"✅ {stock_name}({code}) 종목이 포트폴리오에 추가되었습니다. (매수가: {price})")
         except Exception as e:
