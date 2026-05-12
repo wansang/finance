@@ -47,10 +47,59 @@
 | ETF 투자 전문가 | [agent/agent_etf.md](agent/agent_etf.md) | 차트 분석 기반 ETF 종목 선정 및 포트폴리오 최적화 |
 | 검색 전문가 | [agent/agent_search.md](agent/agent_search.md) | **차트의 기술 중심 탐색, 외부 방법론 발굴** |
 
+## 🤖 Gemini AI 활용 방식
+
+본 프로젝트는 Google Gemini API를 핵심 의사결정 엔진으로 활용합니다. `GEMINI_API_KEY` 환경변수(또는 `.env` 파일)가 설정되어 있을 때만 AI 기능이 활성화되며, 미설정 시 로컬 룰 기반 로직으로 자동 대체됩니다.
+
+### 사용 모델 및 라이브러리
+
+- **기본 모델**: `gemini-flash-latest` (불가 시 `gemini-pro-latest` → `gemini-2.5-flash` → `gemini-2.0-flash` 순으로 자동 폴백)
+- **SDK**: `google-genai` (최신) 또는 `google-generativeai` (구버전) 중 설치된 것을 자동 감지
+
+### AI가 수행하는 4가지 역할
+
+#### 1. 투자 리포트 생성 (`analyzer.py` — `ask_ai_report`)
+시장 상황·보유 종목·관심 종목 데이터를 프롬프트로 전달하면 Gemini가 한국어 투자 전문가 스타일의 리포트를 생성합니다.
+- **monitor 모드**: 30분 단위 실시간 모니터링 리포트 (보유 종목, 지금진입가능관심주, 관심 종목, AI 추천 종목 섹션 구성)
+- **daily 모드**: 일간 종합 투자 리포트 (국제정세 뉴스 요약 포함)
+- API 한도 초과(429) 시 최대 2회 재시도, 실패 시 로컬 요약 리포트로 자동 대체
+
+#### 2. 신규 투자 전략 탐색 (`agent/agent_search.py` — `run_agent_search`)
+기존에 시도된 전략(searchBacklog_history.json 기록)을 제외하고, `strategy_config.json` 파라미터 조정만으로 구현 가능한 **새로운 투자 방법론 20가지**를 JSON 형태로 생성합니다. 각 전략에는 `제안_파라미터_변경` 객체가 포함됩니다.
+
+#### 3. 알고리즘 자동 최적화 (`optimizer.py`)
+`searchBacklog.json`의 전략 후보를 처리하는 파이프라인에서 Gemini가 세 에이전트 역할을 수행합니다:
+
+| 에이전트 | 함수 | 역할 |
+|---|---|---|
+| agent_stock | `_call_agent_stock` | 방법론 → KOSPI 주식 전용 파라미터 변경 제안 |
+| agent_etf | `_call_agent_etf` | 방법론 → ETF 전용 파라미터 변경 제안 |
+| agent_backtest | `_call_agent_backtest` | 백테스트 Before/After 비교 후 파라미터 채택 여부 최종 판단 |
+
+파라미터 단위 혼동 방지를 위해 프롬프트에 단위·범위 제약을 명시합니다 (예: `*_WIN_RATE`는 정수 %, `TIER1_MIN_RS`는 소수 등).
+
+#### 4. Backlog 사전 검증 (`optimizer.py` — `_process_backlog`)
+최적화 실행 전 `searchBacklog.json`에 쌓인 전략 후보를 Gemini가 사전 검토하여 유효하지 않은 항목을 필터링합니다. `GEMINI_API_KEY`가 없으면 단순 아카이브만 수행합니다.
+
+### 설정 방법
+
+```bash
+# 환경변수로 설정
+export GEMINI_API_KEY=AIza...
+
+# 또는 .env 파일에 저장
+echo "GEMINI_API_KEY=AIza..." >> .env
+```
+
+GitHub Actions에서는 저장소 Secrets에 `GEMINI_API_KEY`를 등록하면 모든 워크플로우(`analyze.yml`, `monitor.yml`, `optimize.yml`, `agent_search.yml`)에 자동으로 주입됩니다.
+
+---
+
 ## 🚀 기술 스택
 - **Language**: Python 3.9+ (권장: 3.10 이상)
 - **Data**: FinanceDataReader
 - **Indicators**: pandas-ta-classic
+- **AI**: Google Gemini API (`google-genai` / `google-generativeai`)
 - **Notification**: python-telegram-bot
 - **Platform**: GitHub Actions, Google Apps Script, Cloud Scheduler
 
