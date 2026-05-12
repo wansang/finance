@@ -133,90 +133,163 @@ class AlgorithmUpdateReport:
                 "",
                 f"[📋 searchBacklog 검증 결과]",
                 f"- 전체 대기: {total}건 중 이번 실행 {validated}건 처리 (잔여 {remaining}건)",
-                f"- ✅ 채택: {approved}건 / ❌ 거부: {rejected}건 / ⏭ 스킵: {skipped}건",
+                f"- ✅ 채택: {approved}건 / ❌ 거부: {rejected}건 / ⏭ 스킵·효과없음: {skipped}건",
             ]
 
-            # 채택된 방법론 상세
             entries = bs.get('entries', [])
+
+            # ── 채택된 방법론 상세 ────────────────────────────────────
             approved_entries = [
                 e for e in entries
-                if e.get('stock_result', {}).get('verdict') == 'approved'
-                or e.get('etf_result', {}).get('verdict') == 'approved'
+                if e.get('validation_result', {}).get('stock', {}).get('verdict') == 'approved'
+                or e.get('validation_result', {}).get('etf', {}).get('verdict') == 'approved'
             ]
             if approved_entries:
                 lines.append("")
-                lines.append("[✅ 채택된 방법론 및 이유]")
+                lines.append("[✅ 채택된 방법론 상세]")
                 for e in approved_entries:
-                    name = e.get('method', {}).get('방법론명', '(이름 없음)')
-                    idea = e.get('method', {}).get('핵심 아이디어', '')
-                    for path, key in [('stock_result', '주식'), ('etf_result', 'ETF')]:
-                        r = e.get(path, {})
-                        if r.get('verdict') == 'approved':
-                            reason = r.get('reason', '사유 없음')
-                            reasoning = r.get('reasoning', '')
-                            bm = r.get('before_metrics', {})
-                            am = r.get('after_metrics', {})
-                            lines.append(f"  • [{key}] {name}")
-                            if idea:
-                                lines.append(f"    아이디어: {idea}")
-                            if reasoning:
-                                lines.append(f"    파라미터 변경 근거: {reasoning}")
-                            lines.append(f"    채택 판정 이유: {reason}")
-                            if bm and am:
-                                wr_diff = am.get('win_rate', 0) - bm.get('win_rate', 0)
-                                ret_diff = am.get('avg_return', 0) - bm.get('avg_return', 0)
-                                mdd_diff = am.get('mdd', 0) - bm.get('mdd', 0)
-                                lines.append(
-                                    f"    백테스트: 승률 {bm.get('win_rate',0):.1f}%→{am.get('win_rate',0):.1f}% ({wr_diff:+.1f}%), "
-                                    f"평균수익 {bm.get('avg_return',0):+.2f}%→{am.get('avg_return',0):+.2f}% ({ret_diff:+.2f}%), "
-                                    f"MDD {bm.get('mdd',0):.2f}%→{am.get('mdd',0):.2f}% ({mdd_diff:+.2f}%)"
-                                )
+                    method = e.get('method', {})
+                    name = method.get('방법론명', '(이름 없음)')
+                    idea = method.get('핵심 아이디어', '')
+                    expected = method.get('기대 효과', '')
+                    vr = e.get('validation_result', {})
+                    for path, label in [('stock', '주식'), ('etf', 'ETF')]:
+                        r = vr.get(path, {})
+                        if r.get('verdict') != 'approved':
+                            continue
+                        reason = r.get('reason', '사유 없음')
+                        reasoning = r.get('reasoning', '')
+                        proposed = r.get('proposed_changes', {})
+                        bm = r.get('before_metrics', {})
+                        am = r.get('after_metrics', {})
+                        lines.append(f"")
+                        lines.append(f"  • [{label}] {name}")
+                        if idea:
+                            lines.append(f"    핵심 아이디어: {idea}")
+                        if expected:
+                            lines.append(f"    기대 효과: {expected}")
+                        if reasoning:
+                            lines.append(f"    파라미터 변경 근거: {reasoning}")
+                        if proposed:
+                            param_parts = []
+                            for k, v in proposed.items():
+                                old_v = bs.get('before_stock_metrics', {})  # fallback
+                                param_parts.append(f"{k}={v}")
+                            lines.append(f"    변경 파라미터: {', '.join(param_parts)}")
+                        lines.append(f"    채택 이유: {reason}")
+                        # 상세 지표 비교
+                        if bm and am:
+                            def _fmt(v): return f"{v:.2f}" if isinstance(v, float) else str(v)
+                            wr_b, wr_a = bm.get('win_rate', 0), am.get('win_rate', 0)
+                            ret_b, ret_a = bm.get('avg_return', 0), am.get('avg_return', 0)
+                            mdd_b, mdd_a = bm.get('mdd', 0), am.get('mdd', 0)
+                            sh_b, sh_a = bm.get('sharpe', 0), am.get('sharpe', 0)
+                            cnt_b, cnt_a = bm.get('count', 0), am.get('count', 0)
+                            lines += [
+                                f"    ┌─ 지표 비교 (Before → After)",
+                                f"    │  거래수:   {cnt_b}건 → {cnt_a}건",
+                                f"    │  승  률:   {wr_b:.1f}% → {wr_a:.1f}% ({wr_a - wr_b:+.1f}%p)",
+                                f"    │  평균수익: {ret_b:+.2f}% → {ret_a:+.2f}% ({ret_a - ret_b:+.2f}%p)",
+                                f"    │  MDD:      {mdd_b:.2f}% → {mdd_a:.2f}% ({mdd_a - mdd_b:+.2f}%p)",
+                                f"    └  Sharpe:   {sh_b:.2f} → {sh_a:.2f} ({sh_a - sh_b:+.2f})",
+                            ]
 
-            # 거부된 방법론 요약
+            # ── 거부된 방법론 요약 ────────────────────────────────────
             rejected_entries = [
                 e for e in entries
-                if e.get('stock_result', {}).get('verdict') == 'rejected'
-                or e.get('etf_result', {}).get('verdict') == 'rejected'
+                if e.get('validation_result', {}).get('stock', {}).get('verdict') == 'rejected'
+                or e.get('validation_result', {}).get('etf', {}).get('verdict') == 'rejected'
             ]
+            REJECT_DETAIL_LIMIT = 5  # 거부 건수가 많을 때 상세 표시 상한
             if rejected_entries:
                 lines.append("")
-                lines.append("[❌ 거부된 방법론 및 이유]")
-                for e in rejected_entries:
+                extra_rej = max(0, len(rejected_entries) - REJECT_DETAIL_LIMIT)
+                header_suffix = f" (상위 {REJECT_DETAIL_LIMIT}건만 표시, 외 {extra_rej}건)" if extra_rej > 0 else ""
+                lines.append(f"[❌ 거부된 방법론 요약{header_suffix}]")
+                for e in rejected_entries[:REJECT_DETAIL_LIMIT]:
                     name = e.get('method', {}).get('방법론명', '(이름 없음)')
-                    for path, key in [('stock_result', '주식'), ('etf_result', 'ETF')]:
-                        r = e.get(path, {})
-                        if r.get('verdict') == 'rejected':
-                            reason = r.get('reason', '사유 없음')
-                            lines.append(f"  • [{key}] {name}: {reason}")
+                    vr = e.get('validation_result', {})
+                    for path, label in [('stock', '주식'), ('etf', 'ETF')]:
+                        r = vr.get(path, {})
+                        if r.get('verdict') != 'rejected':
+                            continue
+                        reason = r.get('reason', '사유 없음')
+                        proposed = r.get('proposed_changes', {})
+                        bm = r.get('before_metrics', {})
+                        am = r.get('after_metrics', {})
+                        param_str = ', '.join(f"{k}={v}" for k, v in proposed.items()) if proposed else '없음'
+                        lines.append(f"  • [{label}] {name}  |  제안: {param_str}")
+                        lines.append(f"    거부 이유: {reason}")
+                        if bm and am:
+                            wr_b, wr_a = bm.get('win_rate', 0), am.get('win_rate', 0)
+                            ret_b, ret_a = bm.get('avg_return', 0), am.get('avg_return', 0)
+                            mdd_b, mdd_a = bm.get('mdd', 0), am.get('mdd', 0)
+                            sh_b, sh_a = bm.get('sharpe', 0), am.get('sharpe', 0)
+                            lines.append(
+                                f"    지표: 승률 {wr_b:.1f}%→{wr_a:.1f}% ({wr_a-wr_b:+.1f}%p) | "
+                                f"평균수익 {ret_b:+.2f}%→{ret_a:+.2f}% | "
+                                f"MDD {mdd_b:.2f}%→{mdd_a:.2f}% | "
+                                f"Sharpe {sh_b:.2f}→{sh_a:.2f}"
+                            )
+                if extra_rej > 0:
+                    # 나머지 거부 건은 이름만 콤마 구분으로 나열
+                    rest_names = [e.get('method', {}).get('방법론명', '(이름 없음)') for e in rejected_entries[REJECT_DETAIL_LIMIT:]]
+                    lines.append(f"  + 추가 거부 {extra_rej}건: {', '.join(rest_names)}")
 
-        # ── 2. 파라미터 변경 및 개선 근거 ─────────────────────────────
+            # ── 스킵·효과없음 목록 (간략) ─────────────────────────────
+            skip_entries = [
+                e for e in entries
+                if e.get('validation_result', {}).get('stock', {}).get('verdict') in ('skipped', 'no_effect', 'sparse_market', 'error')
+                and e.get('validation_result', {}).get('etf', {}).get('verdict') in ('skipped', 'no_effect', 'sparse_market', 'error', None)
+                and not (
+                    e.get('validation_result', {}).get('stock', {}).get('verdict') in ('approved', 'rejected')
+                    or e.get('validation_result', {}).get('etf', {}).get('verdict') in ('approved', 'rejected')
+                )
+            ]
+            if skip_entries:
+                lines.append("")
+                lines.append("[⏭ 스킵·효과없음 방법론]")
+                for e in skip_entries:
+                    name = e.get('method', {}).get('방법론명', '(이름 없음)')
+                    vr = e.get('validation_result', {})
+                    s_v = vr.get('stock', {}).get('verdict', '-')
+                    s_r = vr.get('stock', {}).get('reason', '')
+                    e_v = vr.get('etf', {}).get('verdict', '-')
+                    lines.append(f"  • {name}  [주식:{s_v}] [ETF:{e_v}]")
+                    if s_r:
+                        lines.append(f"    사유: {s_r}")
+
+        # ── 2. 파라미터 변경 및 전후 성과 비교 ────────────────────────
         lines += ["", "[⚙️ 파라미터 변경]"]
         if not self.changes:
             lines.append('- 변경된 파라미터가 없습니다.')
         else:
-            bm = self.before_metrics or {}
-            am = self.after_metrics or {}
             for key, values in self.changes.items():
                 old_v = values['before']
                 new_v = values['after']
-                # 방향 힌트 생성
                 try:
                     diff = float(new_v) - float(old_v)
                     direction = '↑' if diff > 0 else '↓'
                 except (TypeError, ValueError):
                     direction = ''
                 lines.append(f"  • {key}: {old_v} → {new_v} {direction}")
+
             # 전체 효과 요약
+            bm = self.before_metrics or {}
+            am = self.after_metrics or {}
             if bm.get('win_rate') is not None and am.get('win_rate') is not None:
                 wr_d = am['win_rate'] - bm['win_rate']
                 ret_d = (am.get('avg_return') or 0) - (bm.get('avg_return') or 0)
                 mdd_d = (am.get('mdd') or am.get('min_return') or 0) - (bm.get('mdd') or bm.get('min_return') or 0)
+                sh_d = (am.get('sharpe') or 0) - (bm.get('sharpe') or 0)
                 lines += [
                     "",
-                    "[📊 변경 전후 성과 비교]",
-                    f"  승률:    {bm.get('win_rate',0):.1f}% → {am.get('win_rate',0):.1f}% ({wr_d:+.1f}%)",
-                    f"  평균수익: {bm.get('avg_return',0):+.2f}% → {am.get('avg_return',0):+.2f}% ({ret_d:+.2f}%)",
-                    f"  MDD:     {bm.get('mdd', bm.get('min_return',0)):.2f}% → {am.get('mdd', am.get('min_return',0)):.2f}% ({mdd_d:+.2f}%)",
+                    "[📊 전체 파라미터 변경 전후 성과 비교]",
+                    f"  거래수:   {bm.get('count',0)}건 → {am.get('count',0)}건",
+                    f"  승  률:   {bm.get('win_rate',0):.1f}% → {am.get('win_rate',0):.1f}% ({wr_d:+.1f}%p)",
+                    f"  평균수익: {bm.get('avg_return',0):+.2f}% → {am.get('avg_return',0):+.2f}% ({ret_d:+.2f}%p)",
+                    f"  MDD:      {bm.get('mdd', bm.get('min_return',0)):.2f}% → {am.get('mdd', am.get('min_return',0)):.2f}% ({mdd_d:+.2f}%p)",
+                    f"  Sharpe:   {bm.get('sharpe',0):.2f} → {am.get('sharpe',0):.2f} ({sh_d:+.2f})",
                 ]
 
         # ── 3. 핵심 요약 ────────────────────────────────────────────────

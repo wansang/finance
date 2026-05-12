@@ -721,15 +721,16 @@ class StockAnalyzer:
             self.save_watchlist(watchlist)
 
     def add_top_recommendation_to_watchlist(self, results):
-        """Tier 1 추천 종목을 watchlist에 자동 추가"""
-        if not results or 1 not in results or len(results[1]) == 0:
+        """Tier 1/2 추천 종목을 watchlist에 자동 추가"""
+        candidates = list(results.get(1, [])) + list(results.get(2, []))
+        if not results or not candidates:
             return []
 
         watchlist = self.load_watchlist()
         added_codes = []
         today = datetime.datetime.now().strftime('%Y-%m-%d')
 
-        for stock in results[1]:
+        for stock in candidates:
             code = stock.get('code')
             if not code:
                 continue
@@ -974,7 +975,7 @@ class StockAnalyzer:
   3. 🚨 [지금진입가능관심주] 섹션을 만들어서, 현재 매수 신호가 포착된 종목들을 강조해줘. 어떤 신호가 발생했는지, 진입가/손절/목표가를 명확히 언급하고, 지금 당장 행동해야 할 이유를 설명해줘.
      ⚠️ 중요: 데이터에 '📊 [주식전문가]' 또는 '🌐 [ETF전문가]' 텍스트가 있는 경우에만 그 내용을 그대로 포함해줘. 해당 텍스트가 없는 종목에는 전문가 의견을 절대 스스로 작성하지 말 것. 데이터가 '없음'이면 이 섹션은 "현재 진입 가능한 관심종목이 없습니다."라고 짧게 작성해줘.
   4. [관심 종목] 섹션을 만들어서, 신호가 없는 대기 중인 종목들에 대해 왜 기다려야 하는지 또는 주의할 점을 설명해줘.
-  5. [AI 추천 관심종목] 섹션을 만들어서, AI가 선별한 1티어 종목들의 현재 상태를 설명해줘. 승률과 평균수익률 데이터를 반드시 언급하고, 현재 매수 신호 여부와 주의할 점을 설명해줘.
+  5. [AI 추천 관심종목] 섹션을 만들어서, AI가 선별한 1/2티어 종목들의 현재 상태를 설명해줘. 승률과 평균수익률 데이터를 반드시 언급하고, 현재 매수 신호 여부와 주의할 점을 설명해줘.
 - **진입가 안내**: 지금진입가능관심주 및 관심 종목 데이터에 `진입가`, `손절`, `목표` 가격이 포함되어 있으면 반드시 언급하고, 각 가격의 의미(어디서 사야 하는지, 어디서 손절해야 하는지, 목표 수익은 어느 수준인지)를 쉬운 말로 설명해줘.
 - **표현 금지**: '트레일링 스톱', '깃발형 패턴', '에너지 응축', '변동성 수렴' 등의 전문 용어를 쓰지 말고, '고점 대비 하락 기준', '급등 후 숨고르기', '거래가 조용해진 구간' 같은 쉬운 설명으로 바꿔줘.
 - **문장 구성**: 각 설명은 새 문단으로 구분하고, 항목 사이에는 빈 줄을 넣어줘.
@@ -2400,22 +2401,24 @@ class StockAnalyzer:
         recs_raw = self.merge_tier_results(recs_raw_kr, recs_raw_us)
         sell_alerts = self.analyze_holdings()
 
-        # 추천 종목 1등급 자동 추가
+        # 추천 종목 1/2등급 자동 추가
         added_codes = self.add_top_recommendation_to_watchlist(recs_raw)
         if added_codes:
-            print(f"추천 종목 1등급 {', '.join(added_codes)}을(를) watchlist에 자동 추가했습니다.")
+            print(f"추천 종목 1/2등급 {', '.join(added_codes)}을(를) watchlist에 자동 추가했습니다.")
         else:
-            if recs_raw and 1 in recs_raw and len(recs_raw[1]) == 0:
-                print("오늘은 1등급 추천 종목이 없습니다. watchlist 자동 추가를 건너뜁니다.")
+            t1 = recs_raw.get(1, []) if recs_raw else []
+            t2 = recs_raw.get(2, []) if recs_raw else []
+            if not t1 and not t2:
+                print("오늘은 1/2등급 추천 종목이 없습니다. watchlist 자동 추가를 건너뜁니다.")
             else:
                 current_watchlist = self.load_watchlist()
-                skipped = [stock.get('code') for stock in recs_raw[1]
+                skipped = [stock.get('code') for stock in (t1 + t2)
                            if stock.get('code') in self.holdings or stock.get('code') in current_watchlist]
                 if skipped:
-                    print("추천 종목 1등급 종목이 없거나 이미 watchlist/holdings에 있는 항목이어서 자동 추가가 수행되지 않았습니다.")
+                    print("추천 종목 1/2등급 종목이 이미 watchlist/holdings에 있는 항목이어서 자동 추가가 수행되지 않았습니다.")
                     print(f"이미 watchlist/holdings에 있는 종목: {', '.join(skipped)}")
                 else:
-                    print("추천 종목 1등급 종목이 없거나 1등급 결과가 올바르지 않아 자동 추가가 수행되지 않았습니다.")
+                    print("추천 종목 1/2등급 종목이 없거나 결과가 올바르지 않아 자동 추가가 수행되지 않았습니다.")
         
         # 2. AI에게 전달할 데이터 정리
         news_msg = self.get_stock_news()

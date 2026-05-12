@@ -322,8 +322,8 @@ class StrategyOptimizer:
             ]
             rejected_entries = [
                 e for e in processed_entries
-                if e.get('validation_result', {}).get('stock', {}).get('verdict') not in ('approved', None, 'sparse_market', 'no_effect', 'skipped', 'error')
-                or e.get('validation_result', {}).get('etf', {}).get('verdict') not in ('approved', None, 'sparse_market', 'no_effect', 'skipped', 'error')
+                if e.get('validation_result', {}).get('stock', {}).get('verdict') == 'rejected'
+                or e.get('validation_result', {}).get('etf', {}).get('verdict') == 'rejected'
             ]
             self._backlog_summary = {
                 'total_validated': len(processed_entries),
@@ -332,6 +332,8 @@ class StrategyOptimizer:
                 'approved_count': len(approved_entries),
                 'rejected_count': len(rejected_entries),
                 'approved_changes': all_approved_changes,
+                'before_stock_metrics': before_stock_metrics,
+                'before_etf_metrics': before_etf_metrics,
                 'entries': processed_entries,
             }
 
