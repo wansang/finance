@@ -111,7 +111,34 @@ jobs:
           merge-multiple: true
 
       - name: Merge batch results
-        run: python merge_batches.py
+        run: |
+          # merge_batches.py 실행 전 backlog 상태 보존 (충돌 해소 시 재사용)
+          python3 - <<'PYEOF'
+          import json
+          try:
+              backlog = json.load(open('searchBacklog.json', encoding='utf-8'))
+              names = [e.get('방법론명', '') for e in backlog]
+              json.dump(names, open('/tmp/pre_merge_names.json', 'w', encoding='utf-8'))
+              print(f"Pre-merge backlog: {len(names)}건 저장")
+          except Exception as e:
+              json.dump([], open('/tmp/pre_merge_names.json', 'w'))
+              print(f"Warning (pre-save): {e}")
+          PYEOF
+          python merge_batches.py
+          # 처리된 항목명 = pre - post (배치 파일은 merge_batches.py가 이미 삭제)
+          python3 - <<'PYEOF'
+          import json
+          try:
+              pre_names = set(json.load(open('/tmp/pre_merge_names.json', encoding='utf-8')))
+              remaining = json.load(open('searchBacklog.json', encoding='utf-8'))
+              post_names = {e.get('방법론명', '') for e in remaining}
+              removed = list(pre_names - post_names)
+              json.dump(removed, open('/tmp/optimizer_removed_names.json', 'w', encoding='utf-8'))
+              print(f"Optimizer가 처리한 항목: {len(removed)}건")
+          except Exception as e:
+              json.dump([], open('/tmp/optimizer_removed_names.json', 'w'))
+              print(f"Warning (post-save): {e}")
+          PYEOF
 
       - name: Commit and push (rebase to avoid overwriting concurrent changes)
         run: |
@@ -122,8 +149,27 @@ jobs:
           # 변경사항이 없으면 commit 스킵
           git diff --cached --quiet && echo "nothing to commit" && exit 0
           git commit -m "Auto-optimized strategy config [skip ci]"
-          # agent_search 등 동시 push 가 있으면 rebase 후 재push
-          git pull --rebase --autostash origin main
+          # agent_search 등 동시 push가 있으면 rebase 후 재push
+          # searchBacklog.json 충돌 시: origin/main 버전(agent_search 추가분) 유지 +
+          #   optimizer가 처리한 항목만 제거하여 자동 해소
+          if ! git pull --rebase --autostash origin main; then
+            echo "⚠️ Rebase 충돌 감지 — searchBacklog.json 자동 해소 시도"
+            git checkout --theirs searchBacklog.json
+            python3 - <<'PYEOF'
+          import json
+          try:
+              removed_names = set(json.load(open('/tmp/optimizer_removed_names.json', encoding='utf-8')))
+              backlog = json.load(open('searchBacklog.json', encoding='utf-8'))
+              resolved = [e for e in backlog if e.get('방법론명', '') not in removed_names]
+              with open('searchBacklog.json', 'w', encoding='utf-8') as f:
+                  json.dump(resolved, f, ensure_ascii=False, indent=2)
+              print(f"충돌 해소: {len(backlog)}건 → {len(resolved)}건 ({len(backlog)-len(resolved)}건 제거)")
+          except Exception as e:
+              print(f"Warning (conflict resolve): {e}")
+          PYEOF
+            git add searchBacklog.json
+            GIT_EDITOR=true git rebase --continue
+          fi
           git push origin main
 
   # ── 4단계: Auto Evolution / 성과 분석 (단일 잡, 배치 완료 후) ───────
@@ -154,11 +200,33 @@ jobs:
           OPTIMIZER_MAX_CANDIDATES: '80'
           # BATCH_INDEX 미설정 → process_search_backlog 스킵, optimize() 만 실행
         run: |
+          # 실행 전 backlog 상태 보존 (충돌 해소 시 재사용)
+          python3 - <<'PYEOF'
+          import json
+          try:
+              backlog = json.load(open('searchBacklog.json', encoding='utf-8'))
+              names = [e.get('방법론명', '') for e in backlog]
+              json.dump(names, open('/tmp/pre_evolve_names.json', 'w', encoding='utf-8'))
+          except Exception as e:
+              json.dump([], open('/tmp/pre_evolve_names.json', 'w'))
+          PYEOF
           python3 -c "
           from optimizer import StrategyOptimizer
           opt = StrategyOptimizer()
           opt.optimize()
           "
+          # 처리된 항목명 계산 (pre - post)
+          python3 - <<'PYEOF'
+          import json
+          try:
+              pre_names = set(json.load(open('/tmp/pre_evolve_names.json', encoding='utf-8')))
+              remaining = json.load(open('searchBacklog.json', encoding='utf-8'))
+              post_names = {e.get('방법론명', '') for e in remaining}
+              removed = list(pre_names - post_names)
+              json.dump(removed, open('/tmp/evolve_removed_names.json', 'w', encoding='utf-8'))
+          except Exception as e:
+              json.dump([], open('/tmp/evolve_removed_names.json', 'w'))
+          PYEOF
 
       - name: Commit evolve results
         run: |
@@ -168,6 +236,23 @@ jobs:
                   analyzer.py searchBacklog.json searchBacklog_history.json
           git diff --cached --quiet && echo "nothing to commit" && exit 0
           git commit -m "Auto Evolution: algorithm update [skip ci]"
-          git pull --rebase --autostash origin main
+          if ! git pull --rebase --autostash origin main; then
+            echo "⚠️ Rebase 충돌 감지 — searchBacklog.json 자동 해소 시도"
+            git checkout --theirs searchBacklog.json
+            python3 - <<'PYEOF'
+          import json
+          try:
+              removed_names = set(json.load(open('/tmp/evolve_removed_names.json', encoding='utf-8')))
+              backlog = json.load(open('searchBacklog.json', encoding='utf-8'))
+              resolved = [e for e in backlog if e.get('방법론명', '') not in removed_names]
+              with open('searchBacklog.json', 'w', encoding='utf-8') as f:
+                  json.dump(resolved, f, ensure_ascii=False, indent=2)
+              print(f"충돌 해소: {len(backlog)}건 → {len(resolved)}건 ({len(backlog)-len(resolved)}건 제거)")
+          except Exception as e:
+              print(f"Warning (conflict resolve): {e}")
+          PYEOF
+            git add searchBacklog.json
+            GIT_EDITOR=true git rebase --continue
+          fi
           git push origin main
 
