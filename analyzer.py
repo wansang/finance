@@ -1589,7 +1589,10 @@ class StockAnalyzer:
         # 중기 상승 추세(SMA50) 위에서 캔들 몸통이 60% 이상인 강한 양봉일 때만 신뢰 (Mansfield RS 전략 반영)
         # 종가가 캔들 상단 25% 이내(꼬리 제한)이며 SMA50 위에서 거래량이 3배 이상 터진 주도주형 수급 필터
         candle_loc = (last['Close'] - last['Low']) / (last['High'] - last['Low'] + 1e-9)
-        if last['Volume'] > last['VOL_AVG'] * 3.0 and last['Close'] > last.get('SMA50', 0) and candle_loc > 0.75:
+        # 이격도(SMA20 기준 1.1배 이내)로 과열권 배제 및 최근 5일 신고가 확인으로 추세 초입 돌파 확증
+        is_not_overheated = last['Close'] < last.get('SMA20', last['Close']) * 1.10
+        is_breakout = last['Close'] >= df_target['Close'].iloc[-6:].max()
+        if last['Volume'] > last['VOL_AVG'] * 3.0 and last['Close'] > last.get('SMA50', 0) and candle_loc > 0.8 and is_not_overheated and is_breakout:
             return True
         return False
 
