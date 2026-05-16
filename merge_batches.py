@@ -110,6 +110,31 @@ def merge():
         os.remove(f)
         print(f"[merge] 삭제: {f}")
 
+    # ── 5. evolve 잡을 위한 backlog 실행 요약 저장 ───────────────────
+    approved_entries = [
+        e for e in all_processed_entries
+        if e.get('validation_result', {}).get('stock', {}).get('verdict') == 'approved'
+        or e.get('validation_result', {}).get('etf', {}).get('verdict') == 'approved'
+    ]
+    rejected_entries = [
+        e for e in all_processed_entries
+        if e.get('validation_result', {}).get('stock', {}).get('verdict') == 'rejected'
+        or e.get('validation_result', {}).get('etf', {}).get('verdict') == 'rejected'
+    ]
+    run_summary = {
+        'total_backlog': len(backlog),
+        'total_validated': len(all_processed_entries),
+        'remaining': len(remaining),
+        'approved_count': len(approved_entries),
+        'rejected_count': len(rejected_entries),
+        'approved_changes': all_approved,
+        'entries': all_processed_entries,
+    }
+    with open('_backlog_run_summary.json', 'w', encoding='utf-8') as f:
+        json.dump(run_summary, f, ensure_ascii=False, indent=2)
+    print(f"[merge] backlog 실행 요약 저장: _backlog_run_summary.json "
+          f"(처리 {len(all_processed_entries)}건, 채택 {len(approved_entries)}건, 거부 {len(rejected_entries)}건)")
+
     print("[merge] 완료")
 
 

@@ -115,6 +115,7 @@ class AlgorithmUpdateReport:
         return '\n'.join(lines)
 
     def build_message(self):
+        """Telegram 전송용 요약 메시지 빌드 (4000자 이내 목표)."""
         lines = [
             f"📌 {self.title}",
             f"날짜: {self.timestamp}",
@@ -123,120 +124,84 @@ class AlgorithmUpdateReport:
         # ── 1. searchBacklog 검증 요약 ─────────────────────────────────
         bs = self.backlog_summary
         if bs:
-            total = bs.get('total_backlog', 0)
+            total     = bs.get('total_backlog', 0)
             validated = bs.get('total_validated', 0)
-            approved = bs.get('approved_count', 0)
-            rejected = bs.get('rejected_count', 0)
-            skipped = validated - approved - rejected
+            approved  = bs.get('approved_count', 0)
+            rejected  = bs.get('rejected_count', 0)
+            skipped   = validated - approved - rejected
             remaining = bs.get('remaining', 0)
             lines += [
                 "",
-                f"[📋 searchBacklog 검증 결과]",
-                f"- 전체 대기: {total}건 중 이번 실행 {validated}건 처리 (잔여 {remaining}건)",
-                f"- ✅ 채택: {approved}건 / ❌ 거부: {rejected}건 / ⏭ 스킵·효과없음: {skipped}건",
+                "[📋 searchBacklog 검증 결과]",
+                f"대기 {total}건 중 {validated}건 처리 (잔여 {remaining}건)",
+                f"✅ 채택 {approved}건  ❌ 거부 {rejected}건  ⏭ 스킵 {skipped}건",
             ]
 
             entries = bs.get('entries', [])
 
-            # ── 채택된 방법론 상세 ────────────────────────────────────
+            # ── 채택된 방법론 (최대 3건, 핵심만) ────────────────────
             approved_entries = [
                 e for e in entries
                 if e.get('validation_result', {}).get('stock', {}).get('verdict') == 'approved'
                 or e.get('validation_result', {}).get('etf', {}).get('verdict') == 'approved'
             ]
             if approved_entries:
+                extra_ap = max(0, len(approved_entries) - 3)
                 lines.append("")
-                lines.append("[✅ 채택된 방법론 상세]")
-                for e in approved_entries:
-                    method = e.get('method', {})
-                    name = method.get('방법론명', '(이름 없음)')
-                    idea = method.get('핵심 아이디어', '')
-                    expected = method.get('기대 효과', '')
+                suffix = f" (+{extra_ap}건 생략)" if extra_ap > 0 else ""
+                lines.append(f"[✅ 채택 방법론{suffix}]")
+                for e in approved_entries[:3]:
+                    name = e.get('method', {}).get('방법론명', '(이름 없음)')
                     vr = e.get('validation_result', {})
                     for path, label in [('stock', '주식'), ('etf', 'ETF')]:
                         r = vr.get(path, {})
                         if r.get('verdict') != 'approved':
                             continue
-                        reason = r.get('reason', '사유 없음')
-                        reasoning = r.get('reasoning', '')
                         proposed = r.get('proposed_changes', {})
                         bm = r.get('before_metrics', {})
                         am = r.get('after_metrics', {})
-                        lines.append(f"")
-                        lines.append(f"  • [{label}] {name}")
-                        if idea:
-                            lines.append(f"    핵심 아이디어: {idea}")
-                        if expected:
-                            lines.append(f"    기대 효과: {expected}")
-                        if reasoning:
-                            lines.append(f"    파라미터 변경 근거: {reasoning}")
-                        if proposed:
-                            param_parts = []
-                            for k, v in proposed.items():
-                                old_v = bs.get('before_stock_metrics', {})  # fallback
-                                param_parts.append(f"{k}={v}")
-                            lines.append(f"    변경 파라미터: {', '.join(param_parts)}")
-                        lines.append(f"    채택 이유: {reason}")
-                        # 상세 지표 비교
+                        reason = r.get('reason', '')
+                        param_str = ', '.join(f"{k}={v}" for k, v in proposed.items()) if proposed else '없음'
+                        # 지표 한 줄 요약
                         if bm and am:
-                            def _fmt(v): return f"{v:.2f}" if isinstance(v, float) else str(v)
-                            wr_b, wr_a = bm.get('win_rate', 0), am.get('win_rate', 0)
+                            wr_b, wr_a   = bm.get('win_rate', 0), am.get('win_rate', 0)
                             ret_b, ret_a = bm.get('avg_return', 0), am.get('avg_return', 0)
-                            mdd_b, mdd_a = bm.get('mdd', 0), am.get('mdd', 0)
-                            sh_b, sh_a = bm.get('sharpe', 0), am.get('sharpe', 0)
-                            cnt_b, cnt_a = bm.get('count', 0), am.get('count', 0)
-                            lines += [
-                                f"    ┌─ 지표 비교 (Before → After)",
-                                f"    │  거래수:   {cnt_b}건 → {cnt_a}건",
-                                f"    │  승  률:   {wr_b:.1f}% → {wr_a:.1f}% ({wr_a - wr_b:+.1f}%p)",
-                                f"    │  평균수익: {ret_b:+.2f}% → {ret_a:+.2f}% ({ret_a - ret_b:+.2f}%p)",
-                                f"    │  MDD:      {mdd_b:.2f}% → {mdd_a:.2f}% ({mdd_a - mdd_b:+.2f}%p)",
-                                f"    └  Sharpe:   {sh_b:.2f} → {sh_a:.2f} ({sh_a - sh_b:+.2f})",
-                            ]
+                            metrics_str  = (f"승률 {wr_b:.0f}%→{wr_a:.0f}% ({wr_a-wr_b:+.0f}%p) | "
+                                            f"수익 {ret_b:+.1f}%→{ret_a:+.1f}%")
+                        else:
+                            metrics_str = ''
+                        lines.append(f"  • [{label}] {name}")
+                        lines.append(f"    파라미터: {param_str}")
+                        if metrics_str:
+                            lines.append(f"    지표: {metrics_str}")
+                        if reason:
+                            # 이유가 길면 80자로 자름
+                            short_reason = reason[:80] + ('…' if len(reason) > 80 else '')
+                            lines.append(f"    사유: {short_reason}")
 
-            # ── 거부된 방법론 요약 ────────────────────────────────────
+            # ── 거부된 방법론 (최대 3건, 1줄씩) ─────────────────────
             rejected_entries = [
                 e for e in entries
                 if e.get('validation_result', {}).get('stock', {}).get('verdict') == 'rejected'
                 or e.get('validation_result', {}).get('etf', {}).get('verdict') == 'rejected'
             ]
-            REJECT_DETAIL_LIMIT = 5  # 거부 건수가 많을 때 상세 표시 상한
             if rejected_entries:
+                extra_rej = max(0, len(rejected_entries) - 3)
                 lines.append("")
-                extra_rej = max(0, len(rejected_entries) - REJECT_DETAIL_LIMIT)
-                header_suffix = f" (상위 {REJECT_DETAIL_LIMIT}건만 표시, 외 {extra_rej}건)" if extra_rej > 0 else ""
-                lines.append(f"[❌ 거부된 방법론 요약{header_suffix}]")
-                for e in rejected_entries[:REJECT_DETAIL_LIMIT]:
+                suffix = f" (+{extra_rej}건 생략)" if extra_rej > 0 else ""
+                lines.append(f"[❌ 거부 방법론{suffix}]")
+                for e in rejected_entries[:3]:
                     name = e.get('method', {}).get('방법론명', '(이름 없음)')
                     vr = e.get('validation_result', {})
                     for path, label in [('stock', '주식'), ('etf', 'ETF')]:
                         r = vr.get(path, {})
                         if r.get('verdict') != 'rejected':
                             continue
-                        reason = r.get('reason', '사유 없음')
-                        proposed = r.get('proposed_changes', {})
-                        bm = r.get('before_metrics', {})
-                        am = r.get('after_metrics', {})
-                        param_str = ', '.join(f"{k}={v}" for k, v in proposed.items()) if proposed else '없음'
-                        lines.append(f"  • [{label}] {name}  |  제안: {param_str}")
-                        lines.append(f"    거부 이유: {reason}")
-                        if bm and am:
-                            wr_b, wr_a = bm.get('win_rate', 0), am.get('win_rate', 0)
-                            ret_b, ret_a = bm.get('avg_return', 0), am.get('avg_return', 0)
-                            mdd_b, mdd_a = bm.get('mdd', 0), am.get('mdd', 0)
-                            sh_b, sh_a = bm.get('sharpe', 0), am.get('sharpe', 0)
-                            lines.append(
-                                f"    지표: 승률 {wr_b:.1f}%→{wr_a:.1f}% ({wr_a-wr_b:+.1f}%p) | "
-                                f"평균수익 {ret_b:+.2f}%→{ret_a:+.2f}% | "
-                                f"MDD {mdd_b:.2f}%→{mdd_a:.2f}% | "
-                                f"Sharpe {sh_b:.2f}→{sh_a:.2f}"
-                            )
-                if extra_rej > 0:
-                    # 나머지 거부 건은 이름만 콤마 구분으로 나열
-                    rest_names = [e.get('method', {}).get('방법론명', '(이름 없음)') for e in rejected_entries[REJECT_DETAIL_LIMIT:]]
-                    lines.append(f"  + 추가 거부 {extra_rej}건: {', '.join(rest_names)}")
+                        reason = r.get('reason', '')
+                        short_reason = reason[:70] + ('…' if len(reason) > 70 else '')
+                        lines.append(f"  • [{label}] {name}: {short_reason}")
 
-            # ── 스킵·효과없음 목록 (간략) ─────────────────────────────
+            # ── 스킵은 건수만 ─────────────────────────────────────────
             skip_entries = [
                 e for e in entries
                 if e.get('validation_result', {}).get('stock', {}).get('verdict') in ('skipped', 'no_effect', 'sparse_market', 'error')
@@ -247,58 +212,54 @@ class AlgorithmUpdateReport:
                 )
             ]
             if skip_entries:
-                lines.append("")
-                lines.append("[⏭ 스킵·효과없음 방법론]")
-                for e in skip_entries:
-                    name = e.get('method', {}).get('방법론명', '(이름 없음)')
-                    vr = e.get('validation_result', {})
-                    s_v = vr.get('stock', {}).get('verdict', '-')
-                    s_r = vr.get('stock', {}).get('reason', '')
-                    e_v = vr.get('etf', {}).get('verdict', '-')
-                    lines.append(f"  • {name}  [주식:{s_v}] [ETF:{e_v}]")
-                    if s_r:
-                        lines.append(f"    사유: {s_r}")
+                skip_names = [e.get('method', {}).get('방법론명', '?') for e in skip_entries[:5]]
+                extra_sk = max(0, len(skip_entries) - 5)
+                suffix = f" 외 {extra_sk}건" if extra_sk > 0 else ""
+                lines.append(f"⏭ 스킵: {', '.join(skip_names)}{suffix}")
 
-        # ── 2. 파라미터 변경 및 전후 성과 비교 ────────────────────────
+        # ── 2. 파라미터 변경 요약 ─────────────────────────────────────
         lines += ["", "[⚙️ 파라미터 변경]"]
         if not self.changes:
-            lines.append('- 변경된 파라미터가 없습니다.')
+            lines.append('변경 없음')
         else:
             for key, values in self.changes.items():
-                old_v = values['before']
-                new_v = values['after']
+                old_v, new_v = values['before'], values['after']
                 try:
-                    diff = float(new_v) - float(old_v)
-                    direction = '↑' if diff > 0 else '↓'
+                    direction = '↑' if float(new_v) > float(old_v) else '↓'
                 except (TypeError, ValueError):
                     direction = ''
-                lines.append(f"  • {key}: {old_v} → {new_v} {direction}")
+                lines.append(f"  {key}: {old_v} → {new_v} {direction}")
 
-            # 전체 효과 요약
+            # 전후 성과 한 줄 요약
             bm = self.before_metrics or {}
             am = self.after_metrics or {}
             if bm.get('win_rate') is not None and am.get('win_rate') is not None:
-                wr_d = am['win_rate'] - bm['win_rate']
-                ret_d = (am.get('avg_return') or 0) - (bm.get('avg_return') or 0)
-                mdd_d = (am.get('mdd') or am.get('min_return') or 0) - (bm.get('mdd') or bm.get('min_return') or 0)
-                sh_d = (am.get('sharpe') or 0) - (bm.get('sharpe') or 0)
+                wr_d   = am['win_rate'] - bm['win_rate']
+                ret_d  = (am.get('avg_return') or 0) - (bm.get('avg_return') or 0)
+                mdd_d  = (am.get('mdd') or am.get('min_return') or 0) - (bm.get('mdd') or bm.get('min_return') or 0)
+                sh_d   = (am.get('sharpe') or 0) - (bm.get('sharpe') or 0)
                 lines += [
                     "",
-                    "[📊 전체 파라미터 변경 전후 성과 비교]",
-                    f"  거래수:   {bm.get('count',0)}건 → {am.get('count',0)}건",
-                    f"  승  률:   {bm.get('win_rate',0):.1f}% → {am.get('win_rate',0):.1f}% ({wr_d:+.1f}%p)",
-                    f"  평균수익: {bm.get('avg_return',0):+.2f}% → {am.get('avg_return',0):+.2f}% ({ret_d:+.2f}%p)",
-                    f"  MDD:      {bm.get('mdd', bm.get('min_return',0)):.2f}% → {am.get('mdd', am.get('min_return',0)):.2f}% ({mdd_d:+.2f}%p)",
-                    f"  Sharpe:   {bm.get('sharpe',0):.2f} → {am.get('sharpe',0):.2f} ({sh_d:+.2f})",
+                    "[📊 성과 변화]",
+                    (f"  승률 {bm.get('win_rate',0):.1f}%→{am.get('win_rate',0):.1f}% ({wr_d:+.1f}%p) | "
+                     f"수익 {bm.get('avg_return',0):+.2f}%→{am.get('avg_return',0):+.2f}% ({ret_d:+.2f}%p)"),
+                    (f"  MDD {bm.get('mdd', bm.get('min_return',0)):.2f}%→"
+                     f"{am.get('mdd', am.get('min_return',0)):.2f}% ({mdd_d:+.2f}%p) | "
+                     f"Sharpe {bm.get('sharpe',0):.2f}→{am.get('sharpe',0):.2f} ({sh_d:+.2f})"),
                 ]
 
-        # ── 3. 핵심 요약 ────────────────────────────────────────────────
+        # ── 3. 핵심 요약 (최대 5줄) ────────────────────────────────────
         lines += ["", "[💡 핵심 요약]"]
-        if not self.notes:
-            lines.append('- 특별한 이슈는 발견되지 않았습니다.')
+        notes_to_show = self.notes[:5] if self.notes else []
+        extra_notes = max(0, len(self.notes or []) - 5)
+        if not notes_to_show:
+            lines.append('특별한 이슈 없음')
         else:
-            for note in self.notes:
+            for note in notes_to_show:
                 lines.append(f"- {note}")
+            if extra_notes > 0:
+                lines.append(f"- (외 {extra_notes}건 생략 — 리포트 파일 참조)")
+
         return '\n'.join(lines)
 
     def save_markdown(self):

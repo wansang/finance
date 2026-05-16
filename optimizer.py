@@ -661,15 +661,30 @@ class StrategyOptimizer:
     def _log_backlog_update(self, approved_changes, before_metrics, processed_entries):
         """승인된 변경사항을 algorithm_update_log.json에 기록한다."""
         log_file = 'algorithm_update_log.json'
+
+        def _is_approved(e):
+            vr = e.get('validation_result', {})
+            return (
+                vr.get('stock', {}).get('verdict') == 'approved'
+                or vr.get('etf', {}).get('verdict') == 'approved'
+            )
+
+        def _get_after_metrics(e):
+            vr = e.get('validation_result', {})
+            for path in ('stock', 'etf'):
+                r = vr.get(path, {})
+                if r.get('verdict') == 'approved' and r.get('after_metrics'):
+                    return r['after_metrics']
+            return None
+
         approved_methods = [
             e['method'].get('방법론명', '')
             for e in processed_entries
-            if e.get('validation_result', {}).get('verdict') == 'approved'
+            if _is_approved(e)
         ]
         after_metrics_list = [
-            e['validation_result']['after_metrics']
-            for e in processed_entries
-            if e.get('validation_result', {}).get('verdict') == 'approved'
+            m for m in (_get_after_metrics(e) for e in processed_entries if _is_approved(e))
+            if m is not None
         ]
         avg_after = {}
         if after_metrics_list:
@@ -2620,8 +2635,33 @@ ETF 보유 시 더 넓은 손절 기준이나 추세 기반 목표가 조정이 
 
         # ── 8. 변경사항 저장 및 보고 ─────────────────────────────────────
 
+        # evolve 잡(배치 merge 이후)에서 _backlog_summary가 없으면 run summary 파일에서 로드
+        if not getattr(self, '_backlog_summary', None):
+            _run_summary_file = '_backlog_run_summary.json'
+            if os.path.exists(_run_summary_file):
+                try:
+                    with open(_run_summary_file, 'r', encoding='utf-8') as _f:
+                        self._backlog_summary = json.load(_f)
+                    print(f"[backlog] 배치 실행 요약 로드: {_run_summary_file} "
+                          f"({self._backlog_summary.get('total_validated', 0)}건 처리)")
+                except Exception as _e:
+                    print(f"[backlog] run summary 로드 실패: {_e}")
+
         if not changes:
             print("\n[최종 결과] 현재 전략이 최적입니다. 변경 없이 종료합니다.")
+            # backlog 처리 결과가 있으면 변경 없음 알림이라도 전송
+            _bs = getattr(self, '_backlog_summary', None)
+            if _bs and _bs.get('total_validated', 0) > 0:
+                _report = AlgorithmUpdateReport(
+                    title='[backlog 검증 완료] 알고리즘 파라미터 최적 유지',
+                    before_metrics=before_metrics,
+                    after_metrics=None,
+                    changes={},
+                    notes=['현재 전략 파라미터가 최적 상태로 유지됩니다. (변경 없음)'],
+                    backlog_summary=_bs,
+                )
+                _report.send_telegram()
+                print("  backlog 검증 결과 Telegram 전송 완료")
         else:
             print(f"\n[최종 결과] {len(changes)}개 파라미터 업데이트")
             self.save_config(gradual_config)
