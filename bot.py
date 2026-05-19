@@ -6,7 +6,7 @@ import datetime
 import requests
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler
-from analyzer import StockAnalyzer
+# StockAnalyzer는 lazy load - 시작 시 메모리 절약
 
 # 로깅 설정
 logging.basicConfig(
@@ -16,11 +16,18 @@ logging.basicConfig(
 
 class StockBot:
     def __init__(self):
-        self.analyzer = StockAnalyzer()
+        self._analyzer = None  # lazy load
         self.token = os.environ.get('TELEGRAM_TOKEN')
         self.chat_id = os.environ.get('TELEGRAM_CHAT_ID')
         self.github_pat = os.environ.get('GITHUB_PAT')
         self.base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    @property
+    def analyzer(self):
+        if self._analyzer is None:
+            from analyzer import StockAnalyzer  # 첫 사용 시에만 로드
+            self._analyzer = StockAnalyzer()
+        return self._analyzer
 
     def _git_push(self, files: list, message: str):
         """GitHub Contents API로 파일을 직접 업데이트한다."""
