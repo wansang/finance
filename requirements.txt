@@ -1,6 +1,6 @@
 finance-datareader
 pandas-ta-classic
-python-telegram-bot
+python-telegram-bot[webhooks]
 scipy
 pandas
 numpy
