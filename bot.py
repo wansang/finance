@@ -248,8 +248,18 @@ class StockBot:
         application.add_handler(CommandHandler('watchlist', self.list_watchlist))
         application.add_handler(CommandHandler('analyze', self.analyze_now))
         
-        print("Bot is running... Press Ctrl+C to stop.")
-        application.run_polling()
+        webhook_url = os.environ.get('WEBHOOK_URL', '')
+        if webhook_url:
+            print(f"Webhook 모드로 실행 중: {webhook_url}")
+            application.run_webhook(
+                listen="0.0.0.0",
+                port=8080,
+                url_path=self.token,
+                webhook_url=f"{webhook_url}/{self.token}",
+            )
+        else:
+            print("Bot is running (polling)... Press Ctrl+C to stop.")
+            application.run_polling()
 
 if __name__ == '__main__':
     bot = StockBot()
