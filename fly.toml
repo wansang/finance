@@ -1,0 +1,15 @@
+# Fly.io configuration for stock telegram bot
+app = "finance-stock-bot"
+primary_region = "nrt"  # Tokyo (Asia nearest)
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  # Non-sensitive env vars can go here
+  # Sensitive values are set via: fly secrets set KEY=VALUE
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

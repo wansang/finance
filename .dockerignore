@@ -1,0 +1,16 @@
+# 대용량 데이터 파일 제외 (런타임에 GitHub에서 가져옴)
+searchBacklog_history.json
+_backlog_run_summary.json
+searchBacklog.json
+
+# 개발/환경 파일
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.git/
+.gitignore
+
+# 로컬 전용 파일
+*.env
+.env*
