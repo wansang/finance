@@ -1949,5 +1949,123 @@
       "TRAILING_STOP_ACTIVATE_PCT": 0.25
     },
     "batch_count": 23
+  },
+  {
+    "timestamp": "2026-05-19T18:13:36.491972",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "detect_stoch_mfi_rebound: 단순 지표 교차 외에 실제 가격 반등(양봉) 여부를 확인하여 하락 추세 중 가짜 반등 신호를 필터링합니다."
+    ],
+    "kept": false,
+    "before": {
+      "total": 169,
+      "wins": 123,
+      "win_rate": 72.7811,
+      "avg_ret": 12.2391,
+      "sharpe": 2.2802,
+      "mdd": 44.5622
+    },
+    "after": {
+      "total": 170,
+      "wins": 122,
+      "win_rate": 71.7647,
+      "avg_ret": 12.0442,
+      "sharpe": 2.2338,
+      "mdd": 44.5622
+    }
+  },
+  {
+    "timestamp": "2026-05-19T18:53:34.369363",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "is_taj_mahal_signal: 피드백에 따라 진입 타이밍을 늦추는 양봉 확인 조건을 제거하고, 대신 200일 이평선 지지 확인을 통해 역추세 진입의 안정성을 확보함."
+    ],
+    "kept": false,
+    "before": {
+      "total": 169,
+      "wins": 123,
+      "win_rate": 72.7811,
+      "avg_ret": 12.2391,
+      "sharpe": 2.2802,
+      "mdd": 44.5622
+    },
+    "after": {
+      "total": 172,
+      "wins": 126,
+      "win_rate": 73.2558,
+      "avg_ret": 12.1748,
+      "sharpe": 2.2759,
+      "mdd": 44.5622
+    }
+  },
+  {
+    "timestamp": "2026-05-19T19:32:57.476149",
+    "type": "ExpertAB_자동개선",
+    "patches_applied": [
+      "detect_stoch_mfi_rebound: 단순 과매도 구간의 골든크로스로 인한 가짜 반등을 방지하기 위해 당일 양봉 및 RSI 상승 확증 조건을 추가하여 승률을 개선합니다."
+    ],
+    "kept": false,
+    "before": {
+      "total": 169,
+      "wins": 123,
+      "win_rate": 72.7811,
+      "avg_ret": 12.2391,
+      "sharpe": 2.2802,
+      "mdd": 44.5622
+    },
+    "after": {
+      "total": 171,
+      "wins": 123,
+      "win_rate": 71.9298,
+      "avg_ret": 12.0946,
+      "sharpe": 2.2486,
+      "mdd": 44.5622
+    }
+  },
+  {
+    "title": "이번주 추천 종목 실적 기반 알고리즘 고도화 업데이트",
+    "timestamp": "2026-05-19 19:32:57",
+    "changes": {
+      "TREND_TEMPLATE_PEAK_FACTOR": {
+        "before": 0.248,
+        "after": 0.254
+      },
+      "TIER1_WIN_RATE": {
+        "before": 59,
+        "after": 60
+      },
+      "TRAILING_STOP_PCT": {
+        "before": 0.0364,
+        "after": 0.0375
+      },
+      "VALIDATE_MAX_HOLD_DAYS": {
+        "before": 60,
+        "after": 45
+      }
+    },
+    "before_metrics": {
+      "count": 18,
+      "avg_return": 10.308719604962516,
+      "win_rate": 72.22222222222221,
+      "max_return": 60.20429620563036,
+      "min_return": -28.965941888619856
+    },
+    "after_metrics": {
+      "count": 18,
+      "avg_return": 10.385483016882294,
+      "win_rate": 77.77777777777779,
+      "max_return": 60.20429620563036,
+      "min_return": -28.965941888619856
+    },
+    "notes": [
+      "실제 추천 종목 18개 성과 기반 고도화 최적화",
+      "시장 상황: BULL",
+      "분석 기준 — 승률 72.2%, 평균수익 +10.31%, MDD -28.97%",
+      "TREND_TEMPLATE_PEAK_FACTOR: 0.248→0.254 — 성과 데이터 기반 점진적 조정",
+      "TIER1_WIN_RATE: 59→60 — 승률 부족으로 상향(진입 조건 강화)",
+      "TRAILING_STOP_PCT: 0.0364→0.0375 — 수익률 패턴 기반 트레일링 스톱 확대(추세 추종 강화)",
+      "VALIDATE_MAX_HOLD_DAYS: 60→45 — 보유기간 단축(단기 변동성 대응)",
+      "최고 성과 신호: RSI 반전 신호(상승 가능성) (승률 100.0%)"
+    ]
   }
 ]
