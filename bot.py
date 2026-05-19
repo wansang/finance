@@ -29,6 +29,30 @@ class StockBot:
             self._analyzer = StockAnalyzer()
         return self._analyzer
 
+    def _load_holdings(self):
+        path = os.path.join(self.base_dir, 'holdings.json')
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return {}
+
+    def _save_holdings(self, holdings):
+        path = os.path.join(self.base_dir, 'holdings.json')
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(holdings, f, ensure_ascii=False, indent=4)
+
+    def _load_watchlist(self):
+        path = os.path.join(self.base_dir, 'watchlist.json')
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        return {}
+
+    def _save_watchlist(self, watchlist):
+        path = os.path.join(self.base_dir, 'watchlist.json')
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(watchlist, f, ensure_ascii=False, indent=4)
+
     def _git_push(self, files: list, message: str):
         """GitHub Contents API로 파일을 직접 업데이트한다."""
         if not self.github_pat:
@@ -114,20 +138,20 @@ class StockBot:
                 pass
 
             # holdings.json 업데이트
-            holdings = self.analyzer.load_holdings()
+            holdings = self._load_holdings()
             holdings[code] = {
                 "name": stock_name,
                 "buy_date": datetime.datetime.now().strftime('%Y-%m-%d'),
                 "buy_price": int(price.replace(',', ''))
             }
-            self.analyzer.save_holdings(holdings)
+            self._save_holdings(holdings)
 
             # watchlist에서 해당 종목 제거 (관심종목 또는 AI관심종목 모두)
             files_to_push = ['holdings.json']
-            watchlist = self.analyzer.load_watchlist()
+            watchlist = self._load_watchlist()
             if code in watchlist:
                 del watchlist[code]
-                self.analyzer.save_watchlist(watchlist)
+                self._save_watchlist(watchlist)
                 files_to_push.append('watchlist.json')
                 await update.message.reply_text(f"🗑 {stock_name}({code})이(가) 관심종목에서 삭제되었습니다.")
 
@@ -144,11 +168,11 @@ class StockBot:
                 return
 
             code = context.args[0]
-            holdings = self.analyzer.load_holdings()
+            holdings = self._load_holdings()
             
             if code in holdings:
                 del holdings[code]
-                self.analyzer.save_holdings(holdings)
+                self._save_holdings(holdings)
                 self._git_push(['holdings.json'], f'bot: /sell {code} 삭제 [skip ci]')
                 await update.message.reply_text(f"🗑 {code} 종목이 포트폴리오에서 삭제되었습니다.")
             else:
@@ -157,7 +181,7 @@ class StockBot:
             await update.message.reply_text(f"❌ 오류 발생: {e}")
 
     async def list_holdings(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        holdings = self.analyzer.load_holdings()
+        holdings = self._load_holdings()
         if not holdings:
             await update.message.reply_text("현재 보유 중인 종목이 없습니다.")
             return
@@ -184,7 +208,7 @@ class StockBot:
             code = context.args[0]
             
             # watchlist.json 업데이트
-            watchlist = self.analyzer.load_watchlist()
+            watchlist = self._load_watchlist()
             if code in watchlist:
                 await update.message.reply_text(f"⚠️ {code} 종목은 이미 관심주 목록에 있습니다.")
                 return
@@ -194,7 +218,7 @@ class StockBot:
                 "add_date": datetime.datetime.now().strftime('%Y-%m-%d'),
                 "source": "manual"
             }
-            self.analyzer.save_watchlist(watchlist)
+            self._save_watchlist(watchlist)
             self._git_push(['watchlist.json'], f'bot: /watch {code} 추가 [skip ci]')
 
             await update.message.reply_text(f"⭐ 종목이 관심주 목록에 추가되었습니다.")
@@ -208,11 +232,11 @@ class StockBot:
                 return
 
             code = context.args[0]
-            watchlist = self.analyzer.load_watchlist()
+            watchlist = self._load_watchlist()
             
             if code in watchlist:
                 del watchlist[code]
-                self.analyzer.save_watchlist(watchlist)
+                self._save_watchlist(watchlist)
                 self._git_push(['watchlist.json'], f'bot: /unwatch {code} 삭제 [skip ci]')
                 await update.message.reply_text(f"🗑 {code} 종목이 관심주 목록에서 삭제되었습니다.")
             else:
@@ -222,7 +246,7 @@ class StockBot:
 
     async def list_watchlist(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
-            watchlist = self.analyzer.load_watchlist()
+            watchlist = self._load_watchlist()
             if not watchlist:
                 await update.message.reply_text("현재 관심주 목록이 비어있습니다.")
                 return
