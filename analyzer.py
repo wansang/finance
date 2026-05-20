@@ -73,10 +73,8 @@ class StockAnalyzer:
 
     def supported_gemini_models(self):
         return [
-            'gemini-2.0-flash',
             'gemini-2.5-flash',
-            'gemini-2.5-flash-lite',
-            'gemini-2.0-flash-001'
+            'gemini-2.5-flash-lite'
         ]
 
     def create_gemini_model(self, model_name):
