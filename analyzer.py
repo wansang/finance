@@ -1030,7 +1030,7 @@ class StockAnalyzer:
                         return normalized
                     return self.build_local_report(market_data, holding_data, watch_data, report_mode, ai_watch_data, entry_now_data)
                 elif hasattr(genai, 'generate_text'):
-                    model_name = self.model_name or 'gemini-2.1'
+                    model_name = self.model_name or 'gemini-2.5-flash'
                     response = genai.generate_text(model=model_name, prompt=prompt)
                     normalized = self._normalize_ai_response(response)
                     if normalized:

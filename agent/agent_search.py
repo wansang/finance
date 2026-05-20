@@ -90,7 +90,7 @@ def run_agent_search():
     except Exception:
         tunable_str = "SMA50, SMA150, SMA200, RSI_LENGTH, BB_LENGTH, BB_STD, STOCH_RSI_LENGTH, TRAILING_STOP_PCT, PROFIT_TARGET_PCT, ATR_STOP_MULTIPLIER, ATR_TARGET_MULTIPLIER, VALIDATE_MAX_HOLD_DAYS, TIER1_WIN_RATE, TIER2_WIN_RATE"
 
-    model_name = 'gemini-flash-latest'
+    model_name = 'gemini-2.5-flash'
     model = create_gemini_model(model_name, api_key)
     prompt = (
         "너는 40년 경력의 투자 방법 검색 전문가(agent_search)다.\n\n"
