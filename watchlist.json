@@ -81,17 +81,12 @@
     },
     "010820": {
         "name": "퍼스텍",
-        "add_date": "2026-05-19",
-        "source": "auto_recommendation"
-    },
-    "006260": {
-        "name": "LS",
-        "add_date": "2026-05-12",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "456040": {
         "name": "OCI",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "090460": {
@@ -99,14 +94,9 @@
         "add_date": "2026-05-19",
         "source": "auto_recommendation"
     },
-    "298040": {
-        "name": "효성중공업",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
     "082740": {
         "name": "한화엔진",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "028050": {
@@ -116,12 +106,12 @@
     },
     "CAT": {
         "name": "CAT",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "006400": {
         "name": "삼성SDI",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "042700": {
@@ -139,39 +129,9 @@
         "add_date": "2026-05-19",
         "source": "auto_recommendation"
     },
-    "120110": {
-        "name": "코오롱인더",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "00806K": {
-        "name": "대덕1우",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "025890": {
-        "name": "한국주강",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "005090": {
-        "name": "SGC에너지",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
     "007815": {
         "name": "코리아써우",
-        "add_date": "2026-05-15",
-        "source": "auto_recommendation"
-    },
-    "034020": {
-        "name": "두산에너빌리티",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "001230": {
-        "name": "동국홀딩스",
-        "add_date": "2026-05-12",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "009160": {
@@ -194,16 +154,6 @@
         "add_date": "2026-05-17",
         "source": "auto_recommendation"
     },
-    "192820": {
-        "name": "코스맥스",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "003000": {
-        "name": "부광약품",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
     "020000": {
         "name": "한섬",
         "add_date": "2026-05-18",
@@ -219,34 +169,14 @@
         "add_date": "2026-05-18",
         "source": "auto_recommendation"
     },
-    "395400": {
-        "name": "SK리츠",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
     "001465": {
         "name": "BYC우",
         "add_date": "2026-05-17",
         "source": "auto_recommendation"
     },
-    "417310": {
-        "name": "코람코더원리츠",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "033780": {
-        "name": "KT&G",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "001560": {
-        "name": "제일연마",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
     "451800": {
         "name": "한화리츠",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "025540": {
@@ -254,104 +184,9 @@
         "add_date": "2026-05-15",
         "source": "auto_recommendation"
     },
-    "373220": {
-        "name": "LG에너지솔루션",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "016740": {
-        "name": "두올",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "282330": {
-        "name": "BGF리테일",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "000880": {
-        "name": "한화",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "010955": {
-        "name": "S-Oil우",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
     "086790": {
         "name": "하나금융지주",
         "add_date": "2026-05-13",
-        "source": "auto_recommendation"
-    },
-    "108320": {
-        "name": "LX세미콘",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "010400": {
-        "name": "우진아이엔에스",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "000670": {
-        "name": "영풍",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "078935": {
-        "name": "GS우",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "005070": {
-        "name": "코스모신소재",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "071055": {
-        "name": "한국금융지주우",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "011780": {
-        "name": "금호석유화학",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "030200": {
-        "name": "KT",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "072710": {
-        "name": "농심홀딩스",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "004690": {
-        "name": "삼천리",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "002355": {
-        "name": "넥센타이어1우B",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "002460": {
-        "name": "HS화성",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "003650": {
-        "name": "미창석유",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "032640": {
-        "name": "LG유플러스",
-        "add_date": "2026-05-12",
         "source": "auto_recommendation"
     },
     "049800": {
@@ -359,19 +194,9 @@
         "add_date": "2026-05-17",
         "source": "auto_recommendation"
     },
-    "021820": {
-        "name": "세원정공",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
-    "001620": {
-        "name": "케이비아이동국실업",
-        "add_date": "2026-05-12",
-        "source": "auto_recommendation"
-    },
     "322000": {
         "name": "HD현대에너지솔루션",
-        "add_date": "2026-05-17",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "008350": {
@@ -396,7 +221,7 @@
     },
     "005935": {
         "name": "삼성전자우",
-        "add_date": "2026-05-17",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "278470": {
@@ -421,7 +246,7 @@
     },
     "015260": {
         "name": "에이엔피",
-        "add_date": "2026-05-18",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "084680": {
@@ -476,7 +301,7 @@
     },
     "058430": {
         "name": "포스코스틸리온",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "178920": {
@@ -491,17 +316,17 @@
     },
     "001250": {
         "name": "GS글로벌",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "034730": {
         "name": "SK",
-        "add_date": "2026-05-15",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "460860": {
         "name": "동국제강",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "006405": {
@@ -511,7 +336,7 @@
     },
     "03473K": {
         "name": "SK우",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "028260": {
@@ -531,7 +356,7 @@
     },
     "005010": {
         "name": "휴스틸",
-        "add_date": "2026-05-18",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "02826K": {
@@ -561,7 +386,7 @@
     },
     "005950": {
         "name": "이수화학",
-        "add_date": "2026-05-18",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "267260": {
@@ -571,7 +396,7 @@
     },
     "108670": {
         "name": "LX하우시스",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "078930": {
@@ -596,17 +421,17 @@
     },
     "008420": {
         "name": "문배철강",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "001290": {
         "name": "상상인증권",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "448730": {
         "name": "삼성FN리츠",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "011760": {
@@ -646,7 +471,7 @@
     },
     "402340": {
         "name": "SK스퀘어",
-        "add_date": "2026-05-17",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "069500": {
@@ -711,7 +536,7 @@
     },
     "092790": {
         "name": "넥스틸",
-        "add_date": "2026-05-18",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "00781K": {
@@ -726,7 +551,7 @@
     },
     "AAPL": {
         "name": "AAPL",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "33637K": {
@@ -751,12 +576,12 @@
     },
     "INTC": {
         "name": "INTC",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "006340": {
         "name": "대원전선",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "009155": {
@@ -776,7 +601,7 @@
     },
     "044820": {
         "name": "코스맥스비티아이",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "195870": {
@@ -786,12 +611,12 @@
     },
     "092220": {
         "name": "KEC",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "078520": {
         "name": "에이블씨엔씨",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "001780": {
@@ -806,12 +631,92 @@
     },
     "002220": {
         "name": "한일철강",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     },
     "460850": {
         "name": "동국씨엠",
-        "add_date": "2026-05-19",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "011070": {
+        "name": "LG이노텍",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "007610": {
+        "name": "선도전기",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "006110": {
+        "name": "삼아알미늄",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "AMD": {
+        "name": "AMD",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "006260": {
+        "name": "LS",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "032830": {
+        "name": "삼성생명",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "007070": {
+        "name": "GS리테일",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "012610": {
+        "name": "경인양행",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "00806K": {
+        "name": "대덕1우",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "016360": {
+        "name": "삼성증권",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "016380": {
+        "name": "KG스틸",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "033240": {
+        "name": "자화전자",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "021050": {
+        "name": "서원",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "024070": {
+        "name": "WISCOM",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "002240": {
+        "name": "고려제강",
+        "add_date": "2026-05-20",
+        "source": "auto_recommendation"
+    },
+    "025860": {
+        "name": "남해화학",
+        "add_date": "2026-05-20",
         "source": "auto_recommendation"
     }
 }
