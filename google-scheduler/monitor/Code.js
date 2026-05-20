@@ -42,8 +42,8 @@ function dispatchMonitorWorkflow() {
     return;
   }
 
-  // 09:00 ~ 20:00 사이만 실행
-  if (kstHour < 9 || kstHour > 20) {
+  // 오전 9시(장 오픈) 또는 오후 2시만 실행
+  if (kstHour !== 9 && kstHour !== 14) {
     Logger.log('[SKIP] 실행 시간 외 (' + kstHour + '시): ' + kstLabel);
     return;
   }
@@ -80,18 +80,28 @@ function dispatchMonitorWorkflow() {
   }
 }
 
-// GAS 트리거 설정: 매 30분마다 실행 (시간대 필터는 코드에서 처리)
+// GAS 트리거 설정: 오전 9시(장 오픈), 오후 2시 하루 2회 실행
 // Apps Script 에디터에서 한 번만 실행하면 트리거 등록됨
-function createEvery30MinTrigger() {
+function createTwiceDailyTrigger() {
   // 기존 동일 함수 트리거 중복 방지
   ScriptApp.getProjectTriggers().forEach(t => {
     if (t.getHandlerFunction() === 'dispatchMonitorWorkflow') {
       ScriptApp.deleteTrigger(t);
     }
   });
+  // 오전 9시 트리거 (KST 09:00 ~ 10:00 사이 실행)
   ScriptApp.newTrigger('dispatchMonitorWorkflow')
     .timeBased()
-    .everyMinutes(30)
+    .everyDays(1)
+    .atHour(9)
+    .inTimezone('Asia/Seoul')
     .create();
-  Logger.log('[SETUP] 30분 간격 트리거 등록 완료');
+  // 오후 2시 트리거 (KST 14:00 ~ 15:00 사이 실행)
+  ScriptApp.newTrigger('dispatchMonitorWorkflow')
+    .timeBased()
+    .everyDays(1)
+    .atHour(14)
+    .inTimezone('Asia/Seoul')
+    .create();
+  Logger.log('[SETUP] 하루 2회 트리거 등록 완료 (오전 9시, 오후 2시 KST)');
 }
