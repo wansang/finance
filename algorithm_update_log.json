@@ -2067,5 +2067,32 @@
       "VALIDATE_MAX_HOLD_DAYS: 60→45 — 보유기간 단축(단기 변동성 대응)",
       "최고 성과 신호: RSI 반전 신호(상승 가능성) (승률 100.0%)"
     ]
+  },
+  {
+    "updated_at": "2026-05-23T05:59:28.332208",
+    "source": "merge_batches",
+    "approved_changes": {
+      "TREND_TEMPLATE_PEAK_FACTOR": 1.25,
+      "TRAILING_STOP_ACTIVATE_PCT": 0.6,
+      "TRAILING_STOP_PCT": 0.08,
+      "RS_LOOKBACK_BEAR": 60,
+      "RS_MIN_BEAR_DEFENSE": 99.8,
+      "VALIDATE_MIN_HISTORY": 1000,
+      "TIER1_WIN_RATE": 0.9,
+      "MARKET_FILTER_ENABLED": true,
+      "RSI_LENGTH": 8,
+      "MFI_LENGTH": 23,
+      "VOL_AVG_WINDOW": 40,
+      "SMA50": 50,
+      "SMA150": 140,
+      "SMA200": 190,
+      "PROFIT_TARGET_PCT": 0.25,
+      "MIN_AVG_VOLUME": 600000,
+      "STOCH_RSI_LENGTH": 60,
+      "STOCH_K": 20,
+      "STOCH_D": 20,
+      "VALIDATE_MAX_HOLD_DAYS": 150
+    },
+    "batch_count": 32
   }
 ]
