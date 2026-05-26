@@ -50,6 +50,44 @@ def merge():
     print(f"[merge] history 총 {len(history)}건 저장")
 
     # ── 2. 승인 변경사항 합산 → strategy_config.json 반영 ────────────
+    # 파라미터 허용 범위: (min, max). None은 한쪽 경계 없음.
+    PARAM_BOUNDS = {
+        'TREND_TEMPLATE_PEAK_FACTOR':  (0.10, 0.95),
+        'TIER1_WIN_RATE':              (30,   85),
+        'TIER2_WIN_RATE':              (25,   75),
+        'RS_MIN_BEAR_DEFENSE':         (-0.5, 0.3),
+        'VALIDATE_MIN_HISTORY':        (50,   500),
+        'VALIDATE_MAX_HOLD_DAYS':      (5,    90),
+        'TRAILING_STOP_PCT':           (0.01, 0.15),
+        'TRAILING_STOP_ACTIVATE_PCT':  (0.01, 0.40),
+        'MIN_AVG_VOLUME':              (1000, 300000),
+        'SMA50':                       (20,   70),
+        'SMA150':                      (100,  200),
+        'SMA200':                      (150,  250),
+        'RSI_LENGTH':                  (5,    30),
+        'MFI_LENGTH':                  (5,    30),
+        'VOL_AVG_WINDOW':              (5,    50),
+        'STOCH_RSI_LENGTH':            (5,    50),
+        'STOCH_K':                     (2,    21),
+        'STOCH_D':                     (2,    21),
+        'PROFIT_TARGET_PCT':           (0.03, 0.60),
+        'RS_LOOKBACK_BEAR':            (5,    120),
+    }
+
+    def validate_param(key, value, current_value):
+        """파라미터 값이 허용 범위 내인지 검증. 범위 벗어나면 current_value 반환."""
+        if key not in PARAM_BOUNDS:
+            return value
+        lo, hi = PARAM_BOUNDS[key]
+        try:
+            val = float(value)
+        except (TypeError, ValueError):
+            return value
+        if (lo is not None and val < lo) or (hi is not None and val > hi):
+            print(f"  [경고] {key}={value} 허용 범위({lo}~{hi}) 초과 → 현재값 {current_value} 유지")
+            return current_value
+        return value
+
     all_approved = {}
     for cf in changes_files:
         try:
@@ -60,6 +98,11 @@ def merge():
 
     if all_approved:
         config = json.load(open(config_file, encoding='utf-8'))
+        # 범위 검증 후 적용
+        validated = {}
+        for k, v in all_approved.items():
+            validated[k] = validate_param(k, v, config.get(k, v))
+        all_approved = validated
         config.update(all_approved)
         with open(config_file, 'w', encoding='utf-8') as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
