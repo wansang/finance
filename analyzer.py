@@ -736,10 +736,9 @@ class StockAnalyzer:
             entry = watchlist.get(code)
             if entry:
                 if entry.get('source') == 'auto_recommendation':
+                    # add_date는 최초 추가일 유지 (갱신 금지 — 7일 타이머 보존)
                     entry['name'] = stock_name
-                    entry['add_date'] = today
                     watchlist[code] = entry
-                    added_codes.append(code)
                 continue
 
             watchlist[code] = {
