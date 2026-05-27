@@ -423,5 +423,80 @@
         "name": "한화갤러리아우",
         "add_date": "2026-05-26",
         "source": "auto_recommendation"
+    },
+    "018260": {
+        "name": "삼성에스디에스",
+        "add_date": "2026-05-27",
+        "source": "auto_recommendation"
+    },
+    "007070": {
+        "name": "GS리테일",
+        "add_date": "2026-05-27",
+        "source": "auto_recommendation"
+    },
+    "017550": {
+        "name": "수산세보틱스",
+        "add_date": "2026-05-27",
+        "source": "auto_recommendation"
+    },
+    "012610": {
+        "name": "경인양행",
+        "add_date": "2026-05-27",
+        "source": "auto_recommendation"
+    },
+    "077970": {
+        "name": "STX엔진",
+        "add_date": "2026-05-27",
+        "source": "auto_recommendation"
+    },
+    "015860": {
+        "name": "일진홀딩스",
+        "add_date": "2026-05-27",
+        "source": "auto_recommendation"
+    },
+    "267270": {
+        "name": "HD건설기계",
+        "add_date": "2026-05-27",
+        "source": "auto_recommendation"
+    },
+    "403550": {
+        "name": "쏘카",
+        "add_date": "2026-05-27",
+        "source": "auto_recommendation"
+    },
+    "011170": {
+        "name": "롯데케미칼",
+        "add_date": "2026-05-27",
+        "source": "auto_recommendation"
+    },
+    "003555": {
+        "name": "LG우",
+        "add_date": "2026-05-27",
+        "source": "auto_recommendation"
+    },
+    "009160": {
+        "name": "SIMPAC",
+        "add_date": "2026-05-27",
+        "source": "auto_recommendation"
+    },
+    "003010": {
+        "name": "혜인",
+        "add_date": "2026-05-27",
+        "source": "auto_recommendation"
+    },
+    "004000": {
+        "name": "롯데정밀화학",
+        "add_date": "2026-05-27",
+        "source": "auto_recommendation"
+    },
+    "134380": {
+        "name": "미원화학",
+        "add_date": "2026-05-27",
+        "source": "auto_recommendation"
+    },
+    "003530": {
+        "name": "한화투자증권",
+        "add_date": "2026-05-27",
+        "source": "auto_recommendation"
     }
 }
