@@ -498,5 +498,45 @@
         "name": "한화투자증권",
         "add_date": "2026-05-27",
         "source": "auto_recommendation"
+    },
+    "001820": {
+        "name": "삼화콘덴서",
+        "add_date": "2026-05-28",
+        "source": "auto_recommendation"
+    },
+    "AMD": {
+        "name": "AMD",
+        "add_date": "2026-05-28",
+        "source": "auto_recommendation"
+    },
+    "012205": {
+        "name": "계양전기우",
+        "add_date": "2026-05-28",
+        "source": "auto_recommendation"
+    },
+    "090460": {
+        "name": "비에이치",
+        "add_date": "2026-05-28",
+        "source": "auto_recommendation"
+    },
+    "278470": {
+        "name": "에이피알",
+        "add_date": "2026-05-28",
+        "source": "auto_recommendation"
+    },
+    "078520": {
+        "name": "에이블씨엔씨",
+        "add_date": "2026-05-28",
+        "source": "auto_recommendation"
+    },
+    "031430": {
+        "name": "신세계인터내셔날",
+        "add_date": "2026-05-28",
+        "source": "auto_recommendation"
+    },
+    "214320": {
+        "name": "이노션",
+        "add_date": "2026-05-28",
+        "source": "auto_recommendation"
     }
 }
