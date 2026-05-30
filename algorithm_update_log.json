@@ -2094,5 +2094,22 @@
       "VALIDATE_MAX_HOLD_DAYS": 150
     },
     "batch_count": 32
+  },
+  {
+    "updated_at": "2026-05-30T10:24:41.023209",
+    "source": "merge_batches",
+    "approved_changes": {
+      "MIN_AVG_VOLUME": 50000,
+      "VOL_AVG_WINDOW": 20,
+      "PROFIT_TARGET_PCT": 0.1,
+      "MARKET_FILTER_ENABLED": true,
+      "MAX_POSITIONS": 20,
+      "MAX_SECTOR_POSITIONS": 5,
+      "SMA200": 200,
+      "TIER1_WIN_RATE": 60,
+      "VALIDATE_MAX_HOLD_DAYS": 90,
+      "ATR_LENGTH": 10
+    },
+    "batch_count": 72
   }
 ]
