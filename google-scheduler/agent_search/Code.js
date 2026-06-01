@@ -2,6 +2,10 @@
  * agent_search 워크플로우를 GitHub Actions로 트리거하는 함수
  */
 function dispatchAgentSearchWorkflow() {
+  // [비용 절감] agent_search 일시 중지
+  Logger.log('[SKIP] agent_search 워크플로우 일시 중지 중');
+  return;
+
   var url = "https://api.github.com/repos/wansang/finance/actions/workflows/agent_search.yml/dispatches";
   var payload = JSON.stringify({ ref: "main" });
   var token = PropertiesService.getScriptProperties().getProperty("GITHUB_PAT");
