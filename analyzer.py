@@ -707,7 +707,7 @@ class StockAnalyzer:
                 continue
 
             days_passed = (today - add_date_obj).days
-            if days_passed > 7 and code not in self.holdings:
+            if days_passed > 3 and code not in self.holdings:
                 del watchlist[code]
                 changed = True
                 print(f"watchlist에서 자동추천 항목 {code}를 {days_passed}일 경과로 인해 자동 삭제했습니다.")
