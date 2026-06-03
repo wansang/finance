@@ -363,5 +363,65 @@
         "name": "와이투솔루션",
         "add_date": "2026-06-01",
         "source": "auto_recommendation"
+    },
+    "034730": {
+        "name": "SK",
+        "add_date": "2026-06-03",
+        "source": "auto_recommendation"
+    },
+    "007810": {
+        "name": "코리아써키트",
+        "add_date": "2026-06-03",
+        "source": "auto_recommendation"
+    },
+    "036570": {
+        "name": "NC",
+        "add_date": "2026-06-03",
+        "source": "auto_recommendation"
+    },
+    "010120": {
+        "name": "LS ELECTRIC",
+        "add_date": "2026-06-03",
+        "source": "auto_recommendation"
+    },
+    "COST": {
+        "name": "COST",
+        "add_date": "2026-06-03",
+        "source": "auto_recommendation"
+    },
+    "456040": {
+        "name": "OCI",
+        "add_date": "2026-06-03",
+        "source": "auto_recommendation"
+    },
+    "031430": {
+        "name": "신세계인터내셔날",
+        "add_date": "2026-06-03",
+        "source": "auto_recommendation"
+    },
+    "305720": {
+        "name": "305720",
+        "add_date": "2026-06-03",
+        "source": "auto_recommendation"
+    },
+    "001450": {
+        "name": "현대해상",
+        "add_date": "2026-06-03",
+        "source": "auto_recommendation"
+    },
+    "001200": {
+        "name": "유진투자증권",
+        "add_date": "2026-06-03",
+        "source": "auto_recommendation"
+    },
+    "042700": {
+        "name": "한미반도체",
+        "add_date": "2026-06-03",
+        "source": "auto_recommendation"
+    },
+    "084670": {
+        "name": "동양고속",
+        "add_date": "2026-06-03",
+        "source": "auto_recommendation"
     }
 }
