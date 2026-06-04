@@ -29,66 +29,6 @@
         "add_date": "2026-05-08",
         "source": "manual"
     },
-    "011070": {
-        "name": "LG이노텍",
-        "add_date": "2026-05-31",
-        "source": "auto_recommendation"
-    },
-    "014910": {
-        "name": "성문전자",
-        "add_date": "2026-05-31",
-        "source": "auto_recommendation"
-    },
-    "062040": {
-        "name": "산일전기",
-        "add_date": "2026-05-31",
-        "source": "auto_recommendation"
-    },
-    "006260": {
-        "name": "LS",
-        "add_date": "2026-05-31",
-        "source": "auto_recommendation"
-    },
-    "008060": {
-        "name": "대덕",
-        "add_date": "2026-05-31",
-        "source": "auto_recommendation"
-    },
-    "003550": {
-        "name": "LG",
-        "add_date": "2026-05-31",
-        "source": "auto_recommendation"
-    },
-    "229640": {
-        "name": "LS에코에너지",
-        "add_date": "2026-05-31",
-        "source": "auto_recommendation"
-    },
-    "454910": {
-        "name": "두산로보틱스",
-        "add_date": "2026-05-31",
-        "source": "auto_recommendation"
-    },
-    "013000": {
-        "name": "세우글로벌",
-        "add_date": "2026-05-31",
-        "source": "auto_recommendation"
-    },
-    "051910": {
-        "name": "LG화학",
-        "add_date": "2026-05-31",
-        "source": "auto_recommendation"
-    },
-    "014915": {
-        "name": "성문전자우",
-        "add_date": "2026-05-31",
-        "source": "auto_recommendation"
-    },
-    "012200": {
-        "name": "계양전기",
-        "add_date": "2026-05-31",
-        "source": "auto_recommendation"
-    },
     "000500": {
         "name": "가온전선",
         "add_date": "2026-06-01",
@@ -422,6 +362,56 @@
     "084670": {
         "name": "동양고속",
         "add_date": "2026-06-03",
+        "source": "auto_recommendation"
+    },
+    "336260": {
+        "name": "두산퓨얼셀",
+        "add_date": "2026-06-04",
+        "source": "auto_recommendation"
+    },
+    "014910": {
+        "name": "성문전자",
+        "add_date": "2026-06-04",
+        "source": "auto_recommendation"
+    },
+    "008060": {
+        "name": "대덕",
+        "add_date": "2026-06-04",
+        "source": "auto_recommendation"
+    },
+    "002220": {
+        "name": "한일철강",
+        "add_date": "2026-06-04",
+        "source": "auto_recommendation"
+    },
+    "005490": {
+        "name": "POSCO홀딩스",
+        "add_date": "2026-06-04",
+        "source": "auto_recommendation"
+    },
+    "051910": {
+        "name": "LG화학",
+        "add_date": "2026-06-04",
+        "source": "auto_recommendation"
+    },
+    "071050": {
+        "name": "한국금융지주",
+        "add_date": "2026-06-04",
+        "source": "auto_recommendation"
+    },
+    "103590": {
+        "name": "일진전기",
+        "add_date": "2026-06-04",
+        "source": "auto_recommendation"
+    },
+    "460860": {
+        "name": "동국제강",
+        "add_date": "2026-06-04",
+        "source": "auto_recommendation"
+    },
+    "012200": {
+        "name": "계양전기",
+        "add_date": "2026-06-04",
         "source": "auto_recommendation"
     }
 }
