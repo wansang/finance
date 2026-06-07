@@ -116,9 +116,10 @@ class MarketMonitor:
                 holding_data.append(f"- {code}: 분석 오류")
 
         # 3. 관심 종목 데이터 수집 (일반 관심종목 / AI 추천 관심종목 / 지금진입가능 분리)
-        # 3. 관심 종목 데이터 수집 (일반 관심종목 / AI 추천 관심종목 / 지금진입가능 분리)
-        watch_data = []
-        ai_watch_data = []
+        watch_data = []          # 신호 있는 관심종목 (진입가 초과)
+        ai_watch_data = []       # 신호 있는 AI추천 관심종목 (진입가 초과)
+        watch_no_signal_count = 0    # 신호 없는 일반 관심종목 수 (프롬프트 생략)
+        ai_no_signal_count = 0       # 신호 없는 AI추천 관심종목 수 (프롬프트 생략)
         entry_now_data = []  # 매수 신호가 포착된 관심종목 (즉시 진입 가능)
         entry_stocks_detail = []  # 타이밍 의견 요청용 상세 데이터
         for code, info in watchlist.items():
@@ -201,8 +202,10 @@ class MarketMonitor:
                             'near_52w_high': bool(high_52w and current_price >= high_52w * 0.98),
                             'is_etf': info.get('sector') == 'ETF',
                         })
+                    elif has_signal:
+                        ai_watch_data.append(line)  # 신호 있지만 진입가 초과 → 포함
                     else:
-                        ai_watch_data.append(line)
+                        ai_no_signal_count += 1  # 신호 없음 → 생략
                 else:
                     line = self._format_monitor_line(
                         name, price_text, change_text, high_text, volume_text,
@@ -221,10 +224,12 @@ class MarketMonitor:
                             'rsi': float(df.iloc[-1]['RSI']) if 'RSI' in df.columns else None,
                             'volume_ratio': float(df.iloc[-1]['Volume'] / df.iloc[-1]['VOL_AVG']) if 'VOL_AVG' in df.columns else None,
                             'near_52w_high': bool(high_52w and current_price >= high_52w * 0.98),
-                            'is_etf': False,  # 일반 관심종목 (주식)
+                            'is_etf': False,
                         })
+                    elif has_signal:
+                        watch_data.append(line)  # 신호 있지만 진입가 초과 → 포함
                     else:
-                        watch_data.append(line)
+                        watch_no_signal_count += 1  # 신호 없음 → 생략
             except Exception:
                 if info.get('source') == 'auto_recommendation':
                     ai_watch_data.append(f"- {code}: 분석 오류")
@@ -261,8 +266,17 @@ class MarketMonitor:
         # 5. AI 리포트 생성
         market_section = sentiment_msg.strip()
         holding_section = "\n\n".join(holding_data) if holding_data else "없음"
-        watch_section = "\n\n".join(watch_data) if watch_data else "없음"
-        ai_watch_section = "\n\n".join(ai_watch_data) if ai_watch_data else "없음"
+
+        # 신호 없는 종목은 개수 요약만 전달 (토큰 절약)
+        watch_parts = watch_data[:]
+        if watch_no_signal_count > 0:
+            watch_parts.append(f"(신호 없음 {watch_no_signal_count}개 대기 중 — 상세 생략)")
+        watch_section = "\n\n".join(watch_parts) if watch_parts else "없음"
+
+        ai_watch_parts = ai_watch_data[:]
+        if ai_no_signal_count > 0:
+            ai_watch_parts.append(f"(신호 없음 {ai_no_signal_count}개 대기 중 — 상세 생략)")
+        ai_watch_section = "\n\n".join(ai_watch_parts) if ai_watch_parts else "없음"
         entry_now_section = "\n\n".join(entry_now_data) if entry_now_data else "없음"
 
         final_report = self.analyzer.ask_ai_report(
