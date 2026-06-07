@@ -8,6 +8,7 @@ on:
 
 jobs:
   check_optimize:
+    if: false  # 임시 중단 (AI 비용 절감)
     runs-on: ubuntu-latest
     outputs:
       optimize_running: ${{ steps.check.outputs.optimize_running }}

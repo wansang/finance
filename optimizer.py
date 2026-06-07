@@ -1606,8 +1606,7 @@ class StrategyOptimizer:
         genai_lib = self.analyzer.genai_library
         model_name = self.analyzer.model_name
         api_key = self.analyzer.gemini_api_key
-        wait_times = [30, 60]
-        for attempt in range(3):
+        for attempt in range(2):
             try:
                 if genai_lib == 'genai':
                     import google.genai as _genai
@@ -1623,9 +1622,10 @@ class StrategyOptimizer:
                     return None
                 return self.analyzer._normalize_ai_response(response)
             except Exception as e:
-                if '429' in str(e) and attempt < 2:
-                    time.sleep(wait_times[attempt])
-                    continue
+                if '429' in str(e):
+                    print(f"  [AI] 월 한도 초과(429) — AI 호출 전체 중단 (이후 AI 스킵)")
+                    self.analyzer.ai_enabled = False
+                    return None
                 print(f"  [AI] 호출 오류: {e}")
                 return None
         return None
