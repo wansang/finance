@@ -707,7 +707,7 @@ class StockAnalyzer:
                 continue
 
             days_passed = (today - add_date_obj).days
-            if days_passed > 3 and code not in self.holdings:
+            if days_passed > 1 and code not in self.holdings:
                 del watchlist[code]
                 changed = True
                 print(f"watchlist에서 자동추천 항목 {code}를 {days_passed}일 경과로 인해 자동 삭제했습니다.")
@@ -716,8 +716,8 @@ class StockAnalyzer:
             self.save_watchlist(watchlist)
 
     def add_top_recommendation_to_watchlist(self, results):
-        """Tier 1/2 추천 종목을 watchlist에 자동 추가"""
-        candidates = list(results.get(1, [])) + list(results.get(2, []))
+        """Tier 1/2 추천 종목을 watchlist에 자동 추가 (Tier 2는 rs_score 상위 3개만)"""
+        candidates = list(results.get(1, [])) + list(results.get(2, []))[:3]
         if not results or not candidates:
             return []
 
