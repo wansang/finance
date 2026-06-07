@@ -235,12 +235,14 @@ class StockBot:
                 await update.message.reply_text("현재 관심주 목록이 비어있습니다.")
                 return
 
+            import html as _html
             lines = []
             for code, info in watchlist.items():
-                source = info.get('source', '알 수 없음')
-                add_date = info.get('add_date', '알 수 없음')
+                source = _html.escape(info.get('source', '알 수 없음'))
+                add_date = _html.escape(info.get('add_date', '알 수 없음'))
+                name = _html.escape(info.get('name', code))
                 lines.append(
-                    f"• {info.get('name', code)}({code})\n"
+                    f"• {name}({code})\n"
                     f"  - 추가일: {add_date}\n"
                     f"  - 출처: {source}\n"
                 )
