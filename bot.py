@@ -155,13 +155,28 @@ class StockBot:
             await update.message.reply_text("현재 보유 중인 종목이 없습니다.")
             return
 
-        text = "<b>[현재 포트폴리오]</b>\n\n"
+        lines = []
         for code, info in holdings.items():
-            text += f"• {info.get('name', code)}({code})\n"
-            text += f"  - 매수일: {info['buy_date']}\n"
-            text += f"  - 매수가: {info['buy_price']:,}원\n\n"
-        
-        await context.bot.send_message(chat_id=update.effective_chat.id, text=text, parse_mode='HTML')
+            lines.append(
+                f"• {info.get('name', code)}({code})\n"
+                f"  - 매수일: {info['buy_date']}\n"
+                f"  - 매수가: {info['buy_price']:,}원\n"
+            )
+
+        chunks = []
+        current = f"<b>[현재 포트폴리오] ({len(holdings)}개)</b>\n\n"
+        for line in lines:
+            if len(current) + len(line) + 1 > 4000:
+                chunks.append(current)
+                current = "<b>[현재 포트폴리오 계속]</b>\n\n"
+            current += line + "\n"
+        if current:
+            chunks.append(current)
+
+        for chunk in chunks:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id, text=chunk, parse_mode='HTML'
+            )
 
     async def analyze_now(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("🔍 코스피 전체 분석을 시작합니다. (잠시만 기다려 주세요...)")
@@ -220,15 +235,31 @@ class StockBot:
                 await update.message.reply_text("현재 관심주 목록이 비어있습니다.")
                 return
 
-            text = "<b>[관심주 목록]</b>\n\n"
+            lines = []
             for code, info in watchlist.items():
                 source = info.get('source', '알 수 없음')
                 add_date = info.get('add_date', '알 수 없음')
-                text += f"• {info.get('name', code)}({code})\n"
-                text += f"  - 추가일: {add_date}\n"
-                text += f"  - 출처: {source}\n\n"
-            
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=text, parse_mode='HTML')
+                lines.append(
+                    f"• {info.get('name', code)}({code})\n"
+                    f"  - 추가일: {add_date}\n"
+                    f"  - 출처: {source}\n"
+                )
+
+            # 4000자 이하로 청크 분할 (텔레그램 4096자 제한)
+            chunks = []
+            current = f"<b>[관심주 목록] ({len(watchlist)}개)</b>\n\n"
+            for line in lines:
+                if len(current) + len(line) + 1 > 4000:
+                    chunks.append(current)
+                    current = f"<b>[관심주 목록 계속]</b>\n\n"
+                current += line + "\n"
+            if current:
+                chunks.append(current)
+
+            for chunk in chunks:
+                await context.bot.send_message(
+                    chat_id=update.effective_chat.id, text=chunk, parse_mode='HTML'
+                )
         except Exception as e:
             await update.message.reply_text(f"❌ 오류 발생: {e}")
 
