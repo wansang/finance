@@ -29,19 +29,19 @@
         "add_date": "2026-05-08",
         "source": "manual"
     },
-    "009155": {
-        "name": "삼성전기우",
-        "add_date": "2026-06-07",
+    "009150": {
+        "name": "삼성전기",
+        "add_date": "2026-06-09",
         "source": "auto_recommendation"
     },
     "000500": {
         "name": "가온전선",
-        "add_date": "2026-06-07",
+        "add_date": "2026-06-09",
         "source": "auto_recommendation"
     },
-    "006345": {
-        "name": "대원전선우",
-        "add_date": "2026-06-07",
+    "INTC": {
+        "name": "INTC",
+        "add_date": "2026-06-09",
         "source": "auto_recommendation"
     }
 }
