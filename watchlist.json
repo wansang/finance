@@ -43,5 +43,10 @@
         "name": "미래산업",
         "add_date": "2026-06-11",
         "source": "auto_recommendation"
+    },
+    "009155": {
+        "name": "삼성전기우",
+        "add_date": "2026-06-11",
+        "source": "auto_recommendation"
     }
 }
