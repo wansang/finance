@@ -31,22 +31,17 @@
     },
     "009150": {
         "name": "삼성전기",
-        "add_date": "2026-06-11",
+        "add_date": "2026-06-14",
         "source": "auto_recommendation"
     },
-    "000500": {
-        "name": "가온전선",
-        "add_date": "2026-06-11",
+    "017900": {
+        "name": "광전자",
+        "add_date": "2026-06-14",
         "source": "auto_recommendation"
     },
-    "025560": {
-        "name": "미래산업",
-        "add_date": "2026-06-11",
-        "source": "auto_recommendation"
-    },
-    "009155": {
-        "name": "삼성전기우",
-        "add_date": "2026-06-11",
+    "006345": {
+        "name": "대원전선우",
+        "add_date": "2026-06-14",
         "source": "auto_recommendation"
     }
 }
