@@ -43,5 +43,15 @@
         "name": "대원전선우",
         "add_date": "2026-06-14",
         "source": "auto_recommendation"
+    },
+    "011070": {
+        "name": "LG이노텍",
+        "add_date": "2026-06-15",
+        "source": "auto_recommendation"
+    },
+    "009155": {
+        "name": "삼성전기우",
+        "add_date": "2026-06-15",
+        "source": "auto_recommendation"
     }
 }
