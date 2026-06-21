@@ -29,24 +29,19 @@
         "add_date": "2026-05-08",
         "source": "manual"
     },
-    "006345": {
-        "name": "대원전선우",
-        "add_date": "2026-06-17",
-        "source": "auto_recommendation"
-    },
-    "009155": {
-        "name": "삼성전기우",
-        "add_date": "2026-06-17",
-        "source": "auto_recommendation"
-    },
-    "009150": {
-        "name": "삼성전기",
-        "add_date": "2026-06-18",
-        "source": "auto_recommendation"
-    },
     "011070": {
         "name": "LG이노텍",
-        "add_date": "2026-06-18",
+        "add_date": "2026-06-21",
+        "source": "auto_recommendation"
+    },
+    "034730": {
+        "name": "SK",
+        "add_date": "2026-06-21",
+        "source": "auto_recommendation"
+    },
+    "006340": {
+        "name": "대원전선",
+        "add_date": "2026-06-21",
         "source": "auto_recommendation"
     }
 }
