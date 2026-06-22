@@ -43,5 +43,10 @@
         "name": "대원전선",
         "add_date": "2026-06-21",
         "source": "auto_recommendation"
+    },
+    "006345": {
+        "name": "대원전선우",
+        "add_date": "2026-06-22",
+        "source": "auto_recommendation"
     }
 }
