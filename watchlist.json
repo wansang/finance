@@ -29,19 +29,19 @@
         "add_date": "2026-05-08",
         "source": "manual"
     },
+    "006345": {
+        "name": "대원전선우",
+        "add_date": "2026-06-24",
+        "source": "auto_recommendation"
+    },
     "009150": {
         "name": "삼성전기",
-        "add_date": "2026-06-23",
+        "add_date": "2026-06-25",
         "source": "auto_recommendation"
     },
     "000500": {
         "name": "가온전선",
-        "add_date": "2026-06-23",
-        "source": "auto_recommendation"
-    },
-    "006345": {
-        "name": "대원전선우",
-        "add_date": "2026-06-24",
+        "add_date": "2026-06-25",
         "source": "auto_recommendation"
     }
 }
