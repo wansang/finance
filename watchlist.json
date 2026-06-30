@@ -29,24 +29,19 @@
         "add_date": "2026-05-08",
         "source": "manual"
     },
-    "009150": {
-        "name": "삼성전기",
-        "add_date": "2026-06-28",
-        "source": "auto_recommendation"
-    },
-    "000500": {
-        "name": "가온전선",
-        "add_date": "2026-06-28",
-        "source": "auto_recommendation"
-    },
-    "025560": {
-        "name": "미래산업",
-        "add_date": "2026-06-28",
-        "source": "auto_recommendation"
-    },
     "006345": {
         "name": "대원전선우",
         "add_date": "2026-06-29",
+        "source": "auto_recommendation"
+    },
+    "069960": {
+        "name": "현대백화점",
+        "add_date": "2026-06-30",
+        "source": "auto_recommendation"
+    },
+    "004170": {
+        "name": "신세계",
+        "add_date": "2026-06-30",
         "source": "auto_recommendation"
     }
 }
