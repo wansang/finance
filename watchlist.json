@@ -29,11 +29,6 @@
         "add_date": "2026-05-08",
         "source": "manual"
     },
-    "006345": {
-        "name": "대원전선우",
-        "add_date": "2026-06-29",
-        "source": "auto_recommendation"
-    },
     "069960": {
         "name": "현대백화점",
         "add_date": "2026-06-30",
@@ -42,6 +37,11 @@
     "004170": {
         "name": "신세계",
         "add_date": "2026-06-30",
+        "source": "auto_recommendation"
+    },
+    "001820": {
+        "name": "삼화콘덴서",
+        "add_date": "2026-07-01",
         "source": "auto_recommendation"
     }
 }
