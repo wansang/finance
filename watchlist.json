@@ -38,5 +38,15 @@
         "name": "신세계",
         "add_date": "2026-07-05",
         "source": "auto_recommendation"
+    },
+    "006345": {
+        "name": "대원전선우",
+        "add_date": "2026-07-06",
+        "source": "auto_recommendation"
+    },
+    "009155": {
+        "name": "삼성전기우",
+        "add_date": "2026-07-06",
+        "source": "auto_recommendation"
     }
 }
