@@ -24,16 +24,6 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "006345": {
-        "name": "대원전선우",
-        "add_date": "2026-07-06",
-        "source": "auto_recommendation"
-    },
-    "009155": {
-        "name": "삼성전기우",
-        "add_date": "2026-07-06",
-        "source": "auto_recommendation"
-    },
     "025560": {
         "name": "미래산업",
         "add_date": "2026-07-07",
@@ -42,6 +32,16 @@
     "PANW": {
         "name": "PANW",
         "add_date": "2026-07-07",
+        "source": "auto_recommendation"
+    },
+    "006345": {
+        "name": "대원전선우",
+        "add_date": "2026-07-08",
+        "source": "auto_recommendation"
+    },
+    "402340": {
+        "name": "SK스퀘어",
+        "add_date": "2026-07-08",
         "source": "auto_recommendation"
     }
 }
