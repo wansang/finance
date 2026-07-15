@@ -24,11 +24,6 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "AMAT": {
-        "name": "AMAT",
-        "add_date": "2026-07-13",
-        "source": "auto_recommendation"
-    },
     "025560": {
         "name": "미래산업",
         "add_date": "2026-07-14",
@@ -42,6 +37,11 @@
     "000660": {
         "name": "SK하이닉스",
         "add_date": "2026-07-14",
+        "source": "auto_recommendation"
+    },
+    "402340": {
+        "name": "SK스퀘어",
+        "add_date": "2026-07-15",
         "source": "auto_recommendation"
     }
 }
