@@ -24,24 +24,19 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "025560": {
-        "name": "미래산업",
-        "add_date": "2026-07-14",
+    "034730": {
+        "name": "SK",
+        "add_date": "2026-07-20",
         "source": "auto_recommendation"
     },
-    "281820": {
-        "name": "케이씨텍",
-        "add_date": "2026-07-14",
+    "001450": {
+        "name": "현대해상",
+        "add_date": "2026-07-20",
         "source": "auto_recommendation"
     },
-    "000660": {
-        "name": "SK하이닉스",
-        "add_date": "2026-07-14",
-        "source": "auto_recommendation"
-    },
-    "402340": {
-        "name": "SK스퀘어",
-        "add_date": "2026-07-15",
+    "009420": {
+        "name": "한올바이오파마",
+        "add_date": "2026-07-20",
         "source": "auto_recommendation"
     }
 }
