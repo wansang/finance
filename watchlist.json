@@ -38,5 +38,20 @@
         "name": "한올바이오파마",
         "add_date": "2026-07-20",
         "source": "auto_recommendation"
+    },
+    "PANW": {
+        "name": "PANW",
+        "add_date": "2026-07-20",
+        "source": "auto_recommendation"
+    },
+    "281820": {
+        "name": "케이씨텍",
+        "add_date": "2026-07-20",
+        "source": "auto_recommendation"
+    },
+    "004710": {
+        "name": "한솔테크닉스",
+        "add_date": "2026-07-20",
+        "source": "auto_recommendation"
     }
 }
