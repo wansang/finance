@@ -53,5 +53,10 @@
         "name": "한솔테크닉스",
         "add_date": "2026-07-20",
         "source": "auto_recommendation"
+    },
+    "025560": {
+        "name": "미래산업",
+        "add_date": "2026-07-21",
+        "source": "auto_recommendation"
     }
 }
