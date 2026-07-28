@@ -38,5 +38,15 @@
         "name": "현대백화점",
         "add_date": "2026-07-27",
         "source": "auto_recommendation"
+    },
+    "317400": {
+        "name": "자이에스앤디",
+        "add_date": "2026-07-28",
+        "source": "auto_recommendation"
+    },
+    "010950": {
+        "name": "S-Oil",
+        "add_date": "2026-07-28",
+        "source": "auto_recommendation"
     }
 }
