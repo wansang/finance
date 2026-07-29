@@ -24,21 +24,6 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "PANW": {
-        "name": "PANW",
-        "add_date": "2026-07-27",
-        "source": "auto_recommendation"
-    },
-    "001820": {
-        "name": "삼화콘덴서",
-        "add_date": "2026-07-27",
-        "source": "auto_recommendation"
-    },
-    "069960": {
-        "name": "현대백화점",
-        "add_date": "2026-07-27",
-        "source": "auto_recommendation"
-    },
     "317400": {
         "name": "자이에스앤디",
         "add_date": "2026-07-28",
@@ -47,6 +32,21 @@
     "010950": {
         "name": "S-Oil",
         "add_date": "2026-07-28",
+        "source": "auto_recommendation"
+    },
+    "078930": {
+        "name": "GS",
+        "add_date": "2026-07-29",
+        "source": "auto_recommendation"
+    },
+    "161890": {
+        "name": "한국콜마",
+        "add_date": "2026-07-29",
+        "source": "auto_recommendation"
+    },
+    "001820": {
+        "name": "삼화콘덴서",
+        "add_date": "2026-07-29",
         "source": "auto_recommendation"
     }
 }
