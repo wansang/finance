@@ -24,34 +24,19 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "078930": {
-        "name": "GS",
-        "add_date": "2026-07-29",
-        "source": "auto_recommendation"
-    },
-    "161890": {
-        "name": "한국콜마",
-        "add_date": "2026-07-29",
-        "source": "auto_recommendation"
-    },
     "001820": {
         "name": "삼화콘덴서",
-        "add_date": "2026-07-29",
+        "add_date": "2026-08-02",
         "source": "auto_recommendation"
     },
-    "PANW": {
-        "name": "PANW",
-        "add_date": "2026-07-30",
+    "281820": {
+        "name": "케이씨텍",
+        "add_date": "2026-08-02",
         "source": "auto_recommendation"
     },
-    "AMAT": {
-        "name": "AMAT",
-        "add_date": "2026-07-30",
-        "source": "auto_recommendation"
-    },
-    "CRWD": {
-        "name": "CRWD",
-        "add_date": "2026-07-30",
+    "402340": {
+        "name": "SK스퀘어",
+        "add_date": "2026-08-02",
         "source": "auto_recommendation"
     }
 }
