@@ -38,5 +38,15 @@
         "name": "SK스퀘어",
         "add_date": "2026-08-02",
         "source": "auto_recommendation"
+    },
+    "MMM": {
+        "name": "MMM",
+        "add_date": "2026-08-03",
+        "source": "auto_recommendation"
+    },
+    "DIA": {
+        "name": "DIA",
+        "add_date": "2026-08-03",
+        "source": "auto_recommendation"
     }
 }
