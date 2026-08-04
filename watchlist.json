@@ -24,21 +24,6 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "001820": {
-        "name": "삼화콘덴서",
-        "add_date": "2026-08-02",
-        "source": "auto_recommendation"
-    },
-    "281820": {
-        "name": "케이씨텍",
-        "add_date": "2026-08-02",
-        "source": "auto_recommendation"
-    },
-    "402340": {
-        "name": "SK스퀘어",
-        "add_date": "2026-08-02",
-        "source": "auto_recommendation"
-    },
     "MMM": {
         "name": "MMM",
         "add_date": "2026-08-03",
@@ -47,6 +32,21 @@
     "DIA": {
         "name": "DIA",
         "add_date": "2026-08-03",
+        "source": "auto_recommendation"
+    },
+    "317400": {
+        "name": "자이에스앤디",
+        "add_date": "2026-08-04",
+        "source": "auto_recommendation"
+    },
+    "161890": {
+        "name": "한국콜마",
+        "add_date": "2026-08-04",
+        "source": "auto_recommendation"
+    },
+    "TRV": {
+        "name": "TRV",
+        "add_date": "2026-08-04",
         "source": "auto_recommendation"
     }
 }
