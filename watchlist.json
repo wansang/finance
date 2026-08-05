@@ -24,16 +24,6 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "MMM": {
-        "name": "MMM",
-        "add_date": "2026-08-03",
-        "source": "auto_recommendation"
-    },
-    "DIA": {
-        "name": "DIA",
-        "add_date": "2026-08-03",
-        "source": "auto_recommendation"
-    },
     "317400": {
         "name": "자이에스앤디",
         "add_date": "2026-08-04",
@@ -47,6 +37,16 @@
     "TRV": {
         "name": "TRV",
         "add_date": "2026-08-04",
+        "source": "auto_recommendation"
+    },
+    "078930": {
+        "name": "GS",
+        "add_date": "2026-08-05",
+        "source": "auto_recommendation"
+    },
+    "010955": {
+        "name": "S-Oil우",
+        "add_date": "2026-08-05",
         "source": "auto_recommendation"
     }
 }
