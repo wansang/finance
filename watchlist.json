@@ -38,5 +38,15 @@
         "name": "AMAT",
         "add_date": "2026-08-09",
         "source": "auto_recommendation"
+    },
+    "161890": {
+        "name": "한국콜마",
+        "add_date": "2026-08-10",
+        "source": "auto_recommendation"
+    },
+    "281820": {
+        "name": "케이씨텍",
+        "add_date": "2026-08-10",
+        "source": "auto_recommendation"
     }
 }
