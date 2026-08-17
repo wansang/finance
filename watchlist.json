@@ -26,22 +26,17 @@
     },
     "025890": {
         "name": "한국주강",
-        "add_date": "2026-08-12",
+        "add_date": "2026-08-17",
         "source": "auto_recommendation"
     },
     "010400": {
         "name": "우진아이엔에스",
-        "add_date": "2026-08-12",
-        "source": "auto_recommendation"
-    },
-    "005360": {
-        "name": "모나미",
-        "add_date": "2026-08-13",
+        "add_date": "2026-08-17",
         "source": "auto_recommendation"
     },
     "483650": {
         "name": "달바글로벌",
-        "add_date": "2026-08-13",
+        "add_date": "2026-08-17",
         "source": "auto_recommendation"
     }
 }
