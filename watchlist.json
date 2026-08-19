@@ -24,19 +24,19 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "025890": {
-        "name": "한국주강",
-        "add_date": "2026-08-17",
+    "483650": {
+        "name": "달바글로벌",
+        "add_date": "2026-08-19",
         "source": "auto_recommendation"
     },
     "010400": {
         "name": "우진아이엔에스",
-        "add_date": "2026-08-17",
+        "add_date": "2026-08-19",
         "source": "auto_recommendation"
     },
-    "483650": {
-        "name": "달바글로벌",
-        "add_date": "2026-08-17",
+    "MRK": {
+        "name": "MRK",
+        "add_date": "2026-08-19",
         "source": "auto_recommendation"
     }
 }
