@@ -38,5 +38,20 @@
         "name": "MRK",
         "add_date": "2026-08-19",
         "source": "auto_recommendation"
+    },
+    "010950": {
+        "name": "S-Oil",
+        "add_date": "2026-08-20",
+        "source": "auto_recommendation"
+    },
+    "010955": {
+        "name": "S-Oil우",
+        "add_date": "2026-08-20",
+        "source": "auto_recommendation"
+    },
+    "009420": {
+        "name": "한올바이오파마",
+        "add_date": "2026-08-20",
+        "source": "auto_recommendation"
     }
 }
