@@ -24,34 +24,19 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "483650": {
-        "name": "달바글로벌",
-        "add_date": "2026-08-19",
-        "source": "auto_recommendation"
-    },
-    "010400": {
-        "name": "우진아이엔에스",
-        "add_date": "2026-08-19",
-        "source": "auto_recommendation"
-    },
-    "MRK": {
-        "name": "MRK",
-        "add_date": "2026-08-19",
-        "source": "auto_recommendation"
-    },
-    "010950": {
-        "name": "S-Oil",
-        "add_date": "2026-08-20",
+    "161890": {
+        "name": "한국콜마",
+        "add_date": "2026-08-23",
         "source": "auto_recommendation"
     },
     "010955": {
         "name": "S-Oil우",
-        "add_date": "2026-08-20",
+        "add_date": "2026-08-23",
         "source": "auto_recommendation"
     },
-    "009420": {
-        "name": "한올바이오파마",
-        "add_date": "2026-08-20",
+    "010950": {
+        "name": "S-Oil",
+        "add_date": "2026-08-23",
         "source": "auto_recommendation"
     }
 }
