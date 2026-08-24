@@ -38,5 +38,20 @@
         "name": "S-Oil",
         "add_date": "2026-08-23",
         "source": "auto_recommendation"
+    },
+    "020120": {
+        "name": "키다리스튜디오",
+        "add_date": "2026-08-24",
+        "source": "auto_recommendation"
+    },
+    "025890": {
+        "name": "한국주강",
+        "add_date": "2026-08-24",
+        "source": "auto_recommendation"
+    },
+    "010400": {
+        "name": "우진아이엔에스",
+        "add_date": "2026-08-24",
+        "source": "auto_recommendation"
     }
 }
