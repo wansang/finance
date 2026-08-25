@@ -24,21 +24,6 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "161890": {
-        "name": "한국콜마",
-        "add_date": "2026-08-23",
-        "source": "auto_recommendation"
-    },
-    "010955": {
-        "name": "S-Oil우",
-        "add_date": "2026-08-23",
-        "source": "auto_recommendation"
-    },
-    "010950": {
-        "name": "S-Oil",
-        "add_date": "2026-08-23",
-        "source": "auto_recommendation"
-    },
     "020120": {
         "name": "키다리스튜디오",
         "add_date": "2026-08-24",
@@ -52,6 +37,11 @@
     "010400": {
         "name": "우진아이엔에스",
         "add_date": "2026-08-24",
+        "source": "auto_recommendation"
+    },
+    "317400": {
+        "name": "자이에스앤디",
+        "add_date": "2026-08-25",
         "source": "auto_recommendation"
     }
 }
