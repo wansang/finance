@@ -24,24 +24,19 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "020120": {
-        "name": "키다리스튜디오",
-        "add_date": "2026-08-24",
+    "181710": {
+        "name": "NHN",
+        "add_date": "2026-08-27",
         "source": "auto_recommendation"
     },
-    "025890": {
-        "name": "한국주강",
-        "add_date": "2026-08-24",
+    "161890": {
+        "name": "한국콜마",
+        "add_date": "2026-08-27",
         "source": "auto_recommendation"
     },
-    "010400": {
-        "name": "우진아이엔에스",
-        "add_date": "2026-08-24",
-        "source": "auto_recommendation"
-    },
-    "317400": {
-        "name": "자이에스앤디",
-        "add_date": "2026-08-25",
+    "089860": {
+        "name": "롯데렌탈",
+        "add_date": "2026-08-27",
         "source": "auto_recommendation"
     }
 }
