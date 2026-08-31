@@ -38,5 +38,10 @@
         "name": "한국콜마",
         "add_date": "2026-08-30",
         "source": "auto_recommendation"
+    },
+    "181710": {
+        "name": "NHN",
+        "add_date": "2026-08-31",
+        "source": "auto_recommendation"
     }
 }
