@@ -24,24 +24,19 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
+    "181710": {
+        "name": "NHN",
+        "add_date": "2026-08-31",
+        "source": "auto_recommendation"
+    },
     "002990": {
         "name": "금호건설",
-        "add_date": "2026-08-30",
+        "add_date": "2026-09-01",
         "source": "auto_recommendation"
     },
     "317400": {
         "name": "자이에스앤디",
-        "add_date": "2026-08-30",
-        "source": "auto_recommendation"
-    },
-    "161890": {
-        "name": "한국콜마",
-        "add_date": "2026-08-30",
-        "source": "auto_recommendation"
-    },
-    "181710": {
-        "name": "NHN",
-        "add_date": "2026-08-31",
+        "add_date": "2026-09-01",
         "source": "auto_recommendation"
     }
 }
