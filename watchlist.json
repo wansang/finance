@@ -24,19 +24,24 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
+    "192820": {
+        "name": "코스맥스",
+        "add_date": "2026-09-02",
+        "source": "auto_recommendation"
+    },
     "002990": {
         "name": "금호건설",
-        "add_date": "2026-09-01",
+        "add_date": "2026-09-03",
         "source": "auto_recommendation"
     },
     "317400": {
         "name": "자이에스앤디",
-        "add_date": "2026-09-01",
+        "add_date": "2026-09-03",
         "source": "auto_recommendation"
     },
-    "192820": {
-        "name": "코스맥스",
-        "add_date": "2026-09-02",
+    "181710": {
+        "name": "NHN",
+        "add_date": "2026-09-03",
         "source": "auto_recommendation"
     }
 }
