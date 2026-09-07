@@ -38,5 +38,10 @@
         "name": "NHN",
         "add_date": "2026-09-06",
         "source": "auto_recommendation"
+    },
+    "020120": {
+        "name": "키다리스튜디오",
+        "add_date": "2026-09-07",
+        "source": "auto_recommendation"
     }
 }
