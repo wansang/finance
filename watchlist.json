@@ -26,17 +26,17 @@
     },
     "078930": {
         "name": "GS",
-        "add_date": "2026-09-10",
-        "source": "auto_recommendation"
-    },
-    "089860": {
-        "name": "롯데렌탈",
-        "add_date": "2026-09-10",
+        "add_date": "2026-09-13",
         "source": "auto_recommendation"
     },
     "001450": {
         "name": "현대해상",
-        "add_date": "2026-09-10",
+        "add_date": "2026-09-13",
+        "source": "auto_recommendation"
+    },
+    "000370": {
+        "name": "한화손해보험",
+        "add_date": "2026-09-13",
         "source": "auto_recommendation"
     }
 }
