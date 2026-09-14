@@ -38,5 +38,10 @@
         "name": "한화손해보험",
         "add_date": "2026-09-13",
         "source": "auto_recommendation"
+    },
+    "CRM": {
+        "name": "CRM",
+        "add_date": "2026-09-14",
+        "source": "auto_recommendation"
     }
 }
