@@ -24,29 +24,19 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "001450": {
-        "name": "현대해상",
-        "add_date": "2026-09-16",
-        "source": "auto_recommendation"
-    },
-    "161890": {
-        "name": "한국콜마",
-        "add_date": "2026-09-16",
-        "source": "auto_recommendation"
-    },
     "005830": {
         "name": "DB손해보험",
-        "add_date": "2026-09-16",
+        "add_date": "2026-09-20",
         "source": "auto_recommendation"
     },
-    "181710": {
-        "name": "NHN",
-        "add_date": "2026-09-17",
+    "078930": {
+        "name": "GS",
+        "add_date": "2026-09-20",
         "source": "auto_recommendation"
     },
-    "007340": {
-        "name": "DN오토모티브",
-        "add_date": "2026-09-17",
+    "000500": {
+        "name": "가온전선",
+        "add_date": "2026-09-20",
         "source": "auto_recommendation"
     }
 }
