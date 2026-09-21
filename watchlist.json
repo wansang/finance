@@ -38,5 +38,15 @@
         "name": "가온전선",
         "add_date": "2026-09-20",
         "source": "auto_recommendation"
+    },
+    "003230": {
+        "name": "삼양식품",
+        "add_date": "2026-09-21",
+        "source": "auto_recommendation"
+    },
+    "161890": {
+        "name": "한국콜마",
+        "add_date": "2026-09-21",
+        "source": "auto_recommendation"
     }
 }
