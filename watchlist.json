@@ -24,21 +24,6 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "005830": {
-        "name": "DB손해보험",
-        "add_date": "2026-09-20",
-        "source": "auto_recommendation"
-    },
-    "078930": {
-        "name": "GS",
-        "add_date": "2026-09-20",
-        "source": "auto_recommendation"
-    },
-    "000500": {
-        "name": "가온전선",
-        "add_date": "2026-09-20",
-        "source": "auto_recommendation"
-    },
     "003230": {
         "name": "삼양식품",
         "add_date": "2026-09-21",
@@ -47,6 +32,16 @@
     "161890": {
         "name": "한국콜마",
         "add_date": "2026-09-21",
+        "source": "auto_recommendation"
+    },
+    "088350": {
+        "name": "한화생명",
+        "add_date": "2026-09-22",
+        "source": "auto_recommendation"
+    },
+    "008930": {
+        "name": "한미사이언스",
+        "add_date": "2026-09-22",
         "source": "auto_recommendation"
     }
 }
