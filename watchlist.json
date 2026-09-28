@@ -24,24 +24,19 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "003230": {
-        "name": "삼양식품",
-        "add_date": "2026-09-21",
-        "source": "auto_recommendation"
-    },
-    "161890": {
-        "name": "한국콜마",
-        "add_date": "2026-09-21",
-        "source": "auto_recommendation"
-    },
     "088350": {
         "name": "한화생명",
-        "add_date": "2026-09-22",
+        "add_date": "2026-09-28",
+        "source": "auto_recommendation"
+    },
+    "001450": {
+        "name": "현대해상",
+        "add_date": "2026-09-28",
         "source": "auto_recommendation"
     },
     "008930": {
         "name": "한미사이언스",
-        "add_date": "2026-09-22",
+        "add_date": "2026-09-28",
         "source": "auto_recommendation"
     }
 }
