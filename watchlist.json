@@ -24,19 +24,19 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "000500": {
-        "name": "가온전선",
-        "add_date": "2026-10-01",
+    "001450": {
+        "name": "현대해상",
+        "add_date": "2026-10-05",
         "source": "auto_recommendation"
     },
-    "008930": {
-        "name": "한미사이언스",
-        "add_date": "2026-10-01",
+    "375500": {
+        "name": "DL이앤씨",
+        "add_date": "2026-10-05",
         "source": "auto_recommendation"
     },
-    "007340": {
-        "name": "DN오토모티브",
-        "add_date": "2026-10-01",
+    "085620": {
+        "name": "미래에셋생명",
+        "add_date": "2026-10-05",
         "source": "auto_recommendation"
     }
 }
