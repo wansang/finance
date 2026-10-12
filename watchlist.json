@@ -38,5 +38,10 @@
         "name": "한미사이언스",
         "add_date": "2026-10-11",
         "source": "auto_recommendation"
+    },
+    "017900": {
+        "name": "광전자",
+        "add_date": "2026-10-12",
+        "source": "auto_recommendation"
     }
 }
