@@ -24,24 +24,24 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "000500": {
-        "name": "가온전선",
-        "add_date": "2026-10-11",
-        "source": "auto_recommendation"
-    },
-    "001450": {
-        "name": "현대해상",
-        "add_date": "2026-10-11",
-        "source": "auto_recommendation"
-    },
-    "008930": {
-        "name": "한미사이언스",
-        "add_date": "2026-10-11",
-        "source": "auto_recommendation"
-    },
     "017900": {
         "name": "광전자",
         "add_date": "2026-10-12",
+        "source": "auto_recommendation"
+    },
+    "003160": {
+        "name": "디아이",
+        "add_date": "2026-10-13",
+        "source": "auto_recommendation"
+    },
+    "020150": {
+        "name": "롯데에너지머티리얼즈",
+        "add_date": "2026-10-13",
+        "source": "auto_recommendation"
+    },
+    "000500": {
+        "name": "가온전선",
+        "add_date": "2026-10-13",
         "source": "auto_recommendation"
     }
 }
