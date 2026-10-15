@@ -24,21 +24,6 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "003160": {
-        "name": "디아이",
-        "add_date": "2026-10-13",
-        "source": "auto_recommendation"
-    },
-    "020150": {
-        "name": "롯데에너지머티리얼즈",
-        "add_date": "2026-10-13",
-        "source": "auto_recommendation"
-    },
-    "000500": {
-        "name": "가온전선",
-        "add_date": "2026-10-13",
-        "source": "auto_recommendation"
-    },
     "077500": {
         "name": "유니퀘스트",
         "add_date": "2026-10-14",
@@ -47,6 +32,16 @@
     "017900": {
         "name": "광전자",
         "add_date": "2026-10-14",
+        "source": "auto_recommendation"
+    },
+    "000500": {
+        "name": "가온전선",
+        "add_date": "2026-10-15",
+        "source": "auto_recommendation"
+    },
+    "010955": {
+        "name": "S-Oil우",
+        "add_date": "2026-10-15",
         "source": "auto_recommendation"
     }
 }
