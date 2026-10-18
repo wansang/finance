@@ -26,22 +26,17 @@
     },
     "077500": {
         "name": "유니퀘스트",
-        "add_date": "2026-10-14",
-        "source": "auto_recommendation"
-    },
-    "017900": {
-        "name": "광전자",
-        "add_date": "2026-10-14",
+        "add_date": "2026-10-18",
         "source": "auto_recommendation"
     },
     "000500": {
         "name": "가온전선",
-        "add_date": "2026-10-15",
+        "add_date": "2026-10-18",
         "source": "auto_recommendation"
     },
-    "010955": {
-        "name": "S-Oil우",
-        "add_date": "2026-10-15",
+    "192650": {
+        "name": "드림텍",
+        "add_date": "2026-10-18",
         "source": "auto_recommendation"
     }
 }
