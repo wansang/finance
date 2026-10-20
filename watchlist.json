@@ -24,24 +24,24 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "077500": {
-        "name": "유니퀘스트",
-        "add_date": "2026-10-18",
+    "010580": {
+        "name": "에스엠벡셀",
+        "add_date": "2026-10-19",
         "source": "auto_recommendation"
     },
-    "000500": {
-        "name": "가온전선",
-        "add_date": "2026-10-18",
+    "077500": {
+        "name": "유니퀘스트",
+        "add_date": "2026-10-20",
         "source": "auto_recommendation"
     },
     "192650": {
         "name": "드림텍",
-        "add_date": "2026-10-18",
+        "add_date": "2026-10-20",
         "source": "auto_recommendation"
     },
-    "010580": {
-        "name": "에스엠벡셀",
-        "add_date": "2026-10-19",
+    "093370": {
+        "name": "후성",
+        "add_date": "2026-10-20",
         "source": "auto_recommendation"
     }
 }
