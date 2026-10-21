@@ -24,11 +24,6 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "010580": {
-        "name": "에스엠벡셀",
-        "add_date": "2026-10-19",
-        "source": "auto_recommendation"
-    },
     "077500": {
         "name": "유니퀘스트",
         "add_date": "2026-10-20",
@@ -42,6 +37,16 @@
     "093370": {
         "name": "후성",
         "add_date": "2026-10-20",
+        "source": "auto_recommendation"
+    },
+    "005320": {
+        "name": "온타이드",
+        "add_date": "2026-10-21",
+        "source": "auto_recommendation"
+    },
+    "020150": {
+        "name": "롯데에너지머티리얼즈",
+        "add_date": "2026-10-21",
         "source": "auto_recommendation"
     }
 }
