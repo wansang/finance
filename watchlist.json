@@ -24,21 +24,6 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "077500": {
-        "name": "유니퀘스트",
-        "add_date": "2026-10-20",
-        "source": "auto_recommendation"
-    },
-    "192650": {
-        "name": "드림텍",
-        "add_date": "2026-10-20",
-        "source": "auto_recommendation"
-    },
-    "093370": {
-        "name": "후성",
-        "add_date": "2026-10-20",
-        "source": "auto_recommendation"
-    },
     "005320": {
         "name": "온타이드",
         "add_date": "2026-10-21",
@@ -47,6 +32,21 @@
     "020150": {
         "name": "롯데에너지머티리얼즈",
         "add_date": "2026-10-21",
+        "source": "auto_recommendation"
+    },
+    "003160": {
+        "name": "디아이",
+        "add_date": "2026-10-22",
+        "source": "auto_recommendation"
+    },
+    "000500": {
+        "name": "가온전선",
+        "add_date": "2026-10-22",
+        "source": "auto_recommendation"
+    },
+    "281820": {
+        "name": "케이씨텍",
+        "add_date": "2026-10-22",
         "source": "auto_recommendation"
     }
 }
