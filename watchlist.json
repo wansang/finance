@@ -24,24 +24,19 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "003160": {
-        "name": "디아이",
-        "add_date": "2026-10-25",
+    "000500": {
+        "name": "가온전선",
+        "add_date": "2026-10-26",
+        "source": "auto_recommendation"
+    },
+    "192650": {
+        "name": "드림텍",
+        "add_date": "2026-10-27",
         "source": "auto_recommendation"
     },
     "281820": {
         "name": "케이씨텍",
-        "add_date": "2026-10-25",
-        "source": "auto_recommendation"
-    },
-    "003580": {
-        "name": "HLB글로벌",
-        "add_date": "2026-10-25",
-        "source": "auto_recommendation"
-    },
-    "000500": {
-        "name": "가온전선",
-        "add_date": "2026-10-26",
+        "add_date": "2026-10-27",
         "source": "auto_recommendation"
     }
 }
