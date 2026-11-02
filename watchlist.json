@@ -38,5 +38,15 @@
         "name": "드림텍",
         "add_date": "2026-11-01",
         "source": "auto_recommendation"
+    },
+    "010580": {
+        "name": "에스엠벡셀",
+        "add_date": "2026-11-02",
+        "source": "auto_recommendation"
+    },
+    "003160": {
+        "name": "디아이",
+        "add_date": "2026-11-02",
+        "source": "auto_recommendation"
     }
 }
