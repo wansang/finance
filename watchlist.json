@@ -24,16 +24,6 @@
         "add_date": "2026-05-06",
         "source": "manual"
     },
-    "010580": {
-        "name": "에스엠벡셀",
-        "add_date": "2026-11-02",
-        "source": "auto_recommendation"
-    },
-    "003160": {
-        "name": "디아이",
-        "add_date": "2026-11-02",
-        "source": "auto_recommendation"
-    },
     "180640": {
         "name": "한진칼",
         "add_date": "2026-11-03",
@@ -42,6 +32,21 @@
     "000500": {
         "name": "가온전선",
         "add_date": "2026-11-03",
+        "source": "auto_recommendation"
+    },
+    "010580": {
+        "name": "에스엠벡셀",
+        "add_date": "2026-11-04",
+        "source": "auto_recommendation"
+    },
+    "077500": {
+        "name": "유니퀘스트",
+        "add_date": "2026-11-04",
+        "source": "auto_recommendation"
+    },
+    "000400": {
+        "name": "롯데손해보험",
+        "add_date": "2026-11-04",
         "source": "auto_recommendation"
     }
 }
